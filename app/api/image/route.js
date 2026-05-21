@@ -8,8 +8,9 @@ export async function POST(request) {
     const response = await openai.images.generate({
       model: 'gpt-image-1',
       prompt,
-      size: '1024x1024',
-      response_format: 'b64_json',
+      n: 1,
+      size: '1024x1792',
+      quality: 'standard',
     })
 
     const b64 = response.data[0]?.b64_json || ''
