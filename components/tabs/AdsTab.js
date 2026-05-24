@@ -46,7 +46,7 @@ const EMPTY_PANEL = {
 export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [history, setHistory] = useState([])
   const [currentStep, setCurrentStep] = useState('idea')
-  const [selectedBubbles, setSelectedBubbles] = useState(new Set())
+  const [lastClicked, setLastClicked] = useState(null)
   const [customBubble, setCustomBubble] = useState('')
   const [loading, setLoading] = useState(false)
   const [adPanel, setAdPanel] = useState({ ...EMPTY_PANEL })
@@ -162,10 +162,11 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   }
 
   async function lockBubble(value) {
-    setSelectedBubbles(new Set())
+    if (loading) return
+    setLastClicked(value)
     setCustomBubble('')
 
-    // Update adPanel with the locked value
+    // Update adPanel with locked value
     const field = PANEL_FIELD[currentStep]
     setAdPanel(p => ({
       ...p,
@@ -173,25 +174,24 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       ...(currentStep === 'confirm' ? { confirmedAngle: value } : {}),
     }))
 
-    // Fire image generation concurrently for image_concept step
+    // Fire image generation concurrently
     if (currentStep === 'image_concept') {
       generateImage(value)
     }
 
-    // Mark last jarvis turn as locked using current history snapshot
+    // Mark last jarvis turn as locked
     const lockedHistory = history.map((item, idx) =>
       idx === getLastJarvisTurnIdx(history) ? { ...item, lockedValue: value } : item
     )
 
-    // If this is the final step (cta), just lock and set done
     const nextStep = NEXT_STEP[currentStep]
     if (!nextStep || nextStep === 'done') {
       setHistory(lockedHistory)
       setCurrentStep('done')
+      setLastClicked(null)
       return
     }
 
-    // Build advance message and call API for next step
     const advanceMsg = `${STEP_LABELS[currentStep]}: "${value}"`
     const withUser = [...lockedHistory, { type: 'user', text: advanceMsg }]
     setHistory(withUser)
@@ -216,35 +216,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     } catch (err) {
       console.error('Lock bubble API error:', err)
     }
-    setLoading(false)
-  }
-
-  async function handleRefine() {
-    if (selectedBubbles.size === 0 || loading) return
-    const selected = [...selectedBubbles]
-    setSelectedBubbles(new Set())
-    const refineText = `I like these directions: ${selected.map((s, i) => `${i + 1}. "${s}"`).join(', ')}. Generate 5 new refined options combining these angles.`
-    const newHistory = [...history, { type: 'user', text: refineText }]
-    setHistory(newHistory)
-    setLoading(true)
-    try {
-      const raw = await callAPI(buildMessages(newHistory))
-      const parsed = parseJarvisResponse(raw)
-      if (parsed) {
-        setHistory(h => [
-          ...h,
-          {
-            type: 'jarvis',
-            step: parsed.step || currentStep,
-            options: parsed.options || [],
-            subOptions: parsed.sub || null,
-            lockedValue: null,
-          },
-        ])
-      }
-    } catch (err) {
-      console.error('Refine error:', err)
-    }
+    setLastClicked(null)
     setLoading(false)
   }
 
@@ -291,7 +263,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setHistory([])
     setCurrentStep('idea')
     setAdPanel({ ...EMPTY_PANEL })
-    setSelectedBubbles(new Set())
+    setLastClicked(null)
     setCustomBubble('')
     setInput('')
   }
@@ -321,27 +293,20 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }
 
-  // ── Bubble style helper ────────────────────────────────────────────────────
-  function bubbleStyle(selected) {
+  // ── Bubble style — highlights on click ─────────────────────────────────────
+  function bubbleStyle(isActive) {
     return {
       border: '1px solid #2990fa',
-      background: selected ? '#2990fa' : '#060d1f',
+      background: isActive ? '#2990fa' : '#060d1f',
       borderRadius: 8,
       padding: '10px 16px',
       fontSize: '0.82rem',
       color: '#ffffff',
-      cursor: 'pointer',
+      cursor: loading ? 'not-allowed' : 'pointer',
       userSelect: 'none',
       lineHeight: 1.4,
+      opacity: loading ? 0.6 : 1,
     }
-  }
-
-  function toggleBubble(opt) {
-    setSelectedBubbles(s => {
-      const n = new Set(s)
-      n.has(opt) ? n.delete(opt) : n.add(opt)
-      return n
-    })
   }
 
   // ── Render a single history item ───────────────────────────────────────────
@@ -395,7 +360,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       )
     }
 
-    // Jarvis — past turn (not last, greyed out)
+    // Jarvis — past turn not last (greyed out, non-interactive)
     if (item.type === 'jarvis' && !isLastJarvis) {
       return (
         <div key={idx} style={{ marginBottom: 14, opacity: 0.4 }}>
@@ -411,7 +376,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       )
     }
 
-    // Jarvis — active last turn (interactive)
+    // Jarvis — active last turn (single click = lock + advance)
     if (item.type === 'jarvis' && isLastJarvis) {
       // CTA step with sub-bubbles
       if (item.step === 'cta') {
@@ -421,9 +386,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
             {item.options.map((opt, oi) => (
               <div key={oi} style={{ marginBottom: 12 }}>
                 <div
-                  style={bubbleStyle(selectedBubbles.has(opt))}
-                  onClick={() => toggleBubble(opt)}
-                  onDoubleClick={() => lockBubble(opt)}
+                  style={bubbleStyle(lastClicked === opt)}
+                  onClick={() => lockBubble(opt)}
                 >
                   {opt}
                 </div>
@@ -443,13 +407,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                         onClick={() => lockBubble(`${opt} — ${sub}`)}
                         style={{
                           border: '1px solid rgba(41,144,250,0.5)',
-                          background: '#060d1f',
+                          background: lastClicked === `${opt} — ${sub}` ? '#2990fa' : '#060d1f',
                           borderRadius: 8,
                           padding: '6px 12px',
                           fontSize: '0.75rem',
                           color: '#ffffff',
-                          cursor: 'pointer',
+                          cursor: loading ? 'not-allowed' : 'pointer',
                           userSelect: 'none',
+                          opacity: loading ? 0.6 : 1,
                         }}
                       >
                         {sub}
@@ -459,11 +424,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                 )}
               </div>
             ))}
-            {selectedBubbles.size > 1 && (
-              <button onClick={handleRefine} style={refineButtonStyle}>
-                Refine these →
-              </button>
-            )}
+            {/* Type your own */}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <input
                 value={customBubble}
@@ -484,7 +445,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         )
       }
 
-      // Standard step
+      // Standard step — single click locks and advances
       return (
         <div key={idx} style={{ marginBottom: 14 }}>
           <div style={stepLabelStyle}>{STEP_LABELS[item.step] || item.step}</div>
@@ -492,19 +453,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
             {item.options.map((opt, oi) => (
               <div
                 key={oi}
-                style={bubbleStyle(selectedBubbles.has(opt))}
-                onClick={() => toggleBubble(opt)}
-                onDoubleClick={() => lockBubble(opt)}
+                style={bubbleStyle(lastClicked === opt)}
+                onClick={() => lockBubble(opt)}
               >
                 {opt}
               </div>
             ))}
           </div>
-          {selectedBubbles.size > 1 && (
-            <button onClick={handleRefine} style={refineButtonStyle}>
-              Refine these →
-            </button>
-          )}
+          {/* Type your own */}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <input
               value={customBubble}
@@ -544,20 +500,28 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     marginBottom: 10,
   }
 
+  const isIdeaOrDone = currentStep === 'idea' || currentStep === 'done'
+
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-      {/* ── LEFT COLUMN ── */}
+
+      {/* ── LEFT COLUMN — fixed height so input never moves ── */}
       <div
         id="ads-left-col"
-        style={{ flex: '1 1 55%', minWidth: 300, display: 'flex', flexDirection: 'column' }}
+        style={{
+          flex: '1 1 55%',
+          minWidth: 300,
+          display: 'flex',
+          flexDirection: 'column',
+          height: 'calc(100vh - 145px)',
+        }}
       >
-        {/* History scroll area */}
+        {/* Messages — scrolls independently, takes all remaining space */}
         <div
           ref={historyScrollRef}
           style={{
+            flex: 1,
             overflowY: 'auto',
-            minHeight: 420,
-            maxHeight: 'calc(100vh - 240px)',
             padding: '1rem',
             background: '#0a1628',
             border: '1px solid #2990fa',
@@ -594,55 +558,57 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
           )}
         </div>
 
-        {/* Bottom input — only at idea or done step */}
-        {(currentStep === 'idea' || currentStep === 'done') && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder={
-                currentStep === 'done'
-                  ? 'Start a new ad...'
-                  : 'Describe your HVAC business and campaign goal...'
+        {/* Input — pinned at bottom, never moves */}
+        <div style={{ flexShrink: 0, display: 'flex', gap: 8 }}>
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder={
+              currentStep === 'done'
+                ? 'Start a new ad...'
+                : isIdeaOrDone
+                ? 'Describe your HVAC business and campaign goal...'
+                : 'Select an option above, or type your own...'
+            }
+            disabled={!isIdeaOrDone || loading}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && isIdeaOrDone) {
+                e.preventDefault()
+                currentStep === 'done' ? resetAd() : handleIdeaSubmit()
               }
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  currentStep === 'done' ? resetAd() : handleIdeaSubmit()
-                }
-              }}
-              style={{
-                flex: 1,
-                background: '#0a1628',
-                border: '1px solid #2990fa',
-                borderRadius: 8,
-                padding: '10px 14px',
-                fontSize: '0.85rem',
-                color: '#ffffff',
-                resize: 'none',
-                height: 52,
-                fontFamily: 'var(--font-inter)',
-              }}
-            />
-            <button
-              onClick={currentStep === 'done' ? resetAd : handleIdeaSubmit}
-              disabled={loading && currentStep !== 'done'}
-              style={{
-                background: '#2990fa',
-                border: 'none',
-                borderRadius: 8,
-                padding: '10px 18px',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                fontFamily: 'var(--font-ibm-plex-mono)',
-                opacity: loading && currentStep !== 'done' ? 0.6 : 1,
-                cursor: loading && currentStep !== 'done' ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {currentStep === 'done' ? 'New' : '→'}
-            </button>
-          </div>
-        )}
+            }}
+            style={{
+              flex: 1,
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: '10px 14px',
+              fontSize: '0.85rem',
+              color: '#ffffff',
+              resize: 'none',
+              height: 52,
+              fontFamily: 'var(--font-inter)',
+              opacity: isIdeaOrDone && !loading ? 1 : 0.4,
+            }}
+          />
+          <button
+            onClick={currentStep === 'done' ? resetAd : handleIdeaSubmit}
+            disabled={!isIdeaOrDone || (loading && currentStep !== 'done')}
+            style={{
+              background: '#2990fa',
+              border: 'none',
+              borderRadius: 8,
+              padding: '10px 18px',
+              color: '#ffffff',
+              fontSize: '0.85rem',
+              fontFamily: 'var(--font-ibm-plex-mono)',
+              opacity: isIdeaOrDone && !loading ? 1 : 0.4,
+              cursor: isIdeaOrDone && !loading ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {currentStep === 'done' ? 'New' : '→'}
+          </button>
+        </div>
       </div>
 
       {/* ── RIGHT COLUMN ── */}
@@ -703,13 +669,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
           </div>
           <div style={imgContainerStyle}>
             {adPanel.imageLoading && (
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: '#2990fa',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                }}
-              >
+              <div style={{ fontSize: '0.7rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)' }}>
                 Generating...
               </div>
             )}
@@ -721,13 +681,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               />
             )}
             {!adPanel.imageB64 && !adPanel.imageLoading && (
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: 'rgba(255,255,255,0.25)',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                }}
-              >
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
                 No image
               </div>
             )}
@@ -771,12 +725,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         </div>
 
         {/* DESCRIPTION + CTA */}
-        <div
-          style={{
-            ...rightPanel,
-            opacity: adPanel.description || adPanel.cta ? 1 : 0.3,
-          }}
-        >
+        <div style={{ ...rightPanel, opacity: adPanel.description || adPanel.cta ? 1 : 0.3 }}>
           <div style={panelLabel}>DESCRIPTION</div>
           <textarea
             value={adPanel.description}
@@ -840,18 +789,6 @@ const stepLabelStyle = {
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
   marginBottom: 8,
-}
-
-const refineButtonStyle = {
-  marginTop: 10,
-  background: '#2990fa',
-  border: 'none',
-  borderRadius: 8,
-  padding: '8px 16px',
-  color: '#ffffff',
-  fontSize: '0.8rem',
-  fontFamily: 'var(--font-ibm-plex-mono)',
-  display: 'block',
 }
 
 const customInputStyle = {
