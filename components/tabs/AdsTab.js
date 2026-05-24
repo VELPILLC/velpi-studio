@@ -147,7 +147,8 @@ const EMPTY_PANEL = {
 export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [history, setHistory] = useState([])
   const [currentStep, setCurrentStep] = useState('idea')
-  const [selectedBubble, setSelectedBubble] = useState(null)
+  // selectedBubbles: array of strings — order matters, last = most recently clicked
+  const [selectedBubbles, setSelectedBubbles] = useState([])
   const [refinementCount, setRefinementCount] = useState(0)
   const [customBubble, setCustomBubble] = useState('')
   const [loading, setLoading] = useState(false)
@@ -269,26 +270,35 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setLoading(false)
   }
 
-  // First click = highlight. Second click on same = lock + advance.
+  // Toggle a bubble in/out of selectedBubbles. Last element = most recently selected.
   function handleBubbleClick(opt) {
     if (loading) return
-    if (selectedBubble === opt) {
-      lockBubble(opt)
-    } else {
-      setSelectedBubble(opt)
-    }
+    setSelectedBubbles(prev => {
+      const idx = prev.indexOf(opt)
+      if (idx >= 0) {
+        // Already selected — deselect
+        return prev.filter(b => b !== opt)
+      } else {
+        // Not selected — append (last = most recent)
+        return [...prev, opt]
+      }
+    })
   }
 
-  // Refine = stay on same step, get fewer options
+  // Refine: send all selected bubbles as context, get fewer options back
   async function handleRefine() {
-    if (!selectedBubble || loading) return
+    if (selectedBubbles.length === 0 || loading) return
     const newCount = refinementCount + 1
     const targetCount = newCount === 1 ? 3 : 2
-    const refineText = `I'm leaning toward "${selectedBubble}" for ${STEP_LABELS[currentStep]}. Return ${targetCount} tighter options in this direction.`
+    const selectionStr =
+      selectedBubbles.length === 1
+        ? `"${selectedBubbles[0]}"`
+        : selectedBubbles.map(b => `"${b}"`).join(', ')
+    const refineText = `I'm leaning toward ${selectionStr} for ${STEP_LABELS[currentStep]}. Return ${targetCount} tighter options in this direction.`
     const newHistory = [...history, { type: 'user', text: refineText }]
 
     setHistory(newHistory)
-    setSelectedBubble(null)
+    setSelectedBubbles([])
     setRefinementCount(newCount)
     setLoading(true)
 
@@ -313,9 +323,16 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setLoading(false)
   }
 
+  // Confirm: take last selected bubble as the confirmed value, lock and advance
+  function handleConfirm() {
+    if (selectedBubbles.length === 0 || loading) return
+    const value = selectedBubbles[selectedBubbles.length - 1]
+    lockBubble(value)
+  }
+
   async function lockBubble(value) {
     if (loading) return
-    setSelectedBubble(null)
+    setSelectedBubbles([])
     setRefinementCount(0)
     setCustomBubble('')
 
@@ -372,7 +389,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     const newHistory = [{ type: 'user', text: userText }]
     setHistory(newHistory)
     setCurrentStep('hook')
-    setSelectedBubble(null)
+    setSelectedBubbles([])
     setRefinementCount(0)
     setAdPanel({
       avatar: ad.avatar || '',
@@ -413,7 +430,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setHistory([])
     setCurrentStep('idea')
     setAdPanel({ ...EMPTY_PANEL })
-    setSelectedBubble(null)
+    setSelectedBubbles([])
     setRefinementCount(0)
     setCustomBubble('')
     setInput('')
@@ -521,106 +538,175 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
     // Active last jarvis turn
     if (item.type === 'jarvis' && isLastJarvis) {
+      const hasSelection = selectedBubbles.length > 0
+      const canRefine = hasSelection && refinementCount < 2
 
-      // CTA step — single click = immediate lock
+      // CTA step
       if (item.step === 'cta') {
+        // Custom entries: those in selectedBubbles that aren't top-level CTA options
+        const customSelected = selectedBubbles.filter(b => !item.options.includes(b))
+
         return (
           <div key={idx} style={{ marginBottom: 14 }}>
             <div style={stepLabelStyle}>{STEP_LABELS.cta}</div>
+
+            {/* Top-level CTA options */}
             {item.options.map((opt, oi) => (
               <div key={oi} style={{ marginBottom: 12 }}>
-                <div style={bubbleStyle(selectedBubble === opt)} onClick={() => lockBubble(opt)}>
+                <div
+                  style={bubbleStyle(selectedBubbles.includes(opt))}
+                  onClick={() => handleBubbleClick(opt)}
+                >
                   {opt}
                 </div>
-                {item.subOptions?.[opt] && (
+                {/* Sub-options shown when parent CTA is selected */}
+                {selectedBubbles.includes(opt) && item.subOptions?.[opt] && (
                   <div style={{ display: 'flex', gap: 6, marginLeft: 16, marginTop: 6, flexWrap: 'wrap' }}>
-                    {item.subOptions[opt].map((sub, si) => (
-                      <div
-                        key={si}
-                        onClick={() => lockBubble(`${opt} — ${sub}`)}
-                        style={{
-                          border: '1px solid rgba(41,144,250,0.5)',
-                          background: selectedBubble === `${opt} — ${sub}` ? '#2990fa' : '#060d1f',
-                          borderRadius: 8,
-                          padding: '6px 12px',
-                          fontSize: '0.75rem',
-                          color: '#ffffff',
-                          cursor: loading ? 'not-allowed' : 'pointer',
-                          userSelect: 'none',
-                          opacity: loading ? 0.6 : 1,
-                        }}
-                      >
-                        {sub}
-                      </div>
-                    ))}
+                    {item.subOptions[opt].map((sub, si) => {
+                      const combined = `${opt} — ${sub}`
+                      return (
+                        <div
+                          key={si}
+                          onClick={() => handleBubbleClick(combined)}
+                          style={{
+                            border: '1px solid rgba(41,144,250,0.5)',
+                            background: selectedBubbles.includes(combined) ? '#2990fa' : '#060d1f',
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            fontSize: '0.75rem',
+                            color: '#ffffff',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            userSelect: 'none',
+                            opacity: loading ? 0.6 : 1,
+                          }}
+                        >
+                          {sub}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
             ))}
+
+            {/* Custom selected entries */}
+            {customSelected.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                {customSelected.map((b, bi) => (
+                  <div key={bi} style={bubbleStyle(true)} onClick={() => handleBubbleClick(b)}>
+                    {b}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Custom input */}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <input
                 value={customBubble}
                 onChange={e => setCustomBubble(e.target.value)}
                 placeholder="Type your own CTA..."
                 style={customInputStyle}
-                onKeyDown={e => { if (e.key === 'Enter' && customBubble.trim()) lockBubble(customBubble.trim()) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && customBubble.trim()) {
+                    handleBubbleClick(customBubble.trim())
+                    setCustomBubble('')
+                  }
+                }}
               />
               {customBubble.trim() && (
-                <button onClick={() => lockBubble(customBubble.trim())} style={useButtonStyle}>Use</button>
+                <button
+                  onClick={() => { handleBubbleClick(customBubble.trim()); setCustomBubble('') }}
+                  style={useButtonStyle}
+                >
+                  Use
+                </button>
               )}
             </div>
+
+            {/* Refine + Confirm buttons */}
+            {hasSelection && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                {canRefine && (
+                  <button onClick={handleRefine} style={refineActionStyle}>
+                    Refine →
+                  </button>
+                )}
+                <button onClick={handleConfirm} style={confirmActionStyle}>
+                  Confirm ✓
+                </button>
+              </div>
+            )}
           </div>
         )
       }
 
-      // Standard step — first click highlights, second click advances, Refine reduces options
-      const canRefine = selectedBubble !== null && refinementCount < 2
+      // Standard step — multi-select, then Refine or Confirm
+      // Custom entries: those in selectedBubbles not in the options list
+      const customSelected = selectedBubbles.filter(b => !item.options.includes(b))
 
       return (
         <div key={idx} style={{ marginBottom: 14 }}>
           <div style={stepLabelStyle}>{STEP_LABELS[item.step] || item.step}</div>
 
-          {selectedBubble && (
-            <div style={{
-              fontSize: '0.6rem',
-              fontFamily: 'var(--font-ibm-plex-mono)',
-              color: 'rgba(255,255,255,0.4)',
-              marginBottom: 8,
-            }}>
-              Click again to lock · or Refine for fewer options
-            </div>
-          )}
-
+          {/* Generated option bubbles */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {item.options.map((opt, oi) => (
               <div
                 key={oi}
-                style={bubbleStyle(selectedBubble === opt)}
+                style={bubbleStyle(selectedBubbles.includes(opt))}
                 onClick={() => handleBubbleClick(opt)}
               >
                 {opt}
               </div>
             ))}
+            {/* Custom entries added via Type your own */}
+            {customSelected.map((b, bi) => (
+              <div
+                key={'custom-' + bi}
+                style={bubbleStyle(true)}
+                onClick={() => handleBubbleClick(b)}
+              >
+                {b}
+              </div>
+            ))}
           </div>
 
-          {/* Refine button — only when something is selected AND under refine limit */}
-          {canRefine && (
-            <button onClick={handleRefine} style={refineButtonStyle}>
-              Refine →
-            </button>
+          {/* Refine + Confirm buttons — appear when at least one bubble selected */}
+          {hasSelection && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              {canRefine && (
+                <button onClick={handleRefine} style={refineActionStyle}>
+                  Refine →
+                </button>
+              )}
+              <button onClick={handleConfirm} style={confirmActionStyle}>
+                Confirm ✓
+              </button>
+            </div>
           )}
 
-          {/* Type your own */}
+          {/* Type your own — always visible */}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <input
               value={customBubble}
               onChange={e => setCustomBubble(e.target.value)}
               placeholder="Type your own..."
               style={customInputStyle}
-              onKeyDown={e => { if (e.key === 'Enter' && customBubble.trim()) lockBubble(customBubble.trim()) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && customBubble.trim()) {
+                  handleBubbleClick(customBubble.trim())
+                  setCustomBubble('')
+                }
+              }}
             />
             {customBubble.trim() && (
-              <button onClick={() => lockBubble(customBubble.trim())} style={useButtonStyle}>Use</button>
+              <button
+                onClick={() => { handleBubbleClick(customBubble.trim()); setCustomBubble('') }}
+                style={useButtonStyle}
+              >
+                Use
+              </button>
             )}
           </div>
         </div>
@@ -1020,16 +1106,26 @@ const stepLabelStyle = {
   marginBottom: 8,
 }
 
-const refineButtonStyle = {
-  marginTop: 10,
-  background: '#2990fa',
-  border: 'none',
-  borderRadius: 8,
-  padding: '7px 14px',
+const refineActionStyle = {
+  border: '1px solid #2990fa',
+  background: '#060d1f',
   color: '#ffffff',
+  padding: '8px 16px',
+  borderRadius: 6,
+  cursor: 'pointer',
   fontSize: '0.78rem',
   fontFamily: 'var(--font-ibm-plex-mono)',
-  display: 'inline-block',
+}
+
+const confirmActionStyle = {
+  border: '1px solid #2990fa',
+  background: '#2990fa',
+  color: '#ffffff',
+  padding: '8px 16px',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: '0.78rem',
+  fontFamily: 'var(--font-ibm-plex-mono)',
 }
 
 const customInputStyle = {
