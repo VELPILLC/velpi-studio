@@ -154,6 +154,27 @@ const EMPTY_AVATAR_FORM = {
   primary_emotion: '',
 }
 
+const AVATAR_QUESTIONS = [
+  "Who do you sell to? Just describe them like you would to a friend.",
+  "How old are they roughly?",
+  "What is the one thing they complain about most?",
+  "What do they want more than anything?",
+  "What would make them stop scrolling on Facebook?",
+]
+
+const AVATAR_BUILDER_SYSTEM = `You are building a marketing avatar from a conversation. Based on the answers given extract and return JSON only:
+{
+  "suggested_name": "short descriptive name for this avatar",
+  "age_range": "age range mentioned or inferred",
+  "niche": "who they sell to in simple terms",
+  "what_they_want": "what the avatar wants most",
+  "what_they_fear": "what they complain about or fear",
+  "what_they_trust": "what visual format or style would stop their scroll based on their age and description",
+  "primary_emotion": "the dominant emotion driving this person",
+  "_done": true
+}
+Return JSON only. Nothing else.`
+
 export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [history, setHistory] = useState([])
   const [currentStep, setCurrentStep] = useState('idea')
@@ -173,6 +194,9 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   // Save success toast
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // Avatar builder chat state
+  const [avatarBuilder, setAvatarBuilder] = useState(null)
 
   useEffect(() => {
     loadAvatars()
@@ -231,6 +255,90 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       primary_emotion: av.primary_emotion || '',
     })
     setAvatarModal({ mode: 'edit', data: av })
+  }
+
+  async function handleAvatarBuilderSend() {
+    if (!avatarBuilder || !avatarBuilder.input.trim() || avatarBuilder.loading) return
+    const answer = avatarBuilder.input.trim()
+    const newMessages = [...avatarBuilder.messages, { role: 'user', text: answer }]
+    const newAnswers = [...avatarBuilder.answers, answer]
+    const newQuestionIdx = avatarBuilder.questionIdx + 1
+
+    if (newQuestionIdx < 5) {
+      setAvatarBuilder(b => ({
+        ...b,
+        messages: [...newMessages, { role: 'ai', text: AVATAR_QUESTIONS[newQuestionIdx] }],
+        input: '',
+        answers: newAnswers,
+        questionIdx: newQuestionIdx,
+      }))
+    } else {
+      setAvatarBuilder(b => ({ ...b, messages: newMessages, input: '', answers: newAnswers, loading: true }))
+      try {
+        const contextMessages = AVATAR_QUESTIONS.map((q, i) => [
+          { role: 'assistant', content: q },
+          { role: 'user', content: newAnswers[i] },
+        ]).flat()
+
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: contextMessages,
+            system: AVATAR_BUILDER_SYSTEM,
+            refinementCount: 0,
+          }),
+        })
+        const data = await response.json()
+
+        let extracted = null
+        try {
+          const cleaned = (data.text || '').replace(/```json|```/g, '').trim()
+          extracted = JSON.parse(cleaned)
+        } catch (_) {}
+
+        const summaryText = extracted
+          ? `Got it. Here is your avatar.\n${extracted.suggested_name}${extracted.niche ? ' — ' + extracted.niche : ''}`
+          : 'Got it. Here is your avatar.'
+
+        setAvatarBuilder(b => ({
+          ...b,
+          messages: [...newMessages, { role: 'ai', text: summaryText }],
+          extracted: extracted || {},
+          editName: extracted?.suggested_name || '',
+          loading: false,
+        }))
+      } catch (err) {
+        console.error('Avatar builder error:', err)
+        setAvatarBuilder(b => ({ ...b, loading: false }))
+      }
+    }
+  }
+
+  async function handleSaveBuiltAvatar() {
+    if (!avatarBuilder || !avatarBuilder.editName.trim() || !avatarBuilder.extracted) return
+    try {
+      const body = {
+        name: avatarBuilder.editName.trim(),
+        age_range: avatarBuilder.extracted.age_range || '',
+        niche: avatarBuilder.extracted.niche || '',
+        what_they_want: avatarBuilder.extracted.what_they_want || '',
+        what_they_fear: avatarBuilder.extracted.what_they_fear || '',
+        what_they_trust: avatarBuilder.extracted.what_they_trust || '',
+        primary_emotion: avatarBuilder.extracted.primary_emotion || '',
+      }
+      const res = await fetch('/api/avatars', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      await loadAvatars()
+      if (data.avatar) setSelectedAvatar(data.avatar)
+      setAvatarBuilder(null)
+    } catch (err) {
+      console.error('Save built avatar error:', err)
+    }
   }
 
   function buildMessages(hist) {
@@ -801,7 +909,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
           {/* New Avatar button */}
           <button
-            onClick={() => { setAvatarForm({ ...EMPTY_AVATAR_FORM }); setAvatarModal({ mode: 'create', data: null }) }}
+            onClick={() => setAvatarBuilder({
+              messages: [{ role: 'ai', text: AVATAR_QUESTIONS[0] }],
+              input: '',
+              questionIdx: 0,
+              answers: [],
+              extracted: null,
+              editName: '',
+              loading: false,
+            })}
             style={{
               border: '1px solid #2990fa',
               background: 'transparent',
@@ -1290,6 +1406,217 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               </button>
               <button
                 onClick={() => { setAvatarModal(null); setAvatarForm({ ...EMPTY_AVATAR_FORM }) }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #2990fa',
+                  borderRadius: 6,
+                  padding: 10,
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  fontSize: '0.78rem',
+                  width: '100%',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AVATAR BUILDER MODAL ── */}
+      {avatarBuilder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2,8,16,0.92)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setAvatarBuilder(null) }}
+        >
+          <div style={{
+            background: '#0a1628',
+            border: '1px solid #2990fa',
+            borderRadius: 12,
+            padding: 24,
+            width: '100%',
+            maxWidth: 460,
+          }}>
+            {/* Title */}
+            <div style={{
+              fontFamily: 'var(--font-bebas-neue)',
+              fontSize: '1.4rem',
+              color: '#ffffff',
+              marginBottom: 4,
+            }}>
+              Build Your Avatar
+            </div>
+            {/* Subtitle */}
+            <div style={{
+              fontFamily: 'var(--font-ibm-plex-mono)',
+              fontSize: '0.48rem',
+              color: '#2990fa',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              marginBottom: 16,
+            }}>
+              Jarvis will ask you a few questions
+            </div>
+
+            {/* Chat area */}
+            <div style={{
+              minHeight: 280,
+              maxHeight: 320,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              padding: 12,
+              background: '#060d1f',
+              borderRadius: 8,
+              marginBottom: 12,
+            }}>
+              {avatarBuilder.messages.map((msg, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                }}>
+                  <div style={{
+                    background: msg.role === 'user' ? '#1a2d48' : '#0a1628',
+                    border: `1px solid ${msg.role === 'user' ? 'rgba(41,144,250,0.4)' : '#2990fa'}`,
+                    borderRadius: 8,
+                    padding: '8px 14px',
+                    fontSize: '0.82rem',
+                    color: '#ffffff',
+                    maxWidth: '85%',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.5,
+                    fontFamily: 'var(--font-inter)',
+                  }}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              {avatarBuilder.loading && (
+                <div style={{
+                  color: '#2990fa',
+                  fontSize: '0.72rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                }}>
+                  Building avatar...
+                </div>
+              )}
+            </div>
+
+            {/* Name input — shown when avatar is extracted */}
+            {avatarBuilder.extracted && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontSize: '0.48rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  color: '#2990fa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4,
+                }}>
+                  Avatar Name
+                </div>
+                <input
+                  value={avatarBuilder.editName}
+                  onChange={e => setAvatarBuilder(b => ({ ...b, editName: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    background: '#060d1f',
+                    border: '1px solid #2990fa',
+                    borderRadius: 4,
+                    color: '#ffffff',
+                    padding: 8,
+                    fontFamily: 'var(--font-inter)',
+                    fontSize: '0.82rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Input row — hidden when avatar is extracted */}
+            {!avatarBuilder.extracted && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <textarea
+                  value={avatarBuilder.input}
+                  onChange={e => setAvatarBuilder(b => ({ ...b, input: e.target.value }))}
+                  disabled={avatarBuilder.loading}
+                  placeholder="Type your answer..."
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey && !avatarBuilder.loading) {
+                      e.preventDefault()
+                      handleAvatarBuilderSend()
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    background: '#0a1628',
+                    border: '1px solid #2990fa',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    fontSize: '0.85rem',
+                    color: '#ffffff',
+                    resize: 'none',
+                    height: 52,
+                    fontFamily: 'var(--font-inter)',
+                    opacity: avatarBuilder.loading ? 0.4 : 1,
+                  }}
+                />
+                <button
+                  onClick={handleAvatarBuilderSend}
+                  disabled={avatarBuilder.loading || !avatarBuilder.input.trim()}
+                  style={{
+                    background: '#2990fa',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '10px 18px',
+                    color: '#ffffff',
+                    fontSize: '0.85rem',
+                    fontFamily: 'var(--font-ibm-plex-mono)',
+                    opacity: (avatarBuilder.loading || !avatarBuilder.input.trim()) ? 0.4 : 1,
+                    cursor: (avatarBuilder.loading || !avatarBuilder.input.trim()) ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  →
+                </button>
+              </div>
+            )}
+
+            {/* Save Avatar + Cancel buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {avatarBuilder.extracted && (
+                <button
+                  onClick={handleSaveBuiltAvatar}
+                  disabled={!avatarBuilder.editName.trim()}
+                  style={{
+                    background: '#2990fa',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: 10,
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-ibm-plex-mono)',
+                    fontSize: '0.78rem',
+                    width: '100%',
+                    opacity: avatarBuilder.editName.trim() ? 1 : 0.5,
+                    cursor: avatarBuilder.editName.trim() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Save Avatar
+                </button>
+              )}
+              <button
+                onClick={() => setAvatarBuilder(null)}
                 style={{
                   background: 'transparent',
                   border: '1px solid #2990fa',
