@@ -1,5 +1,54 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+
+// Passed explicitly on every API call so the route uses this prompt
+const JARVIS_SYSTEM_PROMPT = `You are Jarvis, a direct response copywriter. You help write Facebook ads based only on what the user tells you.
+
+RULES:
+- Never invent numbers, stats, or proof the user did not provide
+- Never make up client results, revenue figures, or guarantees
+- Only use information the user gives you
+- Write based on what is said, nothing more
+- Simple words. Short sentences. Easy to read.
+- Call out who the ad is for using the user's own words
+- Give a reason why using the user's own context
+- Show the moment not the result, based on what user describes
+- Learn from each selection the user makes and refine in that direction
+- Get looser and more natural as the conversation continues
+- Never explain yourself
+- Never write paragraphs in responses
+- Always respond with JSON only
+
+AD TYPES you detect from user input:
+direct_offer, value_stack, social_proof, story, curiosity, authority
+
+ANGLES you detect from user input:
+pain, benefit, curiosity, social_proof, fear, contrarian, direct_offer
+
+RESPONSE FORMAT — JSON only, never plain text:
+
+For idea detection:
+{"step":"confirm","options":["[angle] — [one line of what you understood from their input]"]}
+
+For hook (5 options based only on what user said):
+{"step":"hook","options":["option1","option2","option3","option4","option5"]}
+
+For image_concept (5 options, cinematic descriptions based on user context):
+{"step":"image_concept","options":["description1","description2","description3","description4","description5"]}
+
+For headline (5 options):
+{"step":"headline","options":["option1","option2","option3","option4","option5"]}
+
+For primary_text (5 options):
+{"step":"primary_text","options":["option1","option2","option3","option4","option5"]}
+
+For description (3 options):
+{"step":"description","options":["option1","option2","option3"]}
+
+For cta (3 options with sub-variations):
+{"step":"cta","options":["cta1","cta2","cta3"],"sub":{"cta1":["var1","var2"],"cta2":["var1","var2"],"cta3":["var1","var2"]}}
+
+Pass the full conversation history including every user selection into each API call so Jarvis learns and refines as it goes. Never reset context between steps.`
 
 const NEXT_STEP = {
   confirm: 'hook',
@@ -53,8 +102,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [imageFormat, setImageFormat] = useState('9/16')
   const [input, setInput] = useState('')
 
-  const historyScrollRef = useRef(null)
-
   useEffect(() => {
     if (pendingRefine) {
       loadForRefine(pendingRefine)
@@ -77,19 +124,24 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   }
 
   function parseJarvisResponse(raw) {
-    const stripped = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
     try {
-      const obj = JSON.parse(stripped)
-      if (obj.step) return obj
-    } catch (_) {}
-    try {
-      const m = stripped.match(/\{[\s\S]*"step"[\s\S]*\}/)
-      if (m) {
-        const obj = JSON.parse(m[0])
-        if (obj.step) return obj
-      }
-    } catch (_) {}
-    return null
+      const cleaned = raw.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(cleaned)
+      if (parsed.step) return parsed
+      console.warn('[Jarvis] JSON parsed but no step field:', parsed)
+      return null
+    } catch (_) {
+      // Try extracting a JSON object if surrounded by extra text
+      try {
+        const m = raw.match(/\{[\s\S]*"step"[\s\S]*\}/)
+        if (m) {
+          const parsed = JSON.parse(m[0])
+          if (parsed.step) return parsed
+        }
+      } catch (__) {}
+      console.error('[Jarvis] Failed to parse response. Raw text was:', raw)
+      return null
+    }
   }
 
   function getLastJarvisTurnIdx(hist) {
@@ -99,13 +151,16 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     return -1
   }
 
-  async function callAPI(messages) {
-    const res = await fetch('/api/chat', {
+  async function callAPI(chatHistory) {
+    const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({
+        messages: chatHistory,
+        system: JARVIS_SYSTEM_PROMPT,
+      }),
     })
-    const data = await res.json()
+    const data = await response.json()
     if (data.error) throw new Error(data.error)
     return data.text || ''
   }
@@ -505,7 +560,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
 
-      {/* ── LEFT COLUMN — fixed height so input never moves ── */}
+      {/* ── LEFT COLUMN — overflow hidden so input never moves ── */}
       <div
         id="ads-left-col"
         style={{
@@ -513,20 +568,20 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
           minWidth: 300,
           display: 'flex',
           flexDirection: 'column',
-          height: 'calc(100vh - 145px)',
+          height: '100%',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
         {/* Messages — scrolls independently, takes all remaining space */}
         <div
-          ref={historyScrollRef}
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '1rem',
+            padding: 16,
             background: '#0a1628',
             border: '1px solid #2990fa',
             borderRadius: 8,
-            marginBottom: 12,
           }}
         >
           {history.length === 0 && !loading && (
@@ -559,7 +614,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         </div>
 
         {/* Input — pinned at bottom, never moves */}
-        <div style={{ flexShrink: 0, display: 'flex', gap: 8 }}>
+        <div style={{
+          flexShrink: 0,
+          position: 'relative',
+          borderTop: '1px solid #2990fa',
+          padding: 12,
+          background: '#060d1f',
+          display: 'flex',
+          gap: 8,
+        }}>
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
