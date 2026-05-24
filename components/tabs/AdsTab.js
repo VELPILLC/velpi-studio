@@ -144,10 +144,19 @@ const EMPTY_PANEL = {
   cta: '',
 }
 
+const EMPTY_AVATAR_FORM = {
+  name: '',
+  age_range: '',
+  niche: '',
+  what_they_want: '',
+  what_they_fear: '',
+  what_they_trust: '',
+  primary_emotion: '',
+}
+
 export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [history, setHistory] = useState([])
   const [currentStep, setCurrentStep] = useState('idea')
-  // selectedBubbles: array of strings — order matters, last = most recently clicked
   const [selectedBubbles, setSelectedBubbles] = useState([])
   const [refinementCount, setRefinementCount] = useState(0)
   const [customBubble, setCustomBubble] = useState('')
@@ -156,12 +165,73 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [imageFormat, setImageFormat] = useState('9/16')
   const [input, setInput] = useState('')
 
+  // Avatar state
+  const [avatars, setAvatars] = useState([])
+  const [selectedAvatar, setSelectedAvatar] = useState(null)
+  const [avatarModal, setAvatarModal] = useState(null) // null | { mode: 'create'|'edit', data: obj|null }
+  const [avatarForm, setAvatarForm] = useState({ ...EMPTY_AVATAR_FORM })
+
+  // Save success toast
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  useEffect(() => {
+    loadAvatars()
+  }, [])
+
   useEffect(() => {
     if (pendingRefine) {
       loadForRefine(pendingRefine)
       onRefineConsumed?.()
     }
   }, [pendingRefine])
+
+  async function loadAvatars() {
+    try {
+      const res = await fetch('/api/avatars')
+      const data = await res.json()
+      setAvatars(data.avatars || [])
+    } catch (err) {
+      console.error('Load avatars error:', err)
+    }
+  }
+
+  async function handleSaveAvatar() {
+    if (!avatarForm.name.trim()) return
+    try {
+      const isEdit = avatarModal?.mode === 'edit'
+      const method = isEdit ? 'PATCH' : 'POST'
+      const body = isEdit ? { id: avatarModal.data.id, ...avatarForm } : avatarForm
+
+      const res = await fetch('/api/avatars', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      await loadAvatars()
+
+      if (!isEdit && data.avatar) {
+        setSelectedAvatar(data.avatar)
+      }
+      setAvatarModal(null)
+      setAvatarForm({ ...EMPTY_AVATAR_FORM })
+    } catch (err) {
+      console.error('Save avatar error:', err)
+    }
+  }
+
+  function openEditAvatar(av) {
+    setAvatarForm({
+      name: av.name || '',
+      age_range: av.age_range || '',
+      niche: av.niche || '',
+      what_they_want: av.what_they_want || '',
+      what_they_fear: av.what_they_fear || '',
+      what_they_trust: av.what_they_trust || '',
+      primary_emotion: av.primary_emotion || '',
+    })
+    setAvatarModal({ mode: 'edit', data: av })
+  }
 
   function buildMessages(hist) {
     return hist.map(item => ({
@@ -212,6 +282,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         messages: chatHistory,
         system: JARVIS_SYSTEM_PROMPT,
         refinementCount: refCount,
+        avatar: selectedAvatar || null,
       }),
     })
     const data = await response.json()
@@ -270,22 +341,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setLoading(false)
   }
 
-  // Toggle a bubble in/out of selectedBubbles. Last element = most recently selected.
   function handleBubbleClick(opt) {
     if (loading) return
     setSelectedBubbles(prev => {
       const idx = prev.indexOf(opt)
-      if (idx >= 0) {
-        // Already selected — deselect
-        return prev.filter(b => b !== opt)
-      } else {
-        // Not selected — append (last = most recent)
-        return [...prev, opt]
-      }
+      if (idx >= 0) return prev.filter(b => b !== opt)
+      return [...prev, opt]
     })
   }
 
-  // Refine: send all selected bubbles as context, get fewer options back
   async function handleRefine() {
     if (selectedBubbles.length === 0 || loading) return
     const newCount = refinementCount + 1
@@ -323,7 +387,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setLoading(false)
   }
 
-  // Confirm: take last selected bubble as the confirmed value, lock and advance
   function handleConfirm() {
     if (selectedBubbles.length === 0 || loading) return
     const value = selectedBubbles[selectedBubbles.length - 1]
@@ -385,21 +448,21 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   }
 
   async function loadForRefine(ad) {
-    const userText = `Original ad:\nHook: "${ad.hook}"\nHeadline: "${ad.headline}"\nPrimary text: "${ad.primaryText}"\nDescription: "${ad.description}"\nCTA: "${ad.cta}"\n\nPlease generate 5 new hook options as alternatives for this ad.`
+    const userText = `Original ad:\nHook: "${ad.hook}"\nHeadline: "${ad.headline}"\nPrimary text: "${ad.primaryText || ad.primary_text}"\nDescription: "${ad.description}"\nCTA: "${ad.cta}"\n\nPlease generate 5 new hook options as alternatives for this ad.`
     const newHistory = [{ type: 'user', text: userText }]
     setHistory(newHistory)
     setCurrentStep('hook')
     setSelectedBubbles([])
     setRefinementCount(0)
     setAdPanel({
-      avatar: ad.avatar || '',
+      avatar: ad.avatar || ad.angle || '',
       visualFormat: ad.visualFormat || '',
       hook: ad.hook || '',
-      imageConcept: ad.imageConcept || '',
-      imageB64: ad.imageB64 || '',
+      imageConcept: ad.imageConcept || ad.image_concept || '',
+      imageB64: ad.imageB64 || ad.image_b64 || '',
       imageLoading: false,
       headline: ad.headline || '',
-      primaryText: ad.primaryText || '',
+      primaryText: ad.primaryText || ad.primary_text || '',
       description: ad.description || '',
       cta: ad.cta || '',
     })
@@ -436,27 +499,32 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setInput('')
   }
 
-  function saveToLibrary() {
-    const entry = {
-      id: Date.now(),
-      avatar: adPanel.avatar,
-      visualFormat: adPanel.visualFormat,
-      hook: adPanel.hook,
-      imageConcept: adPanel.imageConcept,
-      imageB64: adPanel.imageB64,
-      headline: adPanel.headline,
-      primaryText: adPanel.primaryText,
-      description: adPanel.description,
-      cta: adPanel.cta,
-      adType: '',
-      createdAt: new Date().toISOString(),
-      versions: [],
-      status: 'unrated',
-    }
+  async function saveToLibrary() {
     try {
-      const existing = JSON.parse(localStorage.getItem('velpi_library') || '[]')
-      localStorage.setItem('velpi_library', JSON.stringify([entry, ...existing]))
-      alert('Saved to Library!')
+      const res = await fetch('/api/library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          avatar_id: selectedAvatar?.id || null,
+          avatar_name: selectedAvatar?.name || 'No Avatar',
+          hook: adPanel.hook,
+          image_concept: adPanel.imageConcept,
+          image_b64: adPanel.imageB64,
+          headline: adPanel.headline,
+          primary_text: adPanel.primaryText,
+          description: adPanel.description,
+          cta: adPanel.cta,
+          angle: adPanel.avatar,
+          ad_type: '',
+          status: 'unrated',
+          version_number: 1,
+          parent_id: null,
+        }),
+      })
+      if (res.ok) {
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 2000)
+      }
     } catch (err) {
       console.error('Save to library error:', err)
     }
@@ -500,7 +568,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       )
     }
 
-    // Locked / completed turn
     if (item.type === 'jarvis' && item.lockedValue) {
       return (
         <div key={idx} style={{ marginBottom: 14 }}>
@@ -522,7 +589,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       )
     }
 
-    // Past jarvis turn — greyed out, no interaction
     if (item.type === 'jarvis' && !isLastJarvis) {
       return (
         <div key={idx} style={{ marginBottom: 14, opacity: 0.4 }}>
@@ -536,30 +602,20 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       )
     }
 
-    // Active last jarvis turn
     if (item.type === 'jarvis' && isLastJarvis) {
       const hasSelection = selectedBubbles.length > 0
       const canRefine = hasSelection && refinementCount < 2
 
-      // CTA step
       if (item.step === 'cta') {
-        // Custom entries: those in selectedBubbles that aren't top-level CTA options
         const customSelected = selectedBubbles.filter(b => !item.options.includes(b))
-
         return (
           <div key={idx} style={{ marginBottom: 14 }}>
             <div style={stepLabelStyle}>{STEP_LABELS.cta}</div>
-
-            {/* Top-level CTA options */}
             {item.options.map((opt, oi) => (
               <div key={oi} style={{ marginBottom: 12 }}>
-                <div
-                  style={bubbleStyle(selectedBubbles.includes(opt))}
-                  onClick={() => handleBubbleClick(opt)}
-                >
+                <div style={bubbleStyle(selectedBubbles.includes(opt))} onClick={() => handleBubbleClick(opt)}>
                   {opt}
                 </div>
-                {/* Sub-options shown when parent CTA is selected */}
                 {selectedBubbles.includes(opt) && item.subOptions?.[opt] && (
                   <div style={{ display: 'flex', gap: 6, marginLeft: 16, marginTop: 6, flexWrap: 'wrap' }}>
                     {item.subOptions[opt].map((sub, si) => {
@@ -588,125 +644,65 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                 )}
               </div>
             ))}
-
-            {/* Custom selected entries */}
             {customSelected.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 {customSelected.map((b, bi) => (
-                  <div key={bi} style={bubbleStyle(true)} onClick={() => handleBubbleClick(b)}>
-                    {b}
-                  </div>
+                  <div key={bi} style={bubbleStyle(true)} onClick={() => handleBubbleClick(b)}>{b}</div>
                 ))}
               </div>
             )}
-
-            {/* Custom input */}
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <input
                 value={customBubble}
                 onChange={e => setCustomBubble(e.target.value)}
                 placeholder="Type your own CTA..."
                 style={customInputStyle}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && customBubble.trim()) {
-                    handleBubbleClick(customBubble.trim())
-                    setCustomBubble('')
-                  }
-                }}
+                onKeyDown={e => { if (e.key === 'Enter' && customBubble.trim()) { handleBubbleClick(customBubble.trim()); setCustomBubble('') } }}
               />
               {customBubble.trim() && (
-                <button
-                  onClick={() => { handleBubbleClick(customBubble.trim()); setCustomBubble('') }}
-                  style={useButtonStyle}
-                >
-                  Use
-                </button>
+                <button onClick={() => { handleBubbleClick(customBubble.trim()); setCustomBubble('') }} style={useButtonStyle}>Use</button>
               )}
             </div>
-
-            {/* Refine + Confirm buttons */}
             {hasSelection && (
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                {canRefine && (
-                  <button onClick={handleRefine} style={refineActionStyle}>
-                    Refine →
-                  </button>
-                )}
-                <button onClick={handleConfirm} style={confirmActionStyle}>
-                  Confirm ✓
-                </button>
+                {canRefine && <button onClick={handleRefine} style={refineActionStyle}>Refine →</button>}
+                <button onClick={handleConfirm} style={confirmActionStyle}>Confirm ✓</button>
               </div>
             )}
           </div>
         )
       }
 
-      // Standard step — multi-select, then Refine or Confirm
-      // Custom entries: those in selectedBubbles not in the options list
       const customSelected = selectedBubbles.filter(b => !item.options.includes(b))
-
       return (
         <div key={idx} style={{ marginBottom: 14 }}>
           <div style={stepLabelStyle}>{STEP_LABELS[item.step] || item.step}</div>
-
-          {/* Generated option bubbles */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {item.options.map((opt, oi) => (
-              <div
-                key={oi}
-                style={bubbleStyle(selectedBubbles.includes(opt))}
-                onClick={() => handleBubbleClick(opt)}
-              >
+              <div key={oi} style={bubbleStyle(selectedBubbles.includes(opt))} onClick={() => handleBubbleClick(opt)}>
                 {opt}
               </div>
             ))}
-            {/* Custom entries added via Type your own */}
             {customSelected.map((b, bi) => (
-              <div
-                key={'custom-' + bi}
-                style={bubbleStyle(true)}
-                onClick={() => handleBubbleClick(b)}
-              >
-                {b}
-              </div>
+              <div key={'custom-' + bi} style={bubbleStyle(true)} onClick={() => handleBubbleClick(b)}>{b}</div>
             ))}
           </div>
-
-          {/* Refine + Confirm buttons — appear when at least one bubble selected */}
           {hasSelection && (
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              {canRefine && (
-                <button onClick={handleRefine} style={refineActionStyle}>
-                  Refine →
-                </button>
-              )}
-              <button onClick={handleConfirm} style={confirmActionStyle}>
-                Confirm ✓
-              </button>
+              {canRefine && <button onClick={handleRefine} style={refineActionStyle}>Refine →</button>}
+              <button onClick={handleConfirm} style={confirmActionStyle}>Confirm ✓</button>
             </div>
           )}
-
-          {/* Type your own — always visible */}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <input
               value={customBubble}
               onChange={e => setCustomBubble(e.target.value)}
               placeholder="Type your own..."
               style={customInputStyle}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && customBubble.trim()) {
-                  handleBubbleClick(customBubble.trim())
-                  setCustomBubble('')
-                }
-              }}
+              onKeyDown={e => { if (e.key === 'Enter' && customBubble.trim()) { handleBubbleClick(customBubble.trim()); setCustomBubble('') } }}
             />
             {customBubble.trim() && (
-              <button
-                onClick={() => { handleBubbleClick(customBubble.trim()); setCustomBubble('') }}
-                style={useButtonStyle}
-              >
-                Use
-              </button>
+              <button onClick={() => { handleBubbleClick(customBubble.trim()); setCustomBubble('') }} style={useButtonStyle}>Use</button>
             )}
           </div>
         </div>
@@ -734,364 +730,604 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const isIdeaOrDone = currentStep === 'idea' || currentStep === 'done'
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '55% 45%',
-      gap: 24,
-      height: 'calc(100vh - 120px)',
-      overflow: 'hidden',
-    }}>
+    <>
+      {/* ── OUTER WRAPPER ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', overflow: 'hidden' }}>
 
-      {/* ── LEFT COLUMN ── */}
-      <div
-        id="ads-left-col"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Chat messages — scrolls on its own */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          minHeight: 0,
-          padding: 16,
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-        }}>
-          {history.length === 0 && !loading && (
-            <div style={{
-              color: 'rgba(255,255,255,0.3)',
-              fontSize: '0.8rem',
-              fontFamily: 'var(--font-ibm-plex-mono)',
-              textAlign: 'center',
-              paddingTop: 80,
-              lineHeight: 1.8,
-            }}>
-              Tell Jarvis who you are targeting and what you are selling.
-            </div>
-          )}
-          {history.map((item, idx) => renderItem(item, idx, history))}
-          {loading && (
-            <div style={{
-              color: '#2990fa',
-              fontSize: '0.72rem',
-              fontFamily: 'var(--font-ibm-plex-mono)',
-              padding: '6px 0',
-            }}>
-              Generating...
-            </div>
-          )}
-        </div>
-
-        {/* Input — never moves */}
+        {/* ── AVATAR BAR ── */}
         <div style={{
           flexShrink: 0,
-          padding: 12,
-          borderTop: '1px solid #2990fa',
-          background: '#060d1f',
+          background: '#0a1628',
+          borderBottom: '1px solid #2990fa',
+          padding: '12px 16px',
           display: 'flex',
-          gap: 8,
+          alignItems: 'center',
+          gap: 12,
         }}>
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder={
-              currentStep === 'done'
-                ? 'Start a new ad...'
-                : isIdeaOrDone
-                ? 'Who are you targeting? What are you selling?'
-                : 'Select an option above, or type your own...'
-            }
-            disabled={!isIdeaOrDone || loading}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey && isIdeaOrDone) {
-                e.preventDefault()
-                currentStep === 'done' ? resetAd() : handleIdeaSubmit()
-              }
-            }}
+          <div style={{
+            fontSize: '0.48rem',
+            fontFamily: 'var(--font-ibm-plex-mono)',
+            color: '#2990fa',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            flexShrink: 0,
+          }}>
+            AVATAR
+          </div>
+
+          {/* Scrollable avatar cards */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flex: 1, alignItems: 'center' }}>
+            {avatars.length === 0 && (
+              <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-ibm-plex-mono)', whiteSpace: 'nowrap' }}>
+                No avatars yet
+              </div>
+            )}
+            {avatars.map(av => (
+              <div key={av.id} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <div
+                  onClick={() => setSelectedAvatar(selectedAvatar?.id === av.id ? null : av)}
+                  style={{
+                    background: selectedAvatar?.id === av.id ? '#2990fa' : '#060d1f',
+                    border: '1px solid #2990fa',
+                    borderRadius: 6,
+                    padding: '6px 14px',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-ibm-plex-mono)',
+                    fontSize: '0.6rem',
+                    whiteSpace: 'nowrap',
+                    userSelect: 'none',
+                  }}
+                >
+                  {av.name}
+                </div>
+                <div
+                  onClick={() => openEditAvatar(av)}
+                  style={{
+                    cursor: 'pointer',
+                    color: 'rgba(255,255,255,0.35)',
+                    fontSize: '0.65rem',
+                    padding: '2px 5px',
+                    lineHeight: 1,
+                    userSelect: 'none',
+                  }}
+                  title="Edit avatar"
+                >
+                  ✎
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* New Avatar button */}
+          <button
+            onClick={() => { setAvatarForm({ ...EMPTY_AVATAR_FORM }); setAvatarModal({ mode: 'create', data: null }) }}
             style={{
+              border: '1px solid #2990fa',
+              background: 'transparent',
+              color: '#2990fa',
+              padding: '6px 14px',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ibm-plex-mono)',
+              fontSize: '0.6rem',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            New Avatar
+          </button>
+        </div>
+
+        {/* ── MAIN GRID ── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '55% 45%',
+          gap: 24,
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          paddingTop: 16,
+        }}>
+
+          {/* ── LEFT COLUMN ── */}
+          <div
+            id="ads-left-col"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Chat messages */}
+            <div style={{
               flex: 1,
+              overflowY: 'auto',
+              minHeight: 0,
+              padding: 16,
               background: '#0a1628',
               border: '1px solid #2990fa',
               borderRadius: 8,
-              padding: '10px 14px',
-              fontSize: '0.85rem',
-              color: '#ffffff',
-              resize: 'none',
-              height: 52,
-              fontFamily: 'var(--font-inter)',
-              opacity: isIdeaOrDone && !loading ? 1 : 0.4,
-            }}
-          />
-          <button
-            onClick={currentStep === 'done' ? resetAd : handleIdeaSubmit}
-            disabled={!isIdeaOrDone || (loading && currentStep !== 'done')}
+            }}>
+              {history.length === 0 && !loading && (
+                <div style={{
+                  color: 'rgba(255,255,255,0.3)',
+                  fontSize: '0.8rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  textAlign: 'center',
+                  paddingTop: 80,
+                  lineHeight: 1.8,
+                }}>
+                  Tell Jarvis who you are targeting and what you are selling.
+                </div>
+              )}
+              {history.map((item, idx) => renderItem(item, idx, history))}
+              {loading && (
+                <div style={{
+                  color: '#2990fa',
+                  fontSize: '0.72rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  padding: '6px 0',
+                }}>
+                  Generating...
+                </div>
+              )}
+            </div>
+
+            {/* Input — never moves */}
+            <div style={{
+              flexShrink: 0,
+              padding: 12,
+              borderTop: '1px solid #2990fa',
+              background: '#060d1f',
+              display: 'flex',
+              gap: 8,
+            }}>
+              <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder={
+                  currentStep === 'done'
+                    ? 'Start a new ad...'
+                    : isIdeaOrDone
+                    ? 'Who are you targeting? What are you selling?'
+                    : 'Select an option above, or type your own...'
+                }
+                disabled={!isIdeaOrDone || loading}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey && isIdeaOrDone) {
+                    e.preventDefault()
+                    currentStep === 'done' ? resetAd() : handleIdeaSubmit()
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  background: '#0a1628',
+                  border: '1px solid #2990fa',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: '0.85rem',
+                  color: '#ffffff',
+                  resize: 'none',
+                  height: 52,
+                  fontFamily: 'var(--font-inter)',
+                  opacity: isIdeaOrDone && !loading ? 1 : 0.4,
+                }}
+              />
+              <button
+                onClick={currentStep === 'done' ? resetAd : handleIdeaSubmit}
+                disabled={!isIdeaOrDone || (loading && currentStep !== 'done')}
+                style={{
+                  background: '#2990fa',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 18px',
+                  color: '#ffffff',
+                  fontSize: '0.85rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  opacity: isIdeaOrDone && !loading ? 1 : 0.4,
+                  cursor: isIdeaOrDone && !loading ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {currentStep === 'done' ? 'New' : '→'}
+              </button>
+            </div>
+          </div>
+
+          {/* ── RIGHT COLUMN ── */}
+          <div
+            id="ads-right-col"
             style={{
-              background: '#2990fa',
-              border: 'none',
-              borderRadius: 8,
-              padding: '10px 18px',
-              color: '#ffffff',
-              fontSize: '0.85rem',
-              fontFamily: 'var(--font-ibm-plex-mono)',
-              opacity: isIdeaOrDone && !loading ? 1 : 0.4,
-              cursor: isIdeaOrDone && !loading ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto',
+              height: '100%',
+              gap: 8,
+              paddingRight: 4,
             }}
           >
-            {currentStep === 'done' ? 'New' : '→'}
-          </button>
-        </div>
-      </div>
+            {/* AVATAR panel — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: adPanel.avatar ? '10px 14px' : '8px 14px',
+              opacity: adPanel.avatar ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.avatar ? 8 : 0 }}>AVATAR</div>
+              {adPanel.avatar && (
+                <textarea
+                  value={adPanel.avatar}
+                  onChange={e => setAdPanel(p => ({ ...p, avatar: e.target.value }))}
+                  style={{ ...panelTextarea, height: 54 }}
+                />
+              )}
+            </div>
 
-      {/* ── RIGHT COLUMN ── */}
-      <div
-        id="ads-right-col"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-          height: '100%',
-          gap: 8,
-          paddingRight: 4,
-        }}
-      >
-        {/* AVATAR — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: adPanel.avatar ? '10px 14px' : '8px 14px',
-          opacity: adPanel.avatar ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.avatar ? 8 : 0 }}>AVATAR</div>
-          {adPanel.avatar && (
-            <textarea
-              value={adPanel.avatar}
-              onChange={e => setAdPanel(p => ({ ...p, avatar: e.target.value }))}
-              style={{ ...panelTextarea, height: 54 }}
-            />
-          )}
-        </div>
+            {/* VISUAL FORMAT panel — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: adPanel.visualFormat ? '10px 14px' : '8px 14px',
+              opacity: adPanel.visualFormat ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.visualFormat ? 8 : 0 }}>VISUAL FORMAT</div>
+              {adPanel.visualFormat && (
+                <textarea
+                  value={adPanel.visualFormat}
+                  onChange={e => setAdPanel(p => ({ ...p, visualFormat: e.target.value }))}
+                  style={{ ...panelTextarea, height: 40 }}
+                />
+              )}
+            </div>
 
-        {/* VISUAL FORMAT — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: adPanel.visualFormat ? '10px 14px' : '8px 14px',
-          opacity: adPanel.visualFormat ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.visualFormat ? 8 : 0 }}>VISUAL FORMAT</div>
-          {adPanel.visualFormat && (
-            <textarea
-              value={adPanel.visualFormat}
-              onChange={e => setAdPanel(p => ({ ...p, visualFormat: e.target.value }))}
-              style={{ ...panelTextarea, height: 40 }}
-            />
-          )}
-        </div>
+            {/* HOOK — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: adPanel.hook ? '10px 14px' : '8px 14px',
+              opacity: adPanel.hook ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.hook ? 8 : 0 }}>HOOK</div>
+              {adPanel.hook && (
+                <textarea
+                  value={adPanel.hook}
+                  onChange={e => setAdPanel(p => ({ ...p, hook: e.target.value }))}
+                  style={{ ...panelTextarea, height: 54 }}
+                />
+              )}
+            </div>
 
-        {/* HOOK — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: adPanel.hook ? '10px 14px' : '8px 14px',
-          opacity: adPanel.hook ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.hook ? 8 : 0 }}>HOOK</div>
-          {adPanel.hook && (
-            <textarea
-              value={adPanel.hook}
-              onChange={e => setAdPanel(p => ({ ...p, hook: e.target.value }))}
-              style={{ ...panelTextarea, height: 54 }}
-            />
-          )}
-        </div>
-
-        {/* IMAGE — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: adPanel.imageConcept ? '10px 14px' : '8px 14px',
-          opacity: adPanel.imageConcept ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.imageConcept ? 8 : 0 }}>IMAGE</div>
-          {adPanel.imageConcept && (
-            <>
-              <div style={{
-                fontSize: '0.72rem',
-                color: 'rgba(255,255,255,0.55)',
-                marginBottom: 10,
-                fontFamily: 'var(--font-inter)',
-                lineHeight: 1.5,
-              }}>
-                {adPanel.imageConcept}
-              </div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                {['9/16', '1:1', '4:5'].map(f => (
+            {/* IMAGE — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: adPanel.imageConcept ? '10px 14px' : '8px 14px',
+              opacity: adPanel.imageConcept ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.imageConcept ? 8 : 0 }}>IMAGE</div>
+              {adPanel.imageConcept && (
+                <>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginBottom: 10, fontFamily: 'var(--font-inter)', lineHeight: 1.5 }}>
+                    {adPanel.imageConcept}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                    {['9/16', '1:1', '4:5'].map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setImageFormat(f)}
+                        style={{
+                          background: imageFormat === f ? '#2990fa' : 'transparent',
+                          border: '1px solid #2990fa',
+                          borderRadius: 6,
+                          padding: '3px 10px',
+                          fontSize: '0.65rem',
+                          color: '#ffffff',
+                          fontFamily: 'var(--font-ibm-plex-mono)',
+                        }}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={imgContainerStyle}>
+                    {adPanel.imageLoading && (
+                      <div style={{ fontSize: '0.7rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                        Generating...
+                      </div>
+                    )}
+                    {adPanel.imageB64 && !adPanel.imageLoading && (
+                      <img
+                        src={`data:image/png;base64,${adPanel.imageB64}`}
+                        alt="ad"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    )}
+                    {!adPanel.imageB64 && !adPanel.imageLoading && (
+                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                        No image
+                      </div>
+                    )}
+                  </div>
                   <button
-                    key={f}
-                    onClick={() => setImageFormat(f)}
+                    onClick={() => generateImage(adPanel.imageConcept)}
                     style={{
-                      background: imageFormat === f ? '#2990fa' : 'transparent',
+                      background: 'transparent',
                       border: '1px solid #2990fa',
                       borderRadius: 6,
-                      padding: '3px 10px',
-                      fontSize: '0.65rem',
-                      color: '#ffffff',
+                      padding: '5px 12px',
+                      color: '#2990fa',
+                      fontSize: '0.7rem',
                       fontFamily: 'var(--font-ibm-plex-mono)',
                     }}
                   >
-                    {f}
+                    New Image
                   </button>
-                ))}
+                </>
+              )}
+            </div>
+
+            {/* HEADLINE — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: adPanel.headline ? '10px 14px' : '8px 14px',
+              opacity: adPanel.headline ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.headline ? 8 : 0 }}>HEADLINE</div>
+              {adPanel.headline && (
+                <textarea
+                  value={adPanel.headline}
+                  onChange={e => setAdPanel(p => ({ ...p, headline: e.target.value }))}
+                  style={{ ...panelTextarea, height: 54 }}
+                />
+              )}
+            </div>
+
+            {/* PRIMARY TEXT — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: adPanel.primaryText ? '10px 14px' : '8px 14px',
+              opacity: adPanel.primaryText ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.primaryText ? 8 : 0 }}>PRIMARY TEXT</div>
+              {adPanel.primaryText && (
+                <textarea
+                  value={adPanel.primaryText}
+                  onChange={e => setAdPanel(p => ({ ...p, primaryText: e.target.value }))}
+                  style={{ ...panelTextarea, height: 80 }}
+                />
+              )}
+            </div>
+
+            {/* DESCRIPTION + CTA — collapsed when empty */}
+            <div style={{
+              background: '#0a1628',
+              border: '1px solid #2990fa',
+              borderRadius: 8,
+              padding: (adPanel.description || adPanel.cta) ? '10px 14px' : '8px 14px',
+              opacity: (adPanel.description || adPanel.cta) ? 1 : 0.35,
+            }}>
+              <div style={{ ...panelLabel, marginBottom: adPanel.description ? 8 : 0 }}>DESCRIPTION</div>
+              {adPanel.description && (
+                <textarea
+                  value={adPanel.description}
+                  onChange={e => setAdPanel(p => ({ ...p, description: e.target.value }))}
+                  style={{ ...panelTextarea, height: 54, marginBottom: 12 }}
+                />
+              )}
+              {adPanel.description && (
+                <>
+                  <div style={{ ...panelLabel, marginBottom: adPanel.cta ? 8 : 0 }}>CTA</div>
+                  {adPanel.cta && (
+                    <textarea
+                      value={adPanel.cta}
+                      onChange={e => setAdPanel(p => ({ ...p, cta: e.target.value }))}
+                      style={{ ...panelTextarea, height: 40 }}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Export + Save */}
+            {adPanel.cta && (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: '1px solid #2990fa',
+                    borderRadius: 8,
+                    padding: 10,
+                    color: '#2990fa',
+                    fontSize: '0.8rem',
+                    fontFamily: 'var(--font-ibm-plex-mono)',
+                  }}
+                >
+                  Export PDF
+                </button>
+                <button
+                  onClick={saveToLibrary}
+                  style={{
+                    flex: 1,
+                    background: '#2990fa',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: 10,
+                    color: '#ffffff',
+                    fontSize: '0.8rem',
+                    fontFamily: 'var(--font-ibm-plex-mono)',
+                  }}
+                >
+                  Save to Library
+                </button>
               </div>
-              <div style={imgContainerStyle}>
-                {adPanel.imageLoading && (
-                  <div style={{ fontSize: '0.7rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)' }}>
-                    Generating...
-                  </div>
-                )}
-                {adPanel.imageB64 && !adPanel.imageLoading && (
-                  <img
-                    src={`data:image/png;base64,${adPanel.imageB64}`}
-                    alt="ad"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── AVATAR MODAL ── */}
+      {avatarModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2,8,16,0.92)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) { setAvatarModal(null); setAvatarForm({ ...EMPTY_AVATAR_FORM }) } }}
+        >
+          <div style={{
+            background: '#0a1628',
+            border: '1px solid #2990fa',
+            borderRadius: 12,
+            padding: 24,
+            width: '100%',
+            maxWidth: 420,
+            maxHeight: '90vh',
+            overflowY: 'auto',
+          }}>
+            <div style={{
+              fontFamily: 'var(--font-bebas-neue)',
+              fontSize: '1.4rem',
+              color: '#ffffff',
+              marginBottom: 20,
+            }}>
+              {avatarModal.mode === 'edit' ? 'Edit Avatar' : 'Create Avatar'}
+            </div>
+
+            {[
+              { label: 'Name', key: 'name', type: 'input', required: true },
+              { label: 'Age Range', key: 'age_range', type: 'input', placeholder: '35-50' },
+              { label: 'Niche / Industry', key: 'niche', type: 'input', placeholder: 'HVAC business owners' },
+              { label: 'What they want', key: 'what_they_want', type: 'textarea' },
+              { label: 'What they fear', key: 'what_they_fear', type: 'textarea' },
+              { label: 'What they trust visually', key: 'what_they_trust', type: 'input', placeholder: 'News formats, authority figures' },
+              { label: 'Primary emotion', key: 'primary_emotion', type: 'input', placeholder: 'Fear of falling behind' },
+            ].map(field => (
+              <div key={field.key} style={{ marginBottom: 14 }}>
+                <div style={{
+                  fontSize: '0.48rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  color: '#2990fa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4,
+                }}>
+                  {field.label}{field.required ? ' *' : ''}
+                </div>
+                {field.type === 'textarea' ? (
+                  <textarea
+                    value={avatarForm[field.key]}
+                    onChange={e => setAvatarForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      background: '#060d1f',
+                      border: '1px solid #2990fa',
+                      borderRadius: 4,
+                      color: '#ffffff',
+                      padding: 8,
+                      fontFamily: 'var(--font-inter)',
+                      fontSize: '0.82rem',
+                      resize: 'none',
+                      height: 70,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                ) : (
+                  <input
+                    value={avatarForm[field.key]}
+                    placeholder={field.placeholder || ''}
+                    onChange={e => setAvatarForm(f => ({ ...f, [field.key]: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      background: '#060d1f',
+                      border: '1px solid #2990fa',
+                      borderRadius: 4,
+                      color: '#ffffff',
+                      padding: 8,
+                      fontFamily: 'var(--font-inter)',
+                      fontSize: '0.82rem',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 )}
-                {!adPanel.imageB64 && !adPanel.imageLoading && (
-                  <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
-                    No image
-                  </div>
-                )}
               </div>
+            ))}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
               <button
-                onClick={() => generateImage(adPanel.imageConcept)}
+                onClick={handleSaveAvatar}
+                disabled={!avatarForm.name.trim()}
+                style={{
+                  background: '#2990fa',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: 10,
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  fontSize: '0.78rem',
+                  width: '100%',
+                  opacity: avatarForm.name.trim() ? 1 : 0.5,
+                  cursor: avatarForm.name.trim() ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => { setAvatarModal(null); setAvatarForm({ ...EMPTY_AVATAR_FORM }) }}
                 style={{
                   background: 'transparent',
                   border: '1px solid #2990fa',
                   borderRadius: 6,
-                  padding: '5px 12px',
-                  color: '#2990fa',
-                  fontSize: '0.7rem',
+                  padding: 10,
+                  color: '#ffffff',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  fontSize: '0.78rem',
+                  width: '100%',
+                  cursor: 'pointer',
                 }}
               >
-                New Image
+                Cancel
               </button>
-            </>
-          )}
-        </div>
-
-        {/* HEADLINE — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: adPanel.headline ? '10px 14px' : '8px 14px',
-          opacity: adPanel.headline ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.headline ? 8 : 0 }}>HEADLINE</div>
-          {adPanel.headline && (
-            <textarea
-              value={adPanel.headline}
-              onChange={e => setAdPanel(p => ({ ...p, headline: e.target.value }))}
-              style={{ ...panelTextarea, height: 54 }}
-            />
-          )}
-        </div>
-
-        {/* PRIMARY TEXT — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: adPanel.primaryText ? '10px 14px' : '8px 14px',
-          opacity: adPanel.primaryText ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.primaryText ? 8 : 0 }}>PRIMARY TEXT</div>
-          {adPanel.primaryText && (
-            <textarea
-              value={adPanel.primaryText}
-              onChange={e => setAdPanel(p => ({ ...p, primaryText: e.target.value }))}
-              style={{ ...panelTextarea, height: 80 }}
-            />
-          )}
-        </div>
-
-        {/* DESCRIPTION + CTA — collapsed when empty */}
-        <div style={{
-          background: '#0a1628',
-          border: '1px solid #2990fa',
-          borderRadius: 8,
-          padding: (adPanel.description || adPanel.cta) ? '10px 14px' : '8px 14px',
-          opacity: (adPanel.description || adPanel.cta) ? 1 : 0.35,
-        }}>
-          <div style={{ ...panelLabel, marginBottom: adPanel.description ? 8 : 0 }}>DESCRIPTION</div>
-          {adPanel.description && (
-            <textarea
-              value={adPanel.description}
-              onChange={e => setAdPanel(p => ({ ...p, description: e.target.value }))}
-              style={{ ...panelTextarea, height: 54, marginBottom: 12 }}
-            />
-          )}
-          {adPanel.description && (
-            <>
-              <div style={{ ...panelLabel, marginBottom: adPanel.cta ? 8 : 0 }}>CTA</div>
-              {adPanel.cta && (
-                <textarea
-                  value={adPanel.cta}
-                  onChange={e => setAdPanel(p => ({ ...p, cta: e.target.value }))}
-                  style={{ ...panelTextarea, height: 40 }}
-                />
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Export + Save */}
-        {adPanel.cta && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => window.print()}
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: '1px solid #2990fa',
-                borderRadius: 8,
-                padding: 10,
-                color: '#2990fa',
-                fontSize: '0.8rem',
-                fontFamily: 'var(--font-ibm-plex-mono)',
-              }}
-            >
-              Export PDF
-            </button>
-            <button
-              onClick={saveToLibrary}
-              style={{
-                flex: 1,
-                background: '#2990fa',
-                border: 'none',
-                borderRadius: 8,
-                padding: 10,
-                color: '#ffffff',
-                fontSize: '0.8rem',
-                fontFamily: 'var(--font-ibm-plex-mono)',
-              }}
-            >
-              Save to Library
-            </button>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+
+      {/* ── SAVE SUCCESS TOAST ── */}
+      {saveSuccess && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          background: '#0d4a1e',
+          border: '1px solid #165c2a',
+          borderRadius: 8,
+          padding: '10px 16px',
+          color: '#00e5c8',
+          fontFamily: 'var(--font-ibm-plex-mono)',
+          fontSize: '0.75rem',
+          zIndex: 2000,
+        }}>
+          Saved to Library
+        </div>
+      )}
+    </>
   )
 }
 

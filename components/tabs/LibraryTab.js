@@ -7,27 +7,48 @@ const STATUS_COLORS = {
   unrated: 'rgba(255,255,255,0.4)',
 }
 
+function normalizeAd(ad) {
+  return {
+    ...ad,
+    imageB64: ad.imageB64 || ad.image_b64 || null,
+    imageConcept: ad.imageConcept || ad.image_concept || '',
+    primaryText: ad.primaryText || ad.primary_text || '',
+    adType: ad.adType || ad.ad_type || '',
+    avatarName: ad.avatarName || ad.avatar_name || '',
+    avatarId: ad.avatarId || ad.avatar_id || null,
+    versionNumber: ad.versionNumber || ad.version_number || 1,
+    parentId: ad.parentId || ad.parent_id || null,
+    createdAt: ad.createdAt || ad.created_at || null,
+  }
+}
+
 export default function LibraryTab({ onRefine }) {
   const [ads, setAds] = useState([])
   const [selectedAd, setSelectedAd] = useState(null)
   const [selectedVersionIdx, setSelectedVersionIdx] = useState(null)
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('velpi_library') || '[]')
-      setAds(stored)
-    } catch (_) {}
+    loadAds()
   }, [])
 
-  function persist(newAds) {
-    setAds(newAds)
-    localStorage.setItem('velpi_library', JSON.stringify(newAds))
+  async function loadAds() {
+    try {
+      const res = await fetch('/api/library')
+      const data = await res.json()
+      setAds((data.ads || []).map(normalizeAd))
+    } catch (_) {}
   }
 
-  function updateAd(id, updates) {
-    const newAds = ads.map(a => (a.id === id ? { ...a, ...updates } : a))
-    persist(newAds)
-    if (selectedAd?.id === id) setSelectedAd(a => ({ ...a, ...updates }))
+  async function updateAd(id, updates) {
+    try {
+      await fetch('/api/library', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...updates }),
+      })
+      await loadAds()
+      if (selectedAd?.id === id) setSelectedAd(a => ({ ...a, ...updates }))
+    } catch (_) {}
   }
 
   function addVersion(ad) {
@@ -43,13 +64,21 @@ export default function LibraryTab({ onRefine }) {
       status: 'unrated',
     }
     const versions = [...(ad.versions || []), version]
-    updateAd(ad.id, { versions })
+    const newAds = ads.map(a => (a.id === ad.id ? { ...a, versions } : a))
+    setAds(newAds)
+    if (selectedAd?.id === ad.id) setSelectedAd(a => ({ ...a, versions }))
   }
 
-  function deleteAd(id) {
-    const newAds = ads.filter(a => a.id !== id)
-    persist(newAds)
-    if (selectedAd?.id === id) setSelectedAd(null)
+  async function deleteAd(id) {
+    try {
+      await fetch('/api/library', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      await loadAds()
+      if (selectedAd?.id === id) setSelectedAd(null)
+    } catch (_) {}
   }
 
   // Group by adType
@@ -366,6 +395,7 @@ export default function LibraryTab({ onRefine }) {
                   color: '#00e5c8',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  cursor: 'pointer',
                 }}
               >
                 ✓ Working
@@ -384,6 +414,7 @@ export default function LibraryTab({ onRefine }) {
                   color: '#ff4455',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  cursor: 'pointer',
                 }}
               >
                 ✗ Not Working
@@ -406,6 +437,7 @@ export default function LibraryTab({ onRefine }) {
                   color: '#ffffff',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  cursor: 'pointer',
                 }}
               >
                 Refine
@@ -421,6 +453,7 @@ export default function LibraryTab({ onRefine }) {
                   color: '#2990fa',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  cursor: 'pointer',
                 }}
               >
                 Split Test
@@ -440,6 +473,7 @@ export default function LibraryTab({ onRefine }) {
                   color: '#ff4455',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  cursor: 'pointer',
                 }}
               >
                 Delete
@@ -455,6 +489,7 @@ export default function LibraryTab({ onRefine }) {
                   color: 'rgba(255,255,255,0.6)',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
+                  cursor: 'pointer',
                 }}
               >
                 Close

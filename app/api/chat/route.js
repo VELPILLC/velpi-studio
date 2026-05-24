@@ -46,10 +46,33 @@ export async function POST(request) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
-    const { messages, system, refinementCount = 0 } = await request.json()
+    const { messages, system, refinementCount = 0, avatar = null } = await request.json()
+
+    // Prepend avatar context as first two messages if an avatar is selected
+    let baseMessages = [...messages]
+    if (avatar && avatar.name) {
+      const avatarContext = [
+        {
+          role: 'user',
+          content: `AVATAR CONTEXT — write everything for this person:
+Name: ${avatar.name}
+Age Range: ${avatar.age_range || 'Not specified'}
+Niche: ${avatar.niche || 'Not specified'}
+What they want: ${avatar.what_they_want || 'Not specified'}
+What they fear: ${avatar.what_they_fear || 'Not specified'}
+What they trust visually: ${avatar.what_they_trust || 'Not specified'}
+Primary emotion: ${avatar.primary_emotion || 'Not specified'}`,
+        },
+        {
+          role: 'assistant',
+          content: '{"step":"ready","message":"Avatar locked in. I know exactly who we are writing for."}',
+        },
+      ]
+      baseMessages = [...avatarContext, ...messages]
+    }
 
     // Append refinementCount to the last user message so Jarvis knows how many options to return
-    const messagesWithCount = [...messages]
+    const messagesWithCount = [...baseMessages]
     const lastIdx = messagesWithCount.length - 1
     if (lastIdx >= 0 && messagesWithCount[lastIdx].role === 'user') {
       messagesWithCount[lastIdx] = {
