@@ -13,7 +13,6 @@ Copy `.env.local.example` to `.env.local` and add your API keys:
 ```
 ANTHROPIC_API_KEY=your_key_here
 OPENAI_API_KEY=your_key_here
-HEDRA_API_KEY=your_key_here
 ```
 
 ## Development
