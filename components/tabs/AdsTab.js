@@ -56,12 +56,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const historyScrollRef = useRef(null)
 
   useEffect(() => {
-    if (historyScrollRef.current) {
-      historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight
-    }
-  }, [history, loading])
-
-  useEffect(() => {
     if (pendingRefine) {
       loadForRefine(pendingRefine)
       onRefineConsumed?.()
