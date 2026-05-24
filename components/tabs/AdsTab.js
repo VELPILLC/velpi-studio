@@ -53,10 +53,12 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [imageFormat, setImageFormat] = useState('9/16')
   const [input, setInput] = useState('')
 
-  const historyEndRef = useRef(null)
+  const historyScrollRef = useRef(null)
 
   useEffect(() => {
-    historyEndRef.current?.scrollIntoView({ behavior: 'auto' })
+    if (historyScrollRef.current) {
+      historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight
+    }
   }, [history, loading])
 
   useEffect(() => {
@@ -557,6 +559,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       >
         {/* History scroll area */}
         <div
+          ref={historyScrollRef}
           style={{
             overflowY: 'auto',
             minHeight: 420,
@@ -595,7 +598,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               Generating...
             </div>
           )}
-          <div ref={historyEndRef} />
         </div>
 
         {/* Bottom input — only at idea or done step */}
