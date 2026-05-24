@@ -1,52 +1,105 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-// Updated system prompt — no invented facts, refinementCount-aware
-const JARVIS_SYSTEM_PROMPT = `You are Jarvis, a direct response copywriter. You write Facebook ads based only on what the user tells you.
+const JARVIS_SYSTEM_PROMPT = `You are Jarvis, a direct response ad strategist and copywriter. You help anyone build a Facebook ad from scratch using psychology, not guesswork.
 
-STRICT RULES:
-- Never invent numbers, statistics, dollar amounts, timeframes, or guarantees
-- Never make up client counts, results, or proof points
-- Only use words, facts, and context the user has given you
-- If the user has not given you proof, do not add any
-- Write simple. Short sentences. Easy words.
-- Call out who the ad is for using the user's exact words
-- Write what they said, made clearer and stronger
-- Learn from every selection and refine in that direction
-- Never explain yourself
-- Never write paragraphs
-- Return JSON only, never plain text
+YOU KNOW NOTHING ABOUT THE USER'S BUSINESS UNTIL THEY TELL YOU.
+Never assume industry, audience, product, or offer.
+Build everything from what the user gives you.
+Never invent numbers, stats, claims, or proof the user did not provide.
+Only use what they tell you. Make it clearer and stronger.
 
-You will receive a refinementCount in the request. Use it to know how many options to return:
-- refinementCount 0: return 5 options
-- refinementCount 1: return 3 options
-- refinementCount 2: return 2 options
-- refinementCount 3+: return 3 variations of the chosen option
+YOUR FRAMEWORK — apply this thinking to every ad you help build:
 
-AD TYPES: direct_offer, value_stack, social_proof, story, curiosity, authority
-ANGLES: pain, benefit, curiosity, social_proof, fear, contrarian, direct_offer
+1. THE AVATAR
+Before writing anything, understand who is being targeted.
+Age range matters. What did they grow up with? What do they trust? What do they fear? What do they want to be seen as?
+A 45 year old business owner grew up reading newspapers and watching the news. They trust authority formats. Red white and blue feels safe. Bold headlines feel credible.
+A 28 year old entrepreneur grew up on Instagram. Raw, unpolished, real feels trustworthy. Overly designed feels fake.
+Always think: what format, color, and feeling does this person already trust?
 
-RESPONSE FORMAT — JSON only:
+2. THE PATTERN INTERRUPT
+The brain scrolls on autopilot. An ad that looks like everything else gets ignored.
+The visual must break the pattern of what else is in their feed.
+Format options to consider based on avatar:
+- Newspaper front page (trust, authority, 40+ demographic)
+- Raw iPhone photo (authenticity, realness, any age)
+- Text on plain background (curiosity, reads like a message)
+- News chyron or breaking news style (urgency, familiarity)
+- Handwritten note (personal, intimate)
+- Document or report cover (professional, authority)
+- Screenshot of a conversation or result (social proof, real)
+- Movie poster or cover (aspiration, status)
+Choose the format that matches what this avatar already trusts.
 
-Idea detection:
-{"step":"confirm","options":["angle — one line of what you understood"]}
+3. THE IDENTITY CALL-OUT
+Name them so specifically they stop scrolling because they think you are talking directly to them.
+Use their exact identity, their exact situation, their exact frustration or desire.
+The more specific the better. Broad loses. Specific wins.
 
-Hook, headline, primary_text (count varies by refinementCount):
-{"step":"hook","options":["option1","option2","..."]}
+4. THE EMOTION
+Every buying decision is emotional first, logical second.
+Identify the primary emotion driving this avatar:
+- Pride (they want to be seen winning)
+- Fear of falling behind (competitors, time, opportunity)
+- Frustration (something is not working)
+- Hope (they believe something better is possible)
+- Status (they want their peers to notice)
+- Relief (they are tired and want a solution)
+Lead with that emotion in the hook and headline.
 
-Image concepts:
-{"step":"image_concept","options":["cinematic description 1","..."]}
+5. THE COPY RULES
+- Short sentences. Small words. Third grade reading level.
+- Headline is 80 percent of the ad. Make it count.
+- Give a reason why. The word because is powerful.
+- Show the moment not the result. Describe what happens, not what you claim.
+- Admit a flaw if it makes the claim more believable.
+- Never fake urgency or scarcity.
+- CTA tells them exactly what to click and what happens next.
 
-Description:
+RESPONSE FORMAT:
+Never return plain text paragraphs.
+Always return JSON only.
+Never explain yourself.
+
+STEP RESPONSES:
+
+Avatar detection from user input:
+{"step":"avatar","options":["[age range] [identity] — [what they trust visually] — [primary emotion]","option2","option3","option4","option5"]}
+
+Visual format suggestions based on avatar:
+{"step":"visual_format","options":["Newspaper front page — authority and trust","Raw photo — real and unpolished","option3","option4","option5"]}
+
+Hook options (based only on what user said, no invented facts):
+{"step":"hook","options":["option1","option2","option3","option4","option5"]}
+
+Image concept options (cinematic, based on chosen visual format and avatar):
+{"step":"image_concept","options":["description1","description2","description3","description4","description5"]}
+
+Headline options:
+{"step":"headline","options":["option1","option2","option3","option4","option5"]}
+
+Primary text options:
+{"step":"primary_text","options":["option1","option2","option3","option4","option5"]}
+
+Description options:
 {"step":"description","options":["option1","option2","option3"]}
 
-CTA:
+CTA options:
 {"step":"cta","options":["cta1","cta2","cta3"],"sub":{"cta1":["var1","var2"],"cta2":["var1","var2"],"cta3":["var1","var2"]}}
 
-Never return plain text. JSON only always.`
+refinementCount controls how many options to return:
+0 = 5 options
+1 = 3 options
+2 = 2 options
+3+ = 3 variations of the chosen one
+
+Pass full conversation history every call so Jarvis learns and refines from every selection.
+Never reset context. Never repeat options already rejected.`
 
 const NEXT_STEP = {
-  confirm: 'hook',
+  avatar: 'visual_format',
+  visual_format: 'hook',
   hook: 'image_concept',
   image_concept: 'headline',
   headline: 'primary_text',
@@ -56,7 +109,8 @@ const NEXT_STEP = {
 }
 
 const STEP_LABELS = {
-  confirm: 'AD ANGLE',
+  avatar: 'AVATAR',
+  visual_format: 'VISUAL FORMAT',
   hook: 'HOOK',
   image_concept: 'IMAGE CONCEPT',
   headline: 'HEADLINE',
@@ -67,6 +121,8 @@ const STEP_LABELS = {
 }
 
 const PANEL_FIELD = {
+  avatar: 'avatar',
+  visual_format: 'visualFormat',
   hook: 'hook',
   image_concept: 'imageConcept',
   headline: 'headline',
@@ -76,7 +132,8 @@ const PANEL_FIELD = {
 }
 
 const EMPTY_PANEL = {
-  confirmedAngle: '',
+  avatar: '',
+  visualFormat: '',
   hook: '',
   imageConcept: '',
   imageB64: '',
@@ -168,7 +225,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `cinematic 9:16 vertical HVAC photo, ${concept}, no text, no logos, photorealistic, documentary style`,
+          prompt: `cinematic 9:16 vertical photo, ${concept}, no text, no logos, photorealistic, documentary style`,
         }),
       })
       const data = await res.json()
@@ -266,7 +323,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setAdPanel(p => ({
       ...p,
       ...(field ? { [field]: value } : {}),
-      ...(currentStep === 'confirm' ? { confirmedAngle: value } : {}),
     }))
 
     if (currentStep === 'image_concept') {
@@ -319,7 +375,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setSelectedBubble(null)
     setRefinementCount(0)
     setAdPanel({
-      confirmedAngle: ad.angle || '',
+      avatar: ad.avatar || '',
+      visualFormat: ad.visualFormat || '',
       hook: ad.hook || '',
       imageConcept: ad.imageConcept || '',
       imageB64: ad.imageB64 || '',
@@ -365,6 +422,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   function saveToLibrary() {
     const entry = {
       id: Date.now(),
+      avatar: adPanel.avatar,
+      visualFormat: adPanel.visualFormat,
       hook: adPanel.hook,
       imageConcept: adPanel.imageConcept,
       imageB64: adPanel.imageB64,
@@ -372,7 +431,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       primaryText: adPanel.primaryText,
       description: adPanel.description,
       cta: adPanel.cta,
-      angle: adPanel.confirmedAngle,
       adType: '',
       createdAt: new Date().toISOString(),
       versions: [],
@@ -627,7 +685,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               paddingTop: 80,
               lineHeight: 1.8,
             }}>
-              Describe your HVAC business and campaign goal to start building your ad.
+              Tell Jarvis who you are targeting and what you are selling.
             </div>
           )}
           {history.map((item, idx) => renderItem(item, idx, history))}
@@ -659,7 +717,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               currentStep === 'done'
                 ? 'Start a new ad...'
                 : isIdeaOrDone
-                ? 'Describe your HVAC business and campaign goal...'
+                ? 'Who are you targeting? What are you selling?'
                 : 'Select an option above, or type your own...'
             }
             disabled={!isIdeaOrDone || loading}
@@ -715,6 +773,42 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
           paddingRight: 4,
         }}
       >
+        {/* AVATAR — collapsed when empty */}
+        <div style={{
+          background: '#0a1628',
+          border: '1px solid #2990fa',
+          borderRadius: 8,
+          padding: adPanel.avatar ? '10px 14px' : '8px 14px',
+          opacity: adPanel.avatar ? 1 : 0.35,
+        }}>
+          <div style={{ ...panelLabel, marginBottom: adPanel.avatar ? 8 : 0 }}>AVATAR</div>
+          {adPanel.avatar && (
+            <textarea
+              value={adPanel.avatar}
+              onChange={e => setAdPanel(p => ({ ...p, avatar: e.target.value }))}
+              style={{ ...panelTextarea, height: 54 }}
+            />
+          )}
+        </div>
+
+        {/* VISUAL FORMAT — collapsed when empty */}
+        <div style={{
+          background: '#0a1628',
+          border: '1px solid #2990fa',
+          borderRadius: 8,
+          padding: adPanel.visualFormat ? '10px 14px' : '8px 14px',
+          opacity: adPanel.visualFormat ? 1 : 0.35,
+        }}>
+          <div style={{ ...panelLabel, marginBottom: adPanel.visualFormat ? 8 : 0 }}>VISUAL FORMAT</div>
+          {adPanel.visualFormat && (
+            <textarea
+              value={adPanel.visualFormat}
+              onChange={e => setAdPanel(p => ({ ...p, visualFormat: e.target.value }))}
+              style={{ ...panelTextarea, height: 40 }}
+            />
+          )}
+        </div>
+
         {/* HOOK — collapsed when empty */}
         <div style={{
           background: '#0a1628',
