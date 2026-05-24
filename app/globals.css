@@ -3,20 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --bg: #030810;
-  --panel: #080f1e;
-  --panel2: #0b1525;
-  --border: #0e1e35;
-  --border2: #152840;
-  --border3: #1d3a58;
-  --blue: #1d6ff5;
-  --blue2: #1458cc;
-  --blue3: #5a9aff;
-  --cyan: #00c8ff;
-  --teal: #00e5c8;
-  --text: #c8dcf5;
-  --text2: #4a6a8a;
-  --orange: #f05a00;
+  --bg: #060d1f;
+  --panel: #0a1628;
+  --blue: #2990fa;
+  --text: #ffffff;
 }
 
 * {
@@ -27,50 +17,22 @@
 
 html,
 body {
-  background: #030810;
-  color: #c8dcf5;
+  background: #060d1f;
+  color: #ffffff;
   font-family: var(--font-inter), system-ui, sans-serif;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      rgba(29, 111, 245, 0.025) 0px,
-      rgba(29, 111, 245, 0.025) 1px,
-      transparent 1px,
-      transparent 40px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(29, 111, 245, 0.025) 0px,
-      rgba(29, 111, 245, 0.025) 1px,
-      transparent 1px,
-      transparent 40px
-    );
-  pointer-events: none;
-  z-index: 0;
-}
-
-body > * {
-  position: relative;
-  z-index: 1;
 }
 
 textarea,
 input,
 select {
   outline: none;
-  color: #c8dcf5;
+  color: #ffffff;
   background: transparent;
 }
 
 textarea::placeholder,
 input::placeholder {
-  color: #4a6a8a;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 ::-webkit-scrollbar {
@@ -82,7 +44,7 @@ input::placeholder {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1d3a58;
+  background: #2990fa;
   border-radius: 2px;
 }
 
@@ -90,10 +52,26 @@ button {
   cursor: pointer;
 }
 
-/* Prevent any global transitions */
+/* Prevent any global transitions or animations */
 *,
 *::before,
 *::after {
   transition: none !important;
   animation: none !important;
+}
+
+@media print {
+  #app-header,
+  #app-tabs,
+  #ads-left-col {
+    display: none !important;
+  }
+  #ads-right-col {
+    color: black !important;
+    background: white !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
 }

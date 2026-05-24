@@ -2,13 +2,20 @@
 import { useState } from 'react'
 import AdsTab from './tabs/AdsTab'
 import ContentTab from './tabs/ContentTab'
-import PerformanceTab from './tabs/PerformanceTab'
+import LibraryTab from './tabs/LibraryTab'
 
 function VelpiLogo() {
   return (
     <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-      <circle cx="15" cy="15" r="13" stroke="#3a9aff" strokeWidth="1.5" />
-      <path d="M9 10 L15 21 L21 10" stroke="#3a9aff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle cx="15" cy="15" r="13" fill="#2990fa" />
+      <path
+        d="M9 10 L15 21 L21 10"
+        stroke="#ffffff"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   )
 }
@@ -16,40 +23,62 @@ function VelpiLogo() {
 const tabs = [
   { id: 'ads', label: 'ADS' },
   { id: 'content', label: 'CONTENT' },
-  { id: 'performance', label: 'PERFORMANCE' },
+  { id: 'library', label: 'LIBRARY' },
 ]
 
 export default function Studio() {
   const [activeTab, setActiveTab] = useState('ads')
+  const [pendingRefine, setPendingRefine] = useState(null)
+
+  function handleRefineFromLibrary(ad) {
+    setPendingRefine(ad)
+    setActiveTab('ads')
+  }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#030810' }}>
+    <div style={{ minHeight: '100vh', background: '#060d1f' }}>
       {/* HEADER */}
-      <header style={{
-        position: 'sticky',
-        top: 0,
-        height: 52,
-        background: '#060e1c',
-        borderBottom: '1px solid #152840',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 1.25rem',
-        gap: 12,
-        zIndex: 100,
-      }}>
+      <header
+        id="app-header"
+        style={{
+          position: 'sticky',
+          top: 0,
+          height: 52,
+          background: '#060d1f',
+          borderBottom: '1px solid rgba(41,144,250,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 1.25rem',
+          gap: 12,
+          zIndex: 100,
+        }}
+      >
         <VelpiLogo />
+        <span
+          style={{
+            fontFamily: 'var(--font-bebas-neue)',
+            fontSize: '1.3rem',
+            color: '#ffffff',
+            letterSpacing: '0.1em',
+          }}
+        >
+          VELPI STUDIO
+        </span>
         <div style={{ flex: 1 }} />
       </header>
 
       {/* TAB BAR */}
-      <div style={{
-        position: 'sticky',
-        top: 52,
-        background: '#080f1e',
-        borderBottom: '1px solid #152840',
-        display: 'flex',
-        zIndex: 99,
-      }}>
+      <div
+        id="app-tabs"
+        style={{
+          position: 'sticky',
+          top: 52,
+          background: '#060d1f',
+          borderBottom: '1px solid rgba(41,144,250,0.3)',
+          display: 'flex',
+          zIndex: 99,
+        }}
+      >
         {tabs.map(t => (
           <button
             key={t.id}
@@ -57,8 +86,8 @@ export default function Studio() {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === t.id ? '2px solid #5a9aff' : '2px solid transparent',
-              color: activeTab === t.id ? '#5a9aff' : '#4a6a8a',
+              borderBottom: activeTab === t.id ? '2px solid #2990fa' : '2px solid transparent',
+              color: activeTab === t.id ? '#2990fa' : '#ffffff',
               padding: '0.7rem 1.5rem',
               fontSize: '0.6rem',
               fontFamily: 'var(--font-ibm-plex-mono)',
@@ -72,9 +101,14 @@ export default function Studio() {
 
       {/* TAB CONTENT */}
       <div style={{ padding: '1.5rem', maxWidth: 1200, margin: '0 auto' }}>
-        {activeTab === 'ads' && <AdsTab />}
+        {activeTab === 'ads' && (
+          <AdsTab
+            pendingRefine={pendingRefine}
+            onRefineConsumed={() => setPendingRefine(null)}
+          />
+        )}
         {activeTab === 'content' && <ContentTab />}
-        {activeTab === 'performance' && <PerformanceTab />}
+        {activeTab === 'library' && <LibraryTab onRefine={handleRefineFromLibrary} />}
       </div>
     </div>
   )
