@@ -558,7 +558,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const isIdeaOrDone = currentStep === 'idea' || currentStep === 'done'
 
   return (
-    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', overflow: 'hidden' }}>
 
       {/* ── LEFT COLUMN — overflow hidden so input never moves ── */}
       <div
