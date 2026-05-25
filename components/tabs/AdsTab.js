@@ -116,17 +116,8 @@ const INDUSTRY_BUBBLES = [
   'Home Services', 'Health & Wellness', 'Real Estate', 'Finance', 'Coaching & Consulting',
   'E-Commerce', 'Restaurants & Food', 'Fitness', 'Beauty & Aesthetics', 'Legal',
   'Construction & Trades', 'Automotive', 'Education', 'Technology', 'Retail',
-  'Marketing & Advertising', 'Insurance', 'Dental & Medical', 'Accounting', 'Type your own',
+  'Marketing & Advertising', 'Insurance', 'Dental & Medical', 'Accounting',
 ]
-
-const INDUSTRY_SUB_MAP = {
-  'Home Services': ['HVAC', 'Plumbing', 'Electrical', 'Roofing', 'Landscaping', 'Cleaning', 'Pest Control', 'Pool Service', 'General Contractor', 'Type your own'],
-  'Health & Wellness': ['Chiropractor', 'Physical Therapy', 'Acupuncture', 'Nutritionist', 'Mental Health', 'Med Spa', 'Type your own'],
-  'Real Estate': ['Residential Agent', 'Commercial Agent', 'Property Manager', 'Mortgage Broker', 'Real Estate Investor', 'Type your own'],
-  'Finance': ['Financial Advisor', 'Accountant', 'Tax Preparer', 'Bookkeeper', 'Insurance Agent', 'Type your own'],
-  'Fitness': ['Gym Owner', 'Personal Trainer', 'CrossFit Box', 'Yoga Studio', 'Martial Arts', 'Sports Performance', 'Type your own'],
-  'Construction & Trades': ['General Contractor', 'HVAC', 'Plumber', 'Electrician', 'Roofer', 'Painter', 'Flooring', 'Type your own'],
-}
 
 const TRADE_INDUSTRIES = new Set([
   'HVAC', 'Plumbing', 'Electrical', 'Roofing', 'Landscaping', 'Cleaning', 'Pest Control',
@@ -134,17 +125,17 @@ const TRADE_INDUSTRIES = new Set([
   'Roofer', 'Painter', 'Flooring', 'Home Services',
 ])
 
-const ROLE_BUBBLES_DEFAULT = ['Business Owner', 'Independent Contractor', 'Manager', 'Employee', 'Freelancer', 'Investor', 'Executive', 'Type your own']
-const ROLE_BUBBLES_TRADES = ['Owner-Operator', 'Business Owner with team', 'Solo tech', 'Office manager', 'Type your own']
+const ROLE_BUBBLES_DEFAULT = ['Business Owner', 'Independent Contractor', 'Manager', 'Employee', 'Freelancer', 'Investor', 'Executive']
+const ROLE_BUBBLES_TRADES = ['Owner-Operator', 'Business Owner with team', 'Solo tech', 'Office manager']
 
-const BUSINESS_SIZE_BUBBLES = ['Just themselves', '2 to 5 people', '6 to 20 people', '20 to 50 people', '50 plus people', "Doesn't matter", 'Type your own']
-const AGE_RANGE_BUBBLES = ['18 to 25', '25 to 35', '35 to 45', '45 to 55', '55 plus', 'Mix of ages', 'Not sure', 'Type your own']
-const MEDIA_TRUST_BUBBLES = ['Local news', 'Facebook groups', 'YouTube', 'Industry trade publications', 'Word of mouth from peers', 'Google search', 'Podcasts', 'Type your own']
+const BUSINESS_SIZE_BUBBLES = ['Just themselves', '2 to 5 people', '6 to 20 people', '20 to 50 people', '50 plus people', "Doesn't matter"]
+const AGE_RANGE_BUBBLES = ['18 to 25', '25 to 35', '35 to 45', '45 to 55', '55 plus', 'Mix of ages', 'Not sure']
+const MEDIA_TRUST_BUBBLES = ['Local news', 'Facebook groups', 'YouTube', 'Industry trade publications', 'Word of mouth from peers', 'Google search', 'Podcasts']
 
 const AVATAR_FUNNEL_STEPS = ['industry', 'role', 'businessSize', 'ageRange', 'wants', 'fears', 'frustrations', 'statusDriver', 'mediaTrust', 'review']
 
 const AVATAR_STEP_MESSAGES = {
-  industry: 'What industry are you targeting? Pick one or type your own.',
+  industry: 'What industry are you targeting? Pick one or more.',
   role: 'What best describes them?',
   businessSize: 'How big is their operation?',
   ageRange: 'How old are they roughly?',
@@ -157,6 +148,13 @@ const AVATAR_STEP_MESSAGES = {
 }
 
 const DYNAMIC_AVATAR_STEPS = new Set(['wants', 'fears', 'frustrations', 'statusDriver'])
+
+const FIELD_LABELS = {
+  industry: 'INDUSTRY', role: 'ROLE', businessSize: 'BUSINESS SIZE',
+  ageRange: 'AGE RANGE', wants: 'WANTS', fears: 'FEARS',
+  frustrations: 'FRUSTRATIONS', statusDriver: 'WHAT WINNING LOOKS LIKE',
+  mediaTrust: 'MEDIA TRUST',
+}
 
 // ─── Shared constants ─────────────────────────────────────────────────────────
 
@@ -207,7 +205,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   // Avatar funnel state
   const [avatarFunnelStep, setAvatarFunnelStep] = useState('industry')
   const [avatarData, setAvatarData] = useState(EMPTY_AVATAR_DATA())
-  const [avatarSubIndustries, setAvatarSubIndustries] = useState(null)
   const [avatarNameInput, setAvatarNameInput] = useState('')
 
   // Avatar bar state
@@ -216,6 +213,19 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [avatarModal, setAvatarModal] = useState(null)
   const [avatarForm, setAvatarForm] = useState({ ...EMPTY_AVATAR_FORM })
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // NEW: Multi-select + back + edit + dropdown + delete
+  const [avatarSelectedBubbles, setAvatarSelectedBubbles] = useState([])
+  const [avatarFunnelHistory, setAvatarFunnelHistory] = useState([])
+  const [avatarEditMode, setAvatarEditMode] = useState(false)
+  const [avatarEditingField, setAvatarEditingField] = useState(null)
+  const [avatarEditingId, setAvatarEditingId] = useState(null)
+  const [avatarDropdown, setAvatarDropdown] = useState(null)
+  const [avatarDeleteConfirm, setAvatarDeleteConfirm] = useState(null)
+
+  const avatarDropdownRef = useRef(null)
+
+  // ─── useEffects ───────────────────────────────────────────────────────────────
 
   useEffect(() => {
     loadAvatars()
@@ -241,6 +251,18 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [sectionChats, activeSection])
+
+  // Close avatar dropdown on outside click
+  useEffect(() => {
+    if (avatarDropdown === null) return
+    function handleClickOutside(e) {
+      if (avatarDropdownRef.current && !avatarDropdownRef.current.contains(e.target)) {
+        setAvatarDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [avatarDropdown])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -310,13 +332,27 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     return starters.some(w => lower.startsWith(w))
   }
 
+  function isTrade(industry) {
+    if (!industry) return false
+    return industry.split(' / ').some(ind => TRADE_INDUSTRIES.has(ind.trim()))
+  }
+
+  function suggestAvatarName(data) {
+    const parts = [data.industry, data.role].filter(Boolean)
+    return parts.length > 0 ? parts.join(' ') : ''
+  }
+
   // ─── Avatar funnel ────────────────────────────────────────────────────────────
 
   function initAvatarFunnel() {
     setAvatarFunnelStep('industry')
     setAvatarData(EMPTY_AVATAR_DATA())
-    setAvatarSubIndustries(null)
     setAvatarNameInput('')
+    setAvatarSelectedBubbles([])
+    setAvatarFunnelHistory([])
+    setAvatarEditMode(false)
+    setAvatarEditingField(null)
+    setAvatarEditingId(null)
     setSectionChats(prev => ({
       ...prev,
       avatar: [{ role: 'assistant', content: AVATAR_STEP_MESSAGES.industry }],
@@ -331,14 +367,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   function restoreAvatarFunnel() {
     const step = avatarFunnelStep
+    setAvatarSelectedBubbles([])
     if (step === 'review') { setCurrentBubbles([]); return }
     if (DYNAMIC_AVATAR_STEPS.has(step)) {
       generateDynamicAvatarBubbles(step, avatarData)
-    } else if (step === 'industry') {
-      setCurrentBubbles(avatarSubIndustries || INDUSTRY_BUBBLES)
     } else {
       const staticBubbles = {
-        role: TRADE_INDUSTRIES.has(avatarData.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
+        industry: INDUSTRY_BUBBLES,
+        role: isTrade(avatarData.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
         businessSize: BUSINESS_SIZE_BUBBLES,
         ageRange: AGE_RANGE_BUBBLES,
         mediaTrust: MEDIA_TRUST_BUBBLES,
@@ -349,16 +385,23 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   function gotoAvatarStep(step, data) {
     setAvatarFunnelStep(step)
+    setAvatarSelectedBubbles([])
     setSectionChats(prev => ({
       ...prev,
       avatar: [...prev.avatar, { role: 'assistant', content: AVATAR_STEP_MESSAGES[step] }],
     }))
-    if (step === 'review') { setCurrentBubbles([]); return }
+    if (step === 'review') {
+      const suggested = suggestAvatarName(data || avatarData)
+      setAvatarNameInput(suggested)
+      setCurrentBubbles([])
+      return
+    }
     if (DYNAMIC_AVATAR_STEPS.has(step)) {
       generateDynamicAvatarBubbles(step, data)
     } else {
       const staticBubbles = {
-        role: TRADE_INDUSTRIES.has(data?.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
+        industry: INDUSTRY_BUBBLES,
+        role: isTrade(data?.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
         businessSize: BUSINESS_SIZE_BUBBLES,
         ageRange: AGE_RANGE_BUBBLES,
         mediaTrust: MEDIA_TRUST_BUBBLES,
@@ -386,93 +429,194 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
       )
       const parsed = parseResponse(raw)
       if (parsed && parsed.options) {
-        setCurrentBubbles([...parsed.options, 'Type your own'])
+        setCurrentBubbles(parsed.options)
       } else {
-        setCurrentBubbles(['Type your own'])
+        setCurrentBubbles([])
       }
     } catch (err) {
       console.error('Dynamic avatar bubbles error:', err)
-      setCurrentBubbles(['Type your own'])
+      setCurrentBubbles([])
     }
     setIsLoading(false)
   }
 
-  async function handleAvatarFunnelSelect(value) {
-    if (value === 'Type your own') return
+  // Multi-select toggle for avatar funnel bubbles
+  function handleAvatarBubbleToggle(bubble) {
+    const activeStep = avatarEditingField || avatarFunnelStep
+    const maxSelect = activeStep === 'mediaTrust' ? 4 : 2
+    setAvatarSelectedBubbles(prev => {
+      if (prev.includes(bubble)) return prev.filter(b => b !== bubble)
+      if (prev.length >= maxSelect) return prev
+      return [...prev, bubble]
+    })
+  }
 
-    const step = avatarFunnelStep
+  // Continue button: advance with combined selected values
+  function handleAvatarContinue() {
+    if (avatarSelectedBubbles.length === 0) return
+    const combined = avatarSelectedBubbles.join(' / ')
+    const currentChatLength = sectionChats.avatar.length
 
-    if (step === 'industry') {
-      if (avatarSubIndustries === null) {
-        setSectionChats(prev => ({
-          ...prev,
-          avatar: [...prev.avatar, { role: 'user', content: value }],
-        }))
-        const subMap = INDUSTRY_SUB_MAP[value]
-        if (subMap) {
-          setAvatarSubIndustries(subMap)
-          setSectionChats(prev => ({
-            ...prev,
-            avatar: [...prev.avatar, { role: 'assistant', content: `Which type of ${value}?` }],
-          }))
-          setCurrentBubbles(subMap)
-        } else {
-          const newData = { ...avatarData, industry: value }
-          setAvatarData(newData)
-          gotoAvatarStep('role', newData)
-        }
-      } else {
-        setSectionChats(prev => ({
-          ...prev,
-          avatar: [...prev.avatar, { role: 'user', content: value }],
-        }))
-        const newData = { ...avatarData, industry: value }
-        setAvatarData(newData)
-        setAvatarSubIndustries(null)
-        gotoAvatarStep('role', newData)
-      }
-      return
-    }
+    // Push current state to history before advancing
+    setAvatarFunnelHistory(prev => [...prev, {
+      step: avatarFunnelStep,
+      bubbles: [...currentBubbles],
+      data: { ...avatarData },
+      selectedBubbles: [...avatarSelectedBubbles],
+      chatLength: currentChatLength,
+    }])
 
+    // Add user message
     setSectionChats(prev => ({
       ...prev,
-      avatar: [...prev.avatar, { role: 'user', content: value }],
+      avatar: [...prev.avatar, { role: 'user', content: combined }],
     }))
 
     const fieldMap = {
-      role: 'role', businessSize: 'businessSize', ageRange: 'ageRange',
+      industry: 'industry', role: 'role', businessSize: 'businessSize', ageRange: 'ageRange',
       wants: 'wants', fears: 'fears', frustrations: 'frustrations',
       statusDriver: 'statusDriver', mediaTrust: 'mediaTrust',
     }
-    const field = fieldMap[step]
-    const newData = field ? { ...avatarData, [field]: value } : avatarData
+    const field = fieldMap[avatarFunnelStep]
+    const newData = field ? { ...avatarData, [field]: combined } : avatarData
     if (field) setAvatarData(newData)
 
-    const nextIdx = AVATAR_FUNNEL_STEPS.indexOf(step) + 1
+    setAvatarSelectedBubbles([])
+
+    const nextIdx = AVATAR_FUNNEL_STEPS.indexOf(avatarFunnelStep) + 1
     if (nextIdx < AVATAR_FUNNEL_STEPS.length) {
       gotoAvatarStep(AVATAR_FUNNEL_STEPS[nextIdx], newData)
     }
   }
 
-  async function handleAskJarvisNonAvatar(text) {
-    if (!text.trim()) return
-    const questionText = text.trim()
-    setTypeOwn('')
-    const questionSystem = `User is asking a question while on section: ${activeSection}. Their question: ${questionText}. Answer in 1-2 simple sentences. Explain it like they have never done marketing before. Then in one sentence redirect them back to what they were doing. Do not generate bubble options in this response. Return plain text only not JSON.`
-    const userMsg = { role: 'user', content: questionText }
-    setSectionChats(prev => ({ ...prev, [activeSection]: [...prev[activeSection], userMsg] }))
+  // Back button: restore previous step
+  function goBackAvatarStep() {
+    if (avatarFunnelHistory.length === 0) return
+    const prevState = avatarFunnelHistory[avatarFunnelHistory.length - 1]
+    setAvatarFunnelHistory(h => h.slice(0, -1))
+    setAvatarFunnelStep(prevState.step)
+    setCurrentBubbles(prevState.bubbles)
+    setAvatarData(prevState.data)
+    setAvatarSelectedBubbles(prevState.selectedBubbles || [])
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: prev.avatar.slice(0, prevState.chatLength),
+    }))
+  }
+
+  // Get more options for current funnel step
+  async function handleGetMoreAvatarOptions() {
+    const step = avatarEditingField || avatarFunnelStep
+    const excludeList = currentBubbles.join(', ')
+    const system = `You are an expert in consumer psychology and ad targeting.
+Generate exactly 4 different options for this avatar funnel step: "${step}".
+Avatar context so far: industry="${avatarData.industry || '?'}", role="${avatarData.role || '?'}", businessSize="${avatarData.businessSize || '?'}", ageRange="${avatarData.ageRange || '?'}"
+Do NOT repeat these already-shown options: [${excludeList}]
+Options must be specific, practical, and different from what is already shown.
+Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4"]}`
     setIsLoading(true)
     try {
-      const raw = await callAPI(activeSection, [userMsg], sectionValues, selectedAvatar, selectedAngles, questionSystem)
-      setSectionChats(prev => ({
-        ...prev,
-        [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
-      }))
+      const raw = await callAPI('avatar', [{ role: 'user', content: `More options for: ${step}` }], sectionValues, null, [], system)
+      const parsed = parseResponse(raw)
+      if (parsed && parsed.options) {
+        const selected = avatarSelectedBubbles
+        setCurrentBubbles([...selected, ...parsed.options.filter(o => !selected.includes(o))])
+      }
     } catch (err) {
-      console.error('Ask Jarvis error:', err)
+      console.error('Get more options error:', err)
     }
     setIsLoading(false)
   }
+
+  // ─── Avatar edit mode (re-edit fields after creation) ─────────────────────────
+
+  function startEditingAvatarField(field) {
+    setAvatarEditingField(field)
+    setAvatarSelectedBubbles([])
+    if (DYNAMIC_AVATAR_STEPS.has(field)) {
+      generateDynamicAvatarBubbles(field, avatarData)
+    } else {
+      const staticBubbles = {
+        industry: INDUSTRY_BUBBLES,
+        role: isTrade(avatarData.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
+        businessSize: BUSINESS_SIZE_BUBBLES,
+        ageRange: AGE_RANGE_BUBBLES,
+        mediaTrust: MEDIA_TRUST_BUBBLES,
+      }
+      setCurrentBubbles(staticBubbles[field] || [])
+    }
+  }
+
+  function confirmEditAvatarField() {
+    if (avatarSelectedBubbles.length === 0) return
+    const combined = avatarSelectedBubbles.join(' / ')
+    setAvatarData(prev => ({ ...prev, [avatarEditingField]: combined }))
+    setAvatarEditingField(null)
+    setAvatarSelectedBubbles([])
+    setCurrentBubbles([])
+  }
+
+  // ─── Avatar save ──────────────────────────────────────────────────────────────
+
+  async function handleSaveAvatarFunnel() {
+    if (!avatarNameInput.trim()) return
+    try {
+      const primaryEmotion = [avatarData.fears, avatarData.frustrations].filter(Boolean).join(' / ')
+      const body = {
+        name: avatarNameInput.trim(),
+        age_range: avatarData.ageRange || '',
+        niche: [avatarData.industry, avatarData.role].filter(Boolean).join(' - '),
+        what_they_want: avatarData.wants || '',
+        what_they_fear: [avatarData.fears, avatarData.deepFear || avatarData.fears].filter(Boolean).join(' / '),
+        what_they_trust: avatarData.mediaTrust || '',
+        primary_emotion: primaryEmotion,
+      }
+
+      let res
+      if (avatarEditingId) {
+        res = await fetch('/api/avatars', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: avatarEditingId, ...body }),
+        })
+      } else {
+        res = await fetch('/api/avatars', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
+      const data = await res.json()
+      await loadAvatars()
+      if (data.avatar) {
+        setSelectedAvatar(data.avatar)
+        const newSvs = { ...sectionValues, avatar: data.avatar.name }
+        setSectionValues(newSvs)
+        setSectionChats(prev => ({
+          ...prev,
+          avatar: [
+            ...prev.avatar,
+            { role: 'user', content: `Name: ${data.avatar.name}` },
+            { role: 'assistant', content: `Avatar "${data.avatar.name}" saved. Moving to visual format.` },
+          ],
+        }))
+        setAvatarFunnelStep('industry')
+        setAvatarData(EMPTY_AVATAR_DATA())
+        setAvatarNameInput('')
+        setAvatarSelectedBubbles([])
+        setAvatarFunnelHistory([])
+        setAvatarEditMode(false)
+        setAvatarEditingField(null)
+        setAvatarEditingId(null)
+        setActiveSection('visual_format')
+        openSection('visual_format', newSvs, data.avatar, [])
+      }
+    } catch (err) {
+      console.error('Save avatar funnel error:', err)
+    }
+  }
+
+  // ─── Avatar bar actions ───────────────────────────────────────────────────────
 
   async function handleAvatarTypeOwn(text) {
     if (!text.trim()) return
@@ -500,51 +644,155 @@ Do not generate bubble options in this response.`
       }
       setIsLoading(false)
     } else {
-      await handleAvatarFunnelSelect(text)
+      // Treat typed text as a selection for the current step
+      setAvatarSelectedBubbles(prev => {
+        if (prev.includes(text)) return prev
+        const activeStep = avatarEditingField || avatarFunnelStep
+        const maxSelect = activeStep === 'mediaTrust' ? 4 : 2
+        if (prev.length >= maxSelect) return prev
+        return [...prev, text]
+      })
+      // Add to bubbles so it's visible
+      setCurrentBubbles(prev => prev.includes(text) ? prev : [...prev, text])
     }
   }
 
-  async function handleSaveAvatarFunnel() {
-    if (!avatarNameInput.trim()) return
+  function handleAvatarSelect(av) {
+    const newSelected = selectedAvatar?.id === av.id ? null : av
+    setSelectedAvatar(newSelected)
+
+    if (newSelected) {
+      const newSvs = { ...sectionValues, avatar: newSelected.name }
+      setSectionValues(newSvs)
+      setSectionChats(prev => ({
+        ...prev,
+        avatar: [{ role: 'assistant', content: `Avatar locked in. Writing for ${newSelected.name}.` }],
+      }))
+      setAvatarFunnelStep('industry')
+      setAvatarData(EMPTY_AVATAR_DATA())
+      setAvatarNameInput('')
+      setAvatarSelectedBubbles([])
+      setAvatarFunnelHistory([])
+      setAvatarEditMode(false)
+      setAvatarEditingField(null)
+      setAvatarEditingId(null)
+      setActiveSection('visual_format')
+      openSection('visual_format', newSvs, newSelected, [])
+    } else {
+      setSectionValues(prev => ({ ...prev, avatar: null }))
+      setSectionChats(prev => ({ ...prev, avatar: [] }))
+    }
+  }
+
+  function handleEditAvatarFromBar(av) {
+    setAvatarDropdown(null)
+    // Parse stored avatar back into avatarData fields
+    const nicheParts = (av.niche || '').split(' - ')
+    setAvatarData({
+      industry: nicheParts[0] || null,
+      role: nicheParts[1] || null,
+      businessSize: null,
+      ageRange: av.age_range || null,
+      location: null,
+      wants: av.what_they_want || null,
+      fears: av.what_they_fear || null,
+      frustrations: null,
+      statusDriver: null,
+      mediaTrust: av.what_they_trust || null,
+      deepFear: null,
+      winLooksLike: null,
+    })
+    setAvatarNameInput(av.name || '')
+    setAvatarEditingId(av.id)
+    setAvatarFunnelStep('review')
+    setAvatarEditMode(true)
+    setAvatarEditingField(null)
+    setAvatarSelectedBubbles([])
+    setAvatarFunnelHistory([])
+    setCurrentBubbles([])
+    setActiveSection('avatar')
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: [{ role: 'assistant', content: `Editing avatar: ${av.name}` }],
+    }))
+  }
+
+  async function handleDeleteAvatar(av) {
     try {
-      const primaryEmotion = [avatarData.fears, avatarData.frustrations].filter(Boolean).join(' / ')
-      const body = {
-        name: avatarNameInput.trim(),
-        age_range: avatarData.ageRange || '',
-        niche: [avatarData.industry, avatarData.role].filter(Boolean).join(' - '),
-        what_they_want: avatarData.wants || '',
-        what_they_fear: [avatarData.fears, avatarData.deepFear || avatarData.fears].filter(Boolean).join(' / '),
-        what_they_trust: avatarData.mediaTrust || '',
-        primary_emotion: primaryEmotion,
+      await fetch('/api/avatars', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: av.id }),
+      })
+      setAvatarDeleteConfirm(null)
+      setAvatarDropdown(null)
+      await loadAvatars()
+      if (selectedAvatar?.id === av.id) {
+        setSelectedAvatar(null)
+        setSectionValues(prev => ({ ...prev, avatar: null }))
+        setActiveSection('avatar')
+        initAvatarFunnel()
       }
+    } catch (err) {
+      console.error('Delete avatar error:', err)
+    }
+  }
+
+  async function handleAskJarvisNonAvatar(text) {
+    if (!text.trim()) return
+    const questionText = text.trim()
+    setTypeOwn('')
+    const questionSystem = `User is asking a question while on section: ${activeSection}. Their question: ${questionText}. Answer in 1-2 simple sentences. Explain it like they have never done marketing before. Then in one sentence redirect them back to what they were doing. Do not generate bubble options in this response. Return plain text only not JSON.`
+    const userMsg = { role: 'user', content: questionText }
+    setSectionChats(prev => ({ ...prev, [activeSection]: [...prev[activeSection], userMsg] }))
+    setIsLoading(true)
+    try {
+      const raw = await callAPI(activeSection, [userMsg], sectionValues, selectedAvatar, selectedAngles, questionSystem)
+      setSectionChats(prev => ({
+        ...prev,
+        [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
+      }))
+    } catch (err) {
+      console.error('Ask Jarvis error:', err)
+    }
+    setIsLoading(false)
+  }
+
+  // ─── Avatar bar modal edit ────────────────────────────────────────────────────
+
+  async function handleSaveAvatar() {
+    if (!avatarForm.name.trim()) return
+    try {
+      const isEdit = avatarModal?.mode === 'edit'
+      const method = isEdit ? 'PATCH' : 'POST'
+      const body = isEdit ? { id: avatarModal.data.id, ...avatarForm } : avatarForm
       const res = await fetch('/api/avatars', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       const data = await res.json()
       await loadAvatars()
-      if (data.avatar) {
-        setSelectedAvatar(data.avatar)
-        const newSvs = { ...sectionValues, avatar: data.avatar.name }
-        setSectionValues(newSvs)
-        setSectionChats(prev => ({
-          ...prev,
-          avatar: [
-            ...prev.avatar,
-            { role: 'user', content: `Name: ${data.avatar.name}` },
-            { role: 'assistant', content: `Avatar "${data.avatar.name}" saved. Moving to visual format.` },
-          ],
-        }))
-        setAvatarFunnelStep('industry')
-        setAvatarData(EMPTY_AVATAR_DATA())
-        setAvatarNameInput('')
-        setActiveSection('visual_format')
-        openSection('visual_format', newSvs, data.avatar, [])
-      }
+      if (!isEdit && data.avatar) setSelectedAvatar(data.avatar)
+      setAvatarModal(null)
+      setAvatarForm({ ...EMPTY_AVATAR_FORM })
     } catch (err) {
-      console.error('Save avatar funnel error:', err)
+      console.error('Save avatar error:', err)
     }
+  }
+
+  function openEditAvatar(av) {
+    setAvatarForm({
+      name: av.name || '',
+      age_range: av.age_range || '',
+      niche: av.niche || '',
+      what_they_want: av.what_they_want || '',
+      what_they_fear: av.what_they_fear || '',
+      what_they_trust: av.what_they_trust || '',
+      primary_emotion: av.primary_emotion || '',
+    })
+    setAvatarModal({ mode: 'edit', data: av })
+    setAvatarDropdown(null)
   }
 
   // ─── Section management ───────────────────────────────────────────────────────
@@ -723,65 +971,6 @@ Do not generate bubble options in this response.`
     } catch (err) {
       console.error('Image gen error:', err)
     }
-  }
-
-  // ─── Avatar bar management ────────────────────────────────────────────────────
-
-  function handleAvatarSelect(av) {
-    const newSelected = selectedAvatar?.id === av.id ? null : av
-    setSelectedAvatar(newSelected)
-
-    if (newSelected) {
-      const newSvs = { ...sectionValues, avatar: newSelected.name }
-      setSectionValues(newSvs)
-      setSectionChats(prev => ({
-        ...prev,
-        avatar: [{ role: 'assistant', content: `Avatar locked in. Writing for ${newSelected.name}.` }],
-      }))
-      setAvatarFunnelStep('industry')
-      setAvatarData(EMPTY_AVATAR_DATA())
-      setAvatarSubIndustries(null)
-      setAvatarNameInput('')
-      setActiveSection('visual_format')
-      openSection('visual_format', newSvs, newSelected, [])
-    } else {
-      setSectionValues(prev => ({ ...prev, avatar: null }))
-      setSectionChats(prev => ({ ...prev, avatar: [] }))
-    }
-  }
-
-  async function handleSaveAvatar() {
-    if (!avatarForm.name.trim()) return
-    try {
-      const isEdit = avatarModal?.mode === 'edit'
-      const method = isEdit ? 'PATCH' : 'POST'
-      const body = isEdit ? { id: avatarModal.data.id, ...avatarForm } : avatarForm
-      const res = await fetch('/api/avatars', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      await loadAvatars()
-      if (!isEdit && data.avatar) setSelectedAvatar(data.avatar)
-      setAvatarModal(null)
-      setAvatarForm({ ...EMPTY_AVATAR_FORM })
-    } catch (err) {
-      console.error('Save avatar error:', err)
-    }
-  }
-
-  function openEditAvatar(av) {
-    setAvatarForm({
-      name: av.name || '',
-      age_range: av.age_range || '',
-      niche: av.niche || '',
-      what_they_want: av.what_they_want || '',
-      what_they_fear: av.what_they_fear || '',
-      what_they_trust: av.what_they_trust || '',
-      primary_emotion: av.primary_emotion || '',
-    })
-    setAvatarModal({ mode: 'edit', data: av })
   }
 
   // ─── Library ──────────────────────────────────────────────────────────────────
@@ -966,12 +1155,21 @@ You have opinions. Use them.`
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
   const sectionAngles = SECTION_ANGLES[activeSection] || []
   const canSubmit = selectedBubbles.length === 1 && !isLoading
+  const avatarStepIdx = AVATAR_FUNNEL_STEPS.indexOf(avatarFunnelStep)
+  const activeStepForMax = avatarEditingField || avatarFunnelStep
+  const avatarMaxSelect = activeStepForMax === 'mediaTrust' ? 4 : 2
 
-  const FIELD_LABELS = {
-    industry: 'INDUSTRY', role: 'ROLE', businessSize: 'BUSINESS SIZE',
-    ageRange: 'AGE RANGE', wants: 'WANTS', fears: 'FEARS',
-    frustrations: 'FRUSTRATIONS', statusDriver: 'WHAT WINNING LOOKS LIKE',
-    mediaTrust: 'MEDIA TRUST',
+  // Shared bubble button styles for avatar funnel
+  function avatarBubbleStyle(bubble) {
+    const selected = avatarSelectedBubbles.includes(bubble)
+    return {
+      border: `1px solid ${selected ? '#2990fa' : '#152840'}`,
+      background: selected ? '#0a1f3f' : '#060d1f',
+      color: selected ? '#ffffff' : 'rgba(255,255,255,0.75)',
+      padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+      fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
+      lineHeight: 1.4, textAlign: 'left', width: '100%', boxSizing: 'border-box',
+    }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
@@ -995,25 +1193,57 @@ You have opinions. Use them.`
               </div>
             )}
             {avatars.map(av => (
-              <div key={av.id} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <div
-                  onClick={() => handleAvatarSelect(av)}
-                  style={{
-                    background: selectedAvatar?.id === av.id ? '#2990fa' : '#060d1f',
-                    border: '1px solid #2990fa', borderRadius: 6, padding: '6px 14px',
-                    cursor: 'pointer', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)',
-                    fontSize: '0.6rem', whiteSpace: 'nowrap', userSelect: 'none',
-                  }}
-                >
-                  {av.name}
+              <div key={av.id} style={{ position: 'relative', flexShrink: 0 }} ref={avatarDropdown === av.id ? avatarDropdownRef : null}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                  <div
+                    onClick={() => handleAvatarSelect(av)}
+                    style={{
+                      background: selectedAvatar?.id === av.id ? '#2990fa' : '#060d1f',
+                      border: '1px solid #2990fa', borderRadius: '6px 0 0 6px',
+                      padding: '6px 14px', cursor: 'pointer', color: '#ffffff',
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem',
+                      whiteSpace: 'nowrap', userSelect: 'none',
+                    }}
+                  >
+                    {av.name}
+                  </div>
+                  <div
+                    onClick={e => { e.stopPropagation(); setAvatarDropdown(prev => prev === av.id ? null : av.id) }}
+                    style={{
+                      background: selectedAvatar?.id === av.id ? '#1a7adf' : '#0a1628',
+                      border: '1px solid #2990fa', borderLeft: 'none',
+                      borderRadius: '0 6px 6px 0', padding: '6px 8px',
+                      cursor: 'pointer', color: '#2990fa', fontSize: '0.65rem',
+                      userSelect: 'none', lineHeight: 1,
+                    }}
+                  >
+                    ⋮
+                  </div>
                 </div>
-                <div
-                  onClick={() => openEditAvatar(av)}
-                  style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', padding: '2px 5px', lineHeight: 1, userSelect: 'none' }}
-                  title="Edit avatar"
-                >
-                  ✎
-                </div>
+                {avatarDropdown === av.id && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: 4,
+                    background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8,
+                    padding: 8, minWidth: 140,
+                  }}>
+                    <div
+                      onClick={() => handleEditAvatarFromBar(av)}
+                      style={{ padding: '8px 14px', color: '#ffffff', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      ✎ Edit
+                    </div>
+                    <div
+                      onClick={() => { setAvatarDropdown(null); setAvatarDeleteConfirm(av) }}
+                      style={{ padding: '8px 14px', color: '#ff4455', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      🗑 Delete
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1039,16 +1269,9 @@ You have opinions. Use them.`
           {/* ── LEFT COLUMN ── */}
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-            {activeSection === null ? (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060d1f', borderRadius: 10, border: '1px solid #152840' }}>
-                <div style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-inter)', fontSize: '0.9rem' }}>
-                  Select a section to continue
-                </div>
-              </div>
-            ) : (<>
-            {/* Section header */}
+            {/* 1. Section title row — always visible */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 12px 0', flexShrink: 0 }}>
-              {activeSectionIdx > 0 && (
+              {activeSection !== null && activeSectionIdx > 0 && (
                 <button
                   onClick={() => gotoSection(SECTIONS[activeSectionIdx - 1])}
                   style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}
@@ -1056,10 +1279,10 @@ You have opinions. Use them.`
                   ←
                 </button>
               )}
-              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#2990fa', letterSpacing: '0.05em' }}>
-                {SECTION_LABELS[activeSection]}
+              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
+                {activeSection ? SECTION_LABELS[activeSection] : 'SELECT SECTION'}
               </div>
-              {activeSectionIdx < SECTIONS.length - 1 && (
+              {activeSection !== null && activeSectionIdx >= 0 && activeSectionIdx < SECTIONS.length - 1 && (
                 <button
                   onClick={() => gotoSection(SECTIONS[activeSectionIdx + 1])}
                   style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}
@@ -1069,14 +1292,19 @@ You have opinions. Use them.`
               )}
             </div>
 
-            {/* Chat messages */}
+            {/* 2. Chat messages area — always visible */}
             <div ref={chatScrollRef} style={{
-              flex: 1, overflowY: 'auto', minHeight: 0,
+              flex: 1, overflowY: 'auto', minHeight: 80,
               display: 'flex', flexDirection: 'column', gap: 10,
               padding: 12, background: '#060d1f', borderRadius: 10, border: '1px solid #152840',
               marginBottom: 10,
             }}>
-              {sectionChats[activeSection].filter(m => !shouldHideMessage(m)).map((msg, idx) => (
+              {activeSection === null && (
+                <div style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-inter)', fontSize: '0.88rem', textAlign: 'center', paddingTop: 24 }}>
+                  Select a section to continue
+                </div>
+              )}
+              {activeSection && (sectionChats[activeSection] || []).filter(m => !shouldHideMessage(m)).map((msg, idx) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <div style={{
                     background: msg.role === 'user' ? '#2990fa' : '#0a1628',
@@ -1096,28 +1324,98 @@ You have opinions. Use them.`
               )}
             </div>
 
-            {/* ── AVATAR SECTION CONTROLS ── */}
+            {/* 3. Controls area — conditional */}
             {activeSection === 'avatar' ? (
-              avatarFunnelStep === 'review' ? (
-                <div style={{ flexShrink: 0, overflowY: 'auto' }}>
-                  {/* Summary card */}
-                  <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                    {Object.entries(FIELD_LABELS).map(([field, label]) =>
-                      avatarData[field] ? (
-                        <div key={field} style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+
+              avatarEditMode ? (
+                /* ── EDIT MODE ── */
+                avatarEditingField !== null ? (
+                  /* Field editing */
+                  <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <button
+                        onClick={() => { setAvatarEditingField(null); setAvatarSelectedBubbles([]); setCurrentBubbles([]) }}
+                        style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', padding: '5px 12px', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)' }}
+                      >
+                        ← Back
+                      </button>
+                      <span style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        {FIELD_LABELS[avatarEditingField]}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                      {currentBubbles.map((bubble, idx) => (
+                        <div key={idx} onClick={() => handleAvatarBubbleToggle(bubble)} style={avatarBubbleStyle(bubble)}>
+                          {bubble}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleGetMoreAvatarOptions}
+                      disabled={isLoading}
+                      style={{ color: '#2990fa', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.72rem', padding: '4px 0', fontFamily: 'var(--font-inter)', display: 'block', marginBottom: 6, opacity: isLoading ? 0.5 : 1 }}
+                    >
+                      Get more options
+                    </button>
+                    {avatarSelectedBubbles.length > 0 && (
+                      <button
+                        onClick={confirmEditAvatarField}
+                        style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: '10px 0', color: '#ffffff', width: '100%', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer' }}
+                      >
+                        Continue → ({avatarSelectedBubbles.length} selected)
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* Chips grid */
+                  <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      {Object.entries(FIELD_LABELS).map(([field, label]) => (
+                        <div
+                          key={field}
+                          onClick={() => startEditingAvatarField(field)}
+                          style={{
+                            background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8,
+                            padding: '10px 12px', cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
                             {label}
                           </div>
-                          <div style={{ fontSize: '0.88rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
+                          <div style={{ fontSize: '0.78rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.4 }}>
+                            {avatarData[field] || <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setAvatarEditMode(false)}
+                      style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', width: '100%', padding: '10px 0', borderRadius: 6, fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer' }}
+                    >
+                      ← Back to Summary
+                    </button>
+                  </div>
+                )
+
+              ) : avatarFunnelStep === 'review' ? (
+                /* ── REVIEW STEP ── */
+                <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                  <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                    {Object.entries(FIELD_LABELS).map(([field, label]) =>
+                      avatarData[field] ? (
+                        <div key={field} style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+                            {label}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.5 }}>
                             {avatarData[field]}
                           </div>
                         </div>
                       ) : null
                     )}
                   </div>
-                  {/* Name input */}
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                    <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
                       AVATAR NAME
                     </div>
                     <input
@@ -1131,75 +1429,91 @@ You have opinions. Use them.`
                       }}
                     />
                   </div>
-                  {/* Save button */}
                   <button
                     onClick={handleSaveAvatarFunnel}
                     disabled={!avatarNameInput.trim()}
                     style={{
                       background: avatarNameInput.trim() ? '#2990fa' : '#0a1628',
-                      border: '1px solid #2990fa', borderRadius: 6,
-                      padding: '10px 22px', color: avatarNameInput.trim() ? '#ffffff' : '#4a6a8a',
+                      border: '1px solid #2990fa', borderRadius: 6, padding: '10px 0',
+                      color: avatarNameInput.trim() ? '#ffffff' : '#4a6a8a',
                       fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                      cursor: avatarNameInput.trim() ? 'pointer' : 'not-allowed', width: '100%',
+                      cursor: avatarNameInput.trim() ? 'pointer' : 'not-allowed',
+                      width: '100%', marginBottom: 8,
                     }}
                   >
                     SAVE AVATAR
                   </button>
+                  <button
+                    onClick={() => setAvatarEditMode(true)}
+                    style={{
+                      background: 'transparent', border: '1px solid #2990fa', borderRadius: 6,
+                      padding: '10px 0', color: '#2990fa',
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                      cursor: 'pointer', width: '100%',
+                    }}
+                  >
+                    EDIT SECTIONS
+                  </button>
                 </div>
+
               ) : (
-                <>
-                  {/* Avatar funnel bubbles */}
-                  <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 380, overflowY: 'auto', padding: '4px 2px', marginBottom: 8 }}>
-                    {currentBubbles.map((bubble, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => handleAvatarFunnelSelect(bubble)}
-                        style={{
-                          border: `1px solid ${bubble === 'Type your own' ? '#152840' : '#2990fa'}`,
-                          background: '#060d1f',
-                          color: bubble === 'Type your own' ? '#4a6a8a' : '#ffffff',
-                          padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                          fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
-                          lineHeight: 1.4, minHeight: 'auto', display: 'flex', alignItems: 'center',
-                          width: '100%', boxSizing: 'border-box',
-                        }}
+                /* ── AVATAR FUNNEL STEPS ── */
+                <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                  {/* Step indicator + back button */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    {avatarFunnelHistory.length > 0 && (
+                      <button
+                        onClick={goBackAvatarStep}
+                        style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', padding: '6px 12px', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)' }}
                       >
+                        ←
+                      </button>
+                    )}
+                    <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                      Step {avatarStepIdx + 1} of {AVATAR_FUNNEL_STEPS.length - 1}
+                    </span>
+                    {avatarSelectedBubbles.length > 0 && (
+                      <span style={{ fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                        {avatarSelectedBubbles.length}/{avatarMaxSelect}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bubbles grid — no Type your own */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                    {currentBubbles.filter(b => b !== 'Type your own').map((bubble, idx) => (
+                      <div key={idx} onClick={() => handleAvatarBubbleToggle(bubble)} style={avatarBubbleStyle(bubble)}>
                         {bubble}
                       </div>
                     ))}
                   </div>
-                  {/* Type your own for avatar */}
-                  <div style={{ flexShrink: 0, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <textarea
-                        value={typeOwn}
-                        onChange={e => setTypeOwn(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAvatarTypeOwn(typeOwn.trim()) } }}
-                        placeholder="Type your own or ask a question..."
-                        rows={1}
-                        style={{
-                          flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                          color: '#ffffff', padding: '8px 14px', borderRadius: 8,
-                          fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                          resize: 'none', minHeight: 36, maxHeight: 36, overflow: 'hidden', boxSizing: 'border-box',
-                        }}
-                      />
-                      {typeOwn.trim() && (
-                        <button
-                          onClick={() => handleAvatarTypeOwn(typeOwn.trim())}
-                          style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0 }}
-                        >
-                          →
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
+
+                  {/* Get more options */}
+                  <button
+                    onClick={handleGetMoreAvatarOptions}
+                    disabled={isLoading}
+                    style={{ color: '#2990fa', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.72rem', padding: '4px 0', fontFamily: 'var(--font-inter)', display: 'block', marginBottom: 4, opacity: isLoading ? 0.5 : 1 }}
+                  >
+                    Get more options
+                  </button>
+
+                  {/* Continue button */}
+                  {avatarSelectedBubbles.length > 0 && (
+                    <button
+                      onClick={handleAvatarContinue}
+                      style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: '10px 0', color: '#ffffff', width: '100%', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer', marginTop: 4 }}
+                    >
+                      Continue → ({avatarSelectedBubbles.length} selected)
+                    </button>
+                  )}
+                </div>
               )
-            ) : (
+
+            ) : activeSection !== null ? (
+
               /* ── NON-AVATAR SECTION CONTROLS ── */
               <>
-                {/* Angle buttons */}
+                {/* Angle buttons with subcategories */}
                 {sectionAngles.length > 0 && (
                   <div style={{ flexShrink: 0, marginBottom: 8 }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: expandedCategories.length > 0 ? 6 : 0 }}>
@@ -1245,7 +1559,7 @@ You have opinions. Use them.`
                   </div>
                 )}
 
-                {/* Bubbles */}
+                {/* Option bubbles */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
                   {currentBubbles.map((bubble, idx) => (
                     <div key={idx}>
@@ -1254,10 +1568,7 @@ You have opinions. Use them.`
                           <textarea
                             value={editingText}
                             onChange={e => setEditingText(e.target.value)}
-                            style={{
-                              background: '#0a1628', color: '#ffffff', border: 'none', outline: 'none',
-                              width: '100%', fontSize: '0.9rem', fontFamily: 'var(--font-inter)', resize: 'none', minHeight: 60,
-                            }}
+                            style={{ background: '#0a1628', color: '#ffffff', border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', fontFamily: 'var(--font-inter)', resize: 'none', minHeight: 60 }}
                           />
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                             <button onClick={() => handleEditSave(idx)} style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 4, padding: '4px 10px', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Save</button>
@@ -1288,80 +1599,119 @@ You have opinions. Use them.`
                     </div>
                   ))}
                 </div>
-
-                {/* Type your own */}
-                <div style={{ flexShrink: 0, marginBottom: 8 }}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input
-                      value={typeOwn}
-                      onChange={e => setTypeOwn(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          if (isQuestion(typeOwn.trim())) {
-                            handleAskJarvisNonAvatar(typeOwn.trim())
-                          } else {
-                            handleAddTypeOwn()
-                          }
-                        }
-                      }}
-                      placeholder="Type your own or ask a question..."
-                      style={{
-                        flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                        color: '#ffffff', padding: '8px 14px', borderRadius: 8,
-                        fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                        height: 36, boxSizing: 'border-box',
-                      }}
-                    />
-                    {typeOwn.trim() && (
-                      <>
-                        <button
-                          onClick={() => handleAskJarvisNonAvatar(typeOwn.trim())}
-                          style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                        >
-                          ASK
-                        </button>
-                        <button
-                          onClick={handleAddTypeOwn}
-                          style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                        >
-                          ADD
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div style={{ flexShrink: 0, display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={handleRefine}
-                    disabled={isLoading}
-                    style={{
-                      border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
-                      padding: '10px 22px', borderRadius: 6, cursor: isLoading ? 'not-allowed' : 'pointer',
-                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', opacity: isLoading ? 0.5 : 1,
-                    }}
-                  >
-                    REFINE
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={!canSubmit}
-                    style={{
-                      background: canSubmit ? '#2990fa' : '#152840',
-                      border: '1px solid #2990fa',
-                      color: canSubmit ? '#ffffff' : '#4a6a8a',
-                      padding: '10px 22px', borderRadius: 6,
-                      cursor: canSubmit ? 'pointer' : 'not-allowed',
-                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                    }}
-                  >
-                    SUBMIT
-                  </button>
-                </div>
               </>
+
+            ) : null}
+
+            {/* 4. Main chat input — always visible */}
+            <div style={{ flexShrink: 0, marginBottom: 8 }}>
+              {activeSection === 'avatar' && avatarFunnelStep !== 'review' && !avatarEditMode ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <textarea
+                    value={typeOwn}
+                    onChange={e => setTypeOwn(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (typeOwn.trim()) handleAvatarTypeOwn(typeOwn.trim()) } }}
+                    placeholder="Type your own or ask a question..."
+                    rows={1}
+                    style={{
+                      flex: 1, background: '#060d1f', border: '1px solid #2990fa',
+                      color: '#ffffff', padding: '8px 14px', borderRadius: 8,
+                      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                      resize: 'none', minHeight: 36, maxHeight: 36, overflow: 'hidden', boxSizing: 'border-box',
+                    }}
+                  />
+                  {typeOwn.trim() && (
+                    <button
+                      onClick={() => handleAvatarTypeOwn(typeOwn.trim())}
+                      style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      →
+                    </button>
+                  )}
+                </div>
+              ) : activeSection !== null && activeSection !== 'avatar' ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={typeOwn}
+                    onChange={e => setTypeOwn(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        if (isQuestion(typeOwn.trim())) {
+                          handleAskJarvisNonAvatar(typeOwn.trim())
+                        } else {
+                          handleAddTypeOwn()
+                        }
+                      }
+                    }}
+                    placeholder="Type your own or ask a question..."
+                    style={{
+                      flex: 1, background: '#060d1f', border: '1px solid #2990fa',
+                      color: '#ffffff', padding: '8px 14px', borderRadius: 8,
+                      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                      height: 36, boxSizing: 'border-box',
+                    }}
+                  />
+                  {typeOwn.trim() && (
+                    <>
+                      <button
+                        onClick={() => handleAskJarvisNonAvatar(typeOwn.trim())}
+                        style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                      >
+                        ASK
+                      </button>
+                      <button
+                        onClick={handleAddTypeOwn}
+                        style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                      >
+                        ADD
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <input
+                  disabled
+                  placeholder="Select a section to start..."
+                  style={{
+                    width: '100%', background: '#060d1f', border: '1px solid #152840',
+                    color: 'rgba(255,255,255,0.2)', padding: '8px 14px', borderRadius: 8,
+                    fontSize: '0.9rem', fontFamily: 'var(--font-inter)', opacity: 0.5, boxSizing: 'border-box', cursor: 'default',
+                  }}
+                />
+              )}
+            </div>
+
+            {/* 5. Refine + Submit — non-avatar sections only */}
+            {activeSection !== null && activeSection !== 'avatar' && (
+              <div style={{ flexShrink: 0, display: 'flex', gap: 10 }}>
+                <button
+                  onClick={handleRefine}
+                  disabled={isLoading}
+                  style={{
+                    border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
+                    padding: '10px 22px', borderRadius: 6, cursor: isLoading ? 'not-allowed' : 'pointer',
+                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', opacity: isLoading ? 0.5 : 1,
+                  }}
+                >
+                  REFINE
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  style={{
+                    background: canSubmit ? '#2990fa' : '#152840',
+                    border: '1px solid #2990fa',
+                    color: canSubmit ? '#ffffff' : '#4a6a8a',
+                    padding: '10px 22px', borderRadius: 6,
+                    cursor: canSubmit ? 'pointer' : 'not-allowed',
+                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                  }}
+                >
+                  SUBMIT
+                </button>
+              </div>
             )}
-            </>)}
+
           </div>
 
           {/* ── RIGHT COLUMN ── */}
@@ -1497,6 +1847,37 @@ You have opinions. Use them.`
                 style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', width: '100%', cursor: 'pointer' }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CONFIRM DIALOG ── */}
+      {avatarDeleteConfirm && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(2,8,16,0.92)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setAvatarDeleteConfirm(null) }}
+        >
+          <div style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 360, textAlign: 'center' }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', marginBottom: 10 }}>
+              Delete Avatar?
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginBottom: 24, lineHeight: 1.5 }}>
+              Delete <strong style={{ color: '#ffffff' }}>{avatarDeleteConfirm.name}</strong>? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setAvatarDeleteConfirm(null)}
+                style={{ flex: 1, background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: '10px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteAvatar(avatarDeleteConfirm)}
+                style={{ flex: 1, background: '#ff4455', border: 'none', borderRadius: 6, padding: '10px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                Delete
               </button>
             </div>
           </div>
