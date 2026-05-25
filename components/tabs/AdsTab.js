@@ -47,6 +47,67 @@ const SECTION_ANGLES = {
   avatar: [],
 }
 
+const SECTION_SUBCATEGORIES = {
+  visual_format: {
+    'Newspaper': ['Tabloid style','Broadsheet style','Trade publication','Local news front page','Financial paper'],
+    'Raw Photo': ['iPhone candid','Behind the scenes','On the job site','Real customer moment','Unposed portrait'],
+    'News Chyron': ['Breaking news banner','Live update ticker','News alert style','Broadcast lower third'],
+    'Screenshot': ['Text conversation','Google review','Social media post','Email screenshot','DM screenshot'],
+    'Documentary': ['Talking head interview','B-roll footage style','Street documentary','Fly on the wall'],
+    'Text Only': ['Bold single statement','Manifesto style','List format','Question and answer'],
+    'Report Cover': ['Industry report','Case study cover','White paper style','Research findings'],
+  },
+  hook: {
+    'Pain': ['Financial pain','Time pain','Stress pain','Fear of loss','Embarrassment'],
+    'Curiosity': ['Open loop','Surprising fact','Counterintuitive','Hidden secret','What most people miss'],
+    'Contrarian': ['Challenge common belief','Call out the industry','Myth bust','Unpopular opinion'],
+    'Benefit': ['Specific outcome','Speed benefit','Ease benefit','Status benefit','Money benefit'],
+    'Social Proof': ['Number of people','Results achieved','Before and after','Peer reference','Authority proof'],
+    'Fear': ['Fear of missing out','Fear of falling behind','Fear of wasting money','Fear of competition'],
+    'Authority': ['Years of experience','Money spent','Clients served','Credentials','Track record'],
+    'Story': ['Personal moment','Customer story','Before and after journey','Turning point','Day in the life'],
+  },
+  image: {
+    'Cinematic': ['Dark moody tones','Epic wide shot','High contrast dramatic','Golden hour','Night scene'],
+    'Editorial': ['Clean white background','Minimal props','Sharp focus','Magazine style','Flat lay'],
+    'Raw/Real': ['Unedited feel','Natural lighting','Candid moment','Gritty realistic','No filter look'],
+    'Bold Text': ['Large headline overlay','Minimal background','High contrast text','Single statement','Color block'],
+    'Lifestyle': ['In use moment','Aspirational setting','Real environment','Family or team','Success scene'],
+    'Before/After': ['Split screen','Transformation reveal','Side by side','Progress shot','Contrast moment'],
+  },
+  headline: {
+    'Direct': ['Straight benefit','Clear offer','No fluff statement','Specific result','Action focused'],
+    'Question': ['Problem question','Curiosity question','Qualifying question','Challenge question','Rhetorical'],
+    'Bold Claim': ['Strong statement','Surprising claim','Record or achievement','Best or only','Guarantee'],
+    'Call Out': ['Name the person','Name the situation','Name the feeling','Name the industry','Name the problem'],
+    'Curiosity': ['Open loop','Missing piece','Secret or hidden','What they dont know','Surprising angle'],
+    'Number Based': ['List format','Percentage','Time frame','Dollar amount','Quantity'],
+  },
+  primary_text: {
+    'Story': ['Personal origin','Customer transformation','Day in the life','Before the solution','Turning point moment'],
+    'Problem/Solution': ['Agitate the pain','Name the enemy','Present the fix','Simple steps','Clear path forward'],
+    'Value Stack': ['List everything included','Show the value','Compare to alternatives','What they get','Overdeliver frame'],
+    'Testimonial': ['Direct quote','Results focused','Specific numbers','Emotional moment','Before and after quote'],
+    'Direct Offer': ['Clear price or terms','Specific guarantee','Limited availability','Exact next step','No fluff offer'],
+    'Educational': ['Teach something valuable','Insider knowledge','Common mistake','Better way','Eye opening fact'],
+  },
+  description: {
+    'Urgency': ['Limited time','Deadline','Spots filling','Act now','Last chance'],
+    'Social Proof': ['Number of people','Reviews','Results','Trusted by','Join others'],
+    'Benefit': ['Main outcome','Key result','What changes','Primary win','Core promise'],
+    'Simple CTA': ['Click to learn','Book now','Get started','See how','Find out'],
+  },
+  cta: {
+    'Book a Call': ['Free strategy call','15 minute intro','No obligation chat','Quick discovery call','Schedule now'],
+    'Fill Form': ['Get a free quote','Apply now','Request info','Get started','Claim your spot'],
+    'DM Us': ['Send a message','Reach out directly','Message us now','Start a conversation','Ask us anything'],
+    'Call Now': ['Call us today','Speak to someone now','Get answers now','Direct line','Talk to a real person'],
+    'Click Link': ['Learn more','See the full story','Get the details','Read more','Visit the page'],
+    'Comment Below': ['Drop a comment','Tell us below','Comment yes','Share your answer','Let us know'],
+  },
+  avatar: {},
+}
+
 const AUTO_PROMPT_TEXTS = new Set(Object.values(SECTION_PROMPTS))
 
 // ─── Avatar funnel constants ──────────────────────────────────────────────────
@@ -138,6 +199,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [dallePrompt, setDallePrompt] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [imageFormat, setImageFormat] = useState('9/16')
+  const [expandedCategories, setExpandedCategories] = useState([])
+  const [selectedSubcategories, setSelectedSubcategories] = useState([])
 
   const chatScrollRef = useRef(null)
 
@@ -169,6 +232,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   useEffect(() => {
     setSelectedAngles([])
     setSelectedBubbles([])
+    setSelectedSubcategories([])
+    setExpandedCategories([])
   }, [activeSection])
 
   useEffect(() => {
@@ -201,7 +266,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         avatar: av || null,
         sectionContext: svs,
         currentSection: section,
-        selectedAngles: angles,
+        activeAngles: angles,
       }),
     })
     const data = await res.json()
@@ -513,7 +578,12 @@ Do not generate bubble options in this response.`
   }
 
   function gotoSection(section) {
-    if (section === activeSection) return
+    if (section === activeSection) {
+      setActiveSection(null)
+      setCurrentBubbles([])
+      setSelectedBubbles([])
+      return
+    }
     setActiveSection(section)
     setSelectedBubbles([])
 
@@ -555,14 +625,26 @@ Do not generate bubble options in this response.`
   }
 
   async function handleRefine() {
-    if (isLoading) return
+    if (isLoading || !activeSection) return
+
+    const activeAngles = [
+      ...selectedAngles.filter(a => !selectedSubcategories.some(s =>
+        SECTION_SUBCATEGORIES[activeSection]?.[a]?.includes(s)
+      )),
+      ...selectedSubcategories,
+    ]
+
     let refineText
-    if (selectedBubbles.length === 2) {
+    if (selectedBubbles.length > 0 && activeAngles.length > 0) {
+      refineText = `Refine based on these selected options: [${selectedBubbles.join(', ')}] and these angle filters: [${activeAngles.join(', ')}]. Generate 3 new options. Keep the direction of the selected options but make them stronger and more specific using the angle filters.`
+    } else if (selectedBubbles.length === 2) {
       refineText = `The user selected these two options: "${selectedBubbles[0]}" and "${selectedBubbles[1]}". Generate exactly 3 refined options:\n1. Refined version of option 1\n2. Refined version of option 2\n3. A blend of both options combined`
     } else if (selectedBubbles.length === 1) {
       refineText = `Refine. I like the direction of: "${selectedBubbles[0]}". Give me 3 tighter variations.`
+    } else if (activeAngles.length > 0) {
+      refineText = `Generate 3 new options using these angle filters: [${activeAngles.join(', ')}]. Stay within these directions.`
     } else {
-      refineText = 'Give me 3 completely different options.'
+      refineText = 'Generate 3 fresh options. Use all confirmed context.'
     }
 
     const userMsg = { role: 'user', content: refineText }
@@ -576,7 +658,7 @@ Do not generate bubble options in this response.`
         updatedChat.map(m => ({ role: m.role, content: m.content })),
         sectionValues,
         selectedAvatar,
-        selectedAngles,
+        activeAngles,
       )
       const parsed = parseResponse(raw)
       setSectionChats(prev => ({
@@ -758,9 +840,35 @@ Do not generate bubble options in this response.`
   }
 
   function handleAngleToggle(angle) {
-    setSelectedAngles(prev =>
-      prev.includes(angle) ? prev.filter(a => a !== angle) : [...prev, angle]
-    )
+    const isExpanded = expandedCategories.includes(angle)
+    if (isExpanded) {
+      setExpandedCategories(prev => prev.filter(c => c !== angle))
+      setSelectedAngles(prev => prev.filter(a => a !== angle))
+      const subs = SECTION_SUBCATEGORIES[activeSection]?.[angle] || []
+      setSelectedSubcategories(prev => prev.filter(s => !subs.includes(s)))
+    } else {
+      const total = selectedAngles.length + selectedSubcategories.length
+      if (total >= 3) return
+      setExpandedCategories(prev => [...prev, angle])
+      setSelectedAngles(prev => [...prev, angle])
+    }
+  }
+
+  function handleSubcategoryToggle(parentAngle, sub) {
+    const isSelected = selectedSubcategories.includes(sub)
+    if (isSelected) {
+      setSelectedSubcategories(prev => prev.filter(s => s !== sub))
+      if (!selectedAngles.includes(parentAngle)) {
+        setSelectedAngles(prev => [...prev, parentAngle])
+      }
+    } else {
+      const parentIsActive = selectedAngles.includes(parentAngle)
+      const netAdd = parentIsActive ? 0 : 1
+      const total = selectedAngles.length + selectedSubcategories.length
+      if (total + netAdd > 3) return
+      setSelectedAngles(prev => prev.filter(a => a !== parentAngle))
+      setSelectedSubcategories(prev => [...prev, sub])
+    }
   }
 
   // ─── Bubble management (non-avatar sections) ──────────────────────────────────
@@ -931,6 +1039,13 @@ You have opinions. Use them.`
           {/* ── LEFT COLUMN ── */}
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
+            {activeSection === null ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060d1f', borderRadius: 10, border: '1px solid #152840' }}>
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-inter)', fontSize: '0.9rem' }}>
+                  Select a section to continue
+                </div>
+              </div>
+            ) : (<>
             {/* Section header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 12px 0', flexShrink: 0 }}>
               {activeSectionIdx > 0 && (
@@ -1086,22 +1201,47 @@ You have opinions. Use them.`
               <>
                 {/* Angle buttons */}
                 {sectionAngles.length > 0 && (
-                  <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                    {sectionAngles.map(angle => (
-                      <button
-                        key={angle}
-                        onClick={() => handleAngleToggle(angle)}
-                        style={{
-                          border: `1px solid ${selectedAngles.includes(angle) ? '#2990fa' : '#152840'}`,
-                          background: selectedAngles.includes(angle) ? '#0a1628' : '#060d1f',
-                          color: selectedAngles.includes(angle) ? '#ffffff' : '#4a6a8a',
-                          padding: '7px 16px', borderRadius: 20,
-                          fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer',
-                        }}
-                      >
-                        {angle}
-                      </button>
-                    ))}
+                  <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: expandedCategories.length > 0 ? 6 : 0 }}>
+                      {sectionAngles.map(angle => (
+                        <button
+                          key={angle}
+                          onClick={() => handleAngleToggle(angle)}
+                          style={{
+                            border: `1px solid ${expandedCategories.includes(angle) ? '#2990fa' : '#152840'}`,
+                            background: expandedCategories.includes(angle) ? '#0a1628' : '#060d1f',
+                            color: expandedCategories.includes(angle) ? '#ffffff' : '#4a6a8a',
+                            padding: '7px 16px', borderRadius: 20,
+                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer',
+                          }}
+                        >
+                          {angle}
+                        </button>
+                      ))}
+                    </div>
+                    {sectionAngles.filter(a => expandedCategories.includes(a)).map(angle => {
+                      const subs = SECTION_SUBCATEGORIES[activeSection]?.[angle] || []
+                      if (!subs.length) return null
+                      return (
+                        <div key={angle} style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4, paddingLeft: 4 }}>
+                          {subs.map(sub => (
+                            <button
+                              key={sub}
+                              onClick={() => handleSubcategoryToggle(angle, sub)}
+                              style={{
+                                background: selectedSubcategories.includes(sub) ? '#0a2a1a' : '#060d1f',
+                                border: `1px solid ${selectedSubcategories.includes(sub) ? '#00e5c8' : '#1d3a58'}`,
+                                color: selectedSubcategories.includes(sub) ? '#00e5c8' : '#4a6a8a',
+                                padding: '4px 10px', borderRadius: 12,
+                                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', cursor: 'pointer',
+                              }}
+                            >
+                              {sub}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -1221,6 +1361,7 @@ You have opinions. Use them.`
                 </div>
               </>
             )}
+            </>)}
           </div>
 
           {/* ── RIGHT COLUMN ── */}
@@ -1233,7 +1374,7 @@ You have opinions. Use them.`
                   background: activeSection === section ? '#0a1628' : 'transparent',
                   border: `1px solid ${activeSection === section ? '#2990fa' : '#152840'}`,
                   borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
-                  opacity: (!sectionValues[section] && section !== activeSection) ? 0.4 : 1,
+                  opacity: activeSection === null ? 0.4 : (!sectionValues[section] && section !== activeSection) ? 0.4 : 1,
                 }}
               >
                 <div style={{

@@ -1,6 +1,26 @@
 const SECTIONS_ORDER = ['avatar', 'visual_format', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
 
-const JARVIS_SYSTEM = `You are Jarvis. You are a professional direct response marketing strategist, copywriter, and consumer psychologist inside Velpi Studio.
+const JARVIS_SYSTEM = `CRITICAL IDENTITY RULE:
+You are talking TO the business owner or marketer who is BUILDING the ad.
+The AVATAR is the TARGET CUSTOMER the ad is written FOR.
+These are two different people. Never confuse them.
+
+When the user asks questions like 'why does this matter' or 'what does this mean':
+Answer from the perspective of WHY THIS HELPS THEM BUILD A BETTER AD.
+Never answer as if the user IS the avatar.
+Never describe the user's own pain points.
+Always frame answers around: 'This helps you understand your target customer so your ad speaks directly to them.'
+
+Example:
+User asks: 'Why does this matter?'
+WRONG: 'Understanding your frustrations helps me address your pain points'
+RIGHT: 'Knowing what frustrates your target customer lets you write copy that makes them feel understood. That is what stops the scroll.'
+
+Always maintain this distinction throughout every conversation.
+
+---
+
+You are Jarvis. You are a professional direct response marketing strategist, copywriter, and consumer psychologist inside Velpi Studio.
 
 YOU HAVE OPINIONS. USE THEM.
 You know what works and what doesn't in advertising.
@@ -74,7 +94,7 @@ export async function POST(request) {
       avatar = null,
       sectionContext = null,
       currentSection = null,
-      selectedAngles = [],
+      activeAngles = [],
     } = await request.json()
 
     // Build confirmed-sections context string (appended to system prompt)
@@ -95,8 +115,8 @@ export async function POST(request) {
     }
 
     // Append active angle filters — hard requirement
-    if (selectedAngles && selectedAngles.length > 0) {
-      contextStr += `\n\nACTIVE ANGLE FILTERS: ${selectedAngles.join(', ')}\nAll 3 options must stay within these angle directions.\nDo not generate anything outside these angles.`
+    if (activeAngles && activeAngles.length > 0) {
+      contextStr += `\n\nACTIVE ANGLE FILTERS (max 3 selected by user): ${activeAngles.join(', ')}\nGenerate all 3 options within these specific angles.\nIf multiple angles selected: distribute options across them.\nOne option per angle where possible.\nNever generate options outside these angles when they are set.\nThese subcategories are more specific than main categories — treat them as precise creative direction.`
     }
 
     // Use provided system prompt (e.g. avatar builder) or default Jarvis system
