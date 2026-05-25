@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import AdsTab from './tabs/AdsTab'
-import ContentTab from './tabs/ContentTab'
 import LibraryTab from './tabs/LibraryTab'
 
 function VelpiLogo() {
@@ -22,7 +21,6 @@ function VelpiLogo() {
 
 const tabs = [
   { id: 'ads', label: 'ADS' },
-  { id: 'content', label: 'CONTENT' },
   { id: 'library', label: 'LIBRARY' },
 ]
 
@@ -107,7 +105,6 @@ export default function Studio() {
             onRefineConsumed={() => setPendingRefine(null)}
           />
         )}
-        {activeTab === 'content' && <ContentTab />}
         {activeTab === 'library' && <LibraryTab onRefine={handleRefineFromLibrary} />}
       </div>
     </div>
