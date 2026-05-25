@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import AdsTab from './tabs/AdsTab'
 import LibraryTab from './tabs/LibraryTab'
+import ProfileTab from './tabs/ProfileTab'
 
 function VelpiLogo() {
   return (
@@ -20,13 +21,15 @@ function VelpiLogo() {
 }
 
 const tabs = [
+  { id: 'profile', label: 'PROFILE' },
   { id: 'ads', label: 'ADS' },
   { id: 'library', label: 'LIBRARY' },
 ]
 
 export default function Studio() {
-  const [activeTab, setActiveTab] = useState('ads')
+  const [activeTab, setActiveTab] = useState('profile')
   const [pendingRefine, setPendingRefine] = useState(null)
+  const [selectedProfile, setSelectedProfile] = useState(null)
 
   function handleRefineFromLibrary(ad) {
     setPendingRefine(ad)
@@ -99,10 +102,21 @@ export default function Studio() {
 
       {/* TAB CONTENT */}
       <div style={{ padding: '1.5rem', maxWidth: 1200, margin: '0 auto' }}>
+        {activeTab === 'profile' && (
+          <ProfileTab
+            selectedProfile={selectedProfile}
+            onProfileSelect={p => {
+              setSelectedProfile(p)
+              if (p) setActiveTab('ads')
+            }}
+          />
+        )}
         {activeTab === 'ads' && (
           <AdsTab
             pendingRefine={pendingRefine}
             onRefineConsumed={() => setPendingRefine(null)}
+            selectedProfile={selectedProfile}
+            onGoToProfile={() => setActiveTab('profile')}
           />
         )}
         {activeTab === 'library' && <LibraryTab onRefine={handleRefineFromLibrary} />}

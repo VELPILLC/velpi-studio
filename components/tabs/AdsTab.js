@@ -182,7 +182,7 @@ const EMPTY_AVATAR_FORM = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdsTab({ pendingRefine, onRefineConsumed }) {
+export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfile, onGoToProfile }) {
   // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
@@ -251,6 +251,21 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }, [sectionChats, activeSection])
 
+  // Reset everything when profile changes
+  useEffect(() => {
+    setSectionChats(EMPTY_SECTION_OBJ())
+    setSectionValues(EMPTY_VALUES_OBJ())
+    setActiveSection('avatar')
+    setCurrentBubbles([])
+    setSelectedBubbles([])
+    setSelectedAngles([])
+    setSelectedSubcategories([])
+    setExpandedCategories([])
+    setTypeOwn('')
+    setImageB64(null)
+    initAvatarFunnel()
+  }, [selectedProfile?.id])
+
   // Close avatar dropdown on outside click
   useEffect(() => {
     if (avatarDropdown === null) return
@@ -285,6 +300,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         messages,
         ...(system ? { system } : {}),
         avatar: av || null,
+        profile: selectedProfile || null,
         sectionContext: svs,
         currentSection: section,
         activeAngles: angles,
@@ -1085,6 +1101,23 @@ Do not generate bubble options in this response.`
     }
   }
 
+  // ─── Section reset ────────────────────────────────────────────────────────────
+
+  function handleResetSection(section) {
+    setSectionChats(prev => ({ ...prev, [section]: [] }))
+    setSectionValues(prev => ({ ...prev, [section]: null }))
+    if (section === activeSection) {
+      setCurrentBubbles([])
+      setSelectedBubbles([])
+      setSelectedAngles([])
+      setSelectedSubcategories([])
+      setExpandedCategories([])
+      if (section === 'image') setImageB64(null)
+      const newSvs = { ...sectionValues, [section]: null }
+      openSection(section, newSvs, selectedAvatar, [])
+    }
+  }
+
   function handleAngleToggle(angle) {
     const isExpanded = expandedCategories.includes(angle)
     if (isExpanded) {
@@ -1230,6 +1263,30 @@ You have opinions. Use them.`
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
+
+  // Profile lock screen
+  if (!selectedProfile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 160px)', gap: 20 }}>
+        <svg width="48" height="48" viewBox="0 0 30 30" fill="none">
+          <circle cx="15" cy="15" r="13" fill="#2990fa" />
+          <path d="M9 10 L15 21 L21 10" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+        <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.8rem', color: '#ffffff', letterSpacing: '0.05em', textAlign: 'center' }}>
+          Create your profile first
+        </div>
+        <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.65rem', color: '#4a6a8a', textAlign: 'center', maxWidth: 320, lineHeight: 1.6 }}>
+          Jarvis needs to know who you are before building ads.
+        </div>
+        <button
+          onClick={onGoToProfile}
+          style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '12px 24px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+        >
+          Go to Profile
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -1735,14 +1792,22 @@ You have opinions. Use them.`
                   border: `1px solid ${activeSection === section ? '#2990fa' : '#152840'}`,
                   borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
                   opacity: activeSection === null ? 0.4 : (!sectionValues[section] && section !== activeSection) ? 0.4 : 1,
+                  position: 'relative',
                 }}
               >
-                <div style={{
-                  fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa',
-                  textTransform: 'uppercase', letterSpacing: '0.12em',
-                  marginBottom: sectionValues[section] ? 4 : 0,
-                }}>
-                  {SECTION_LABELS[section]}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sectionValues[section] ? 4 : 0 }}>
+                  <div style={{
+                    fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa',
+                    textTransform: 'uppercase', letterSpacing: '0.12em',
+                  }}>
+                    {SECTION_LABELS[section]}
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleResetSection(section) }}
+                    style={{ color: '#ff4455', fontSize: '0.58rem', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 6px', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}
+                  >
+                    Reset
+                  </button>
                 </div>
                 {sectionValues[section] && (
                   <div style={{ fontSize: '0.88rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>

@@ -39,6 +39,15 @@ YOUR EXPERTISE:
 - Hormozi third-grade reading level principles
 - Human emotion and status drivers in marketing
 
+PROFILE CONTEXT RULE:
+You have access to the profile of the business creating this ad.
+Use it to inform copy but never let it dominate.
+The differentiator especially should only appear when the user's
+selections and the section context make it naturally relevant.
+If the user keeps refining away from profile-specific suggestions
+stop using profile details and focus on the idea direction instead.
+Learn from what they keep and what they reject.
+
 YOUR RULES:
 - Never invent numbers, stats, or claims the user did not provide
 - Only use what the user tells you, made clearer and stronger
@@ -92,10 +101,20 @@ export async function POST(request) {
       messages,
       system,
       avatar = null,
+      profile = null,
       sectionContext = null,
       currentSection = null,
       activeAngles = [],
     } = await request.json()
+
+    // Build profile context string
+    let profileStr = ''
+    if (profile && profile.name) {
+      profileStr = `\n\nYOUR PROFILE (the business creating this ad):
+Industry: ${profile.industry || 'Not specified'}
+Services: ${profile.services || 'Not specified'}
+Who they serve: ${profile.who_they_serve || 'Not specified'}${profile.differentiator ? '\nDifferentiator (use sparingly, only when directly relevant): ' + profile.differentiator : ''}`
+    }
 
     // Build confirmed-sections context string (appended to system prompt)
     let contextStr = ''
@@ -121,6 +140,7 @@ export async function POST(request) {
 
     // Use provided system prompt (e.g. avatar builder) or default Jarvis system
     let finalSystem = system || JARVIS_SYSTEM
+    if (profileStr) finalSystem += profileStr
     if (contextStr) finalSystem += contextStr
 
     // Build context messages to inject as conversation turns (non-avatar sections only)
