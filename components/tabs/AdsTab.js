@@ -221,7 +221,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [avatarEditingField, setAvatarEditingField] = useState(null)
   const [avatarEditingId, setAvatarEditingId] = useState(null)
   const [avatarDropdown, setAvatarDropdown] = useState(null)
-  const [avatarDeleteConfirm, setAvatarDeleteConfirm] = useState(null)
 
   const avatarDropdownRef = useRef(null)
 
@@ -489,6 +488,65 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
     }
   }
 
+  // Advance funnel via → button (guards empty selection)
+  function handleAvatarAdvance() {
+    if (avatarFunnelStep === 'review' || avatarEditMode) return
+    if (avatarSelectedBubbles.length === 0) {
+      setSectionChats(prev => ({
+        ...prev,
+        avatar: [...prev.avatar, { role: 'assistant', content: 'Select at least one option to continue.' }],
+      }))
+      return
+    }
+    handleAvatarContinue()
+  }
+
+  // ADD button: add typed text as bubble and auto-select it
+  function handleAvatarAdd() {
+    if (!typeOwn.trim()) return
+    const text = typeOwn.trim()
+    setTypeOwn('')
+    setCurrentBubbles(prev => prev.includes(text) ? prev : [...prev, text])
+    setAvatarSelectedBubbles(prev => {
+      if (prev.includes(text)) return prev
+      const activeStep = avatarEditingField || avatarFunnelStep
+      const maxSelect = activeStep === 'mediaTrust' ? 4 : 2
+      if (prev.length >= maxSelect) return prev
+      return [...prev, text]
+    })
+  }
+
+  // ASK button: send question to API with selected bubbles context
+  async function handleAvatarAsk() {
+    if (!typeOwn.trim()) return
+    const question = typeOwn.trim()
+    setTypeOwn('')
+    const contextNote = avatarSelectedBubbles.length > 0
+      ? ` (Currently selected: ${avatarSelectedBubbles.join(', ')})`
+      : ''
+    const fullQuestion = question + contextNote
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: [...prev.avatar, { role: 'user', content: question }],
+    }))
+    const questionSystem = `The user is building their avatar. They are on step: ${avatarFunnelStep}.
+They asked: ${question}${contextNote ? ' Context: ' + contextNote : ''}
+Answer their question in 1-2 sentences using plain simple language.
+Then redirect them back to the current step question.
+Do not generate bubble options in this response.`
+    setIsLoading(true)
+    try {
+      const raw = await callAPI('avatar', [{ role: 'user', content: fullQuestion }], sectionValues, null, [], questionSystem)
+      setSectionChats(prev => ({
+        ...prev,
+        avatar: [...prev.avatar, { role: 'assistant', content: raw }],
+      }))
+    } catch (err) {
+      console.error('Avatar ask error:', err)
+    }
+    setIsLoading(false)
+  }
+
   // Back button: restore previous step
   function goBackAvatarStep() {
     if (avatarFunnelHistory.length === 0) return
@@ -724,7 +782,6 @@ Do not generate bubble options in this response.`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: av.id }),
       })
-      setAvatarDeleteConfirm(null)
       setAvatarDropdown(null)
       await loadAvatars()
       if (selectedAvatar?.id === av.id) {
@@ -1194,12 +1251,12 @@ You have opinions. Use them.`
             )}
             {avatars.map(av => (
               <div key={av.id} style={{ position: 'relative', flexShrink: 0 }} ref={avatarDropdown === av.id ? avatarDropdownRef : null}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <div
                     onClick={() => handleAvatarSelect(av)}
                     style={{
                       background: selectedAvatar?.id === av.id ? '#2990fa' : '#060d1f',
-                      border: '1px solid #2990fa', borderRadius: '6px 0 0 6px',
+                      border: '1px solid #2990fa', borderRadius: 6,
                       padding: '6px 14px', cursor: 'pointer', color: '#ffffff',
                       fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem',
                       whiteSpace: 'nowrap', userSelect: 'none',
@@ -1207,24 +1264,22 @@ You have opinions. Use them.`
                   >
                     {av.name}
                   </div>
-                  <div
+                  <button
                     onClick={e => { e.stopPropagation(); setAvatarDropdown(prev => prev === av.id ? null : av.id) }}
                     style={{
-                      background: selectedAvatar?.id === av.id ? '#1a7adf' : '#0a1628',
-                      border: '1px solid #2990fa', borderLeft: 'none',
-                      borderRadius: '0 6px 6px 0', padding: '6px 8px',
-                      cursor: 'pointer', color: '#2990fa', fontSize: '0.65rem',
-                      userSelect: 'none', lineHeight: 1,
+                      background: 'transparent', border: 'none',
+                      color: '#2990fa', fontSize: '1rem',
+                      cursor: 'pointer', padding: '2px 6px',
                     }}
                   >
-                    ⋮
-                  </div>
+                    ⋯
+                  </button>
                 </div>
                 {avatarDropdown === av.id && (
                   <div style={{
-                    position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: 4,
+                    position: 'absolute', top: '100%', left: 0, zIndex: 100, marginTop: 4,
                     background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8,
-                    padding: 8, minWidth: 140,
+                    padding: 4, minWidth: 120, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                   }}>
                     <div
                       onClick={() => handleEditAvatarFromBar(av)}
@@ -1235,7 +1290,7 @@ You have opinions. Use them.`
                       ✎ Edit
                     </div>
                     <div
-                      onClick={() => { setAvatarDropdown(null); setAvatarDeleteConfirm(av) }}
+                      onClick={() => { setAvatarDropdown(null); if (window.confirm(`Delete ${av.name}? This cannot be undone.`)) handleDeleteAvatar(av) }}
                       style={{ padding: '8px 14px', color: '#ff4455', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
                       onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -1271,24 +1326,22 @@ You have opinions. Use them.`
 
             {/* 1. Section title row — always visible */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 12px 0', flexShrink: 0 }}>
-              {activeSection !== null && activeSectionIdx > 0 && (
-                <button
-                  onClick={() => gotoSection(SECTIONS[activeSectionIdx - 1])}
-                  style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}
-                >
-                  ←
-                </button>
+              {activeSection !== null && (
+                (activeSection === 'avatar' && avatarFunnelHistory.length > 0)
+                  ? <button onClick={goBackAvatarStep} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>←</button>
+                  : activeSectionIdx > 0
+                    ? <button onClick={() => gotoSection(SECTIONS[activeSectionIdx - 1])} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>←</button>
+                    : null
               )}
               <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
                 {activeSection ? SECTION_LABELS[activeSection] : 'SELECT SECTION'}
               </div>
-              {activeSection !== null && activeSectionIdx >= 0 && activeSectionIdx < SECTIONS.length - 1 && (
-                <button
-                  onClick={() => gotoSection(SECTIONS[activeSectionIdx + 1])}
-                  style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}
-                >
-                  →
-                </button>
+              {activeSection !== null && (
+                (activeSection === 'avatar' && avatarFunnelStep !== 'review' && !avatarEditMode)
+                  ? <button onClick={handleAvatarAdvance} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>→</button>
+                  : (activeSectionIdx >= 0 && activeSectionIdx < SECTIONS.length - 1)
+                    ? <button onClick={() => gotoSection(SECTIONS[activeSectionIdx + 1])} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>→</button>
+                    : null
               )}
             </div>
 
@@ -1353,9 +1406,9 @@ You have opinions. Use them.`
                     <button
                       onClick={handleGetMoreAvatarOptions}
                       disabled={isLoading}
-                      style={{ color: '#2990fa', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.72rem', padding: '4px 0', fontFamily: 'var(--font-inter)', display: 'block', marginBottom: 6, opacity: isLoading ? 0.5 : 1 }}
+                      style={{ color: '#2990fa', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 0', fontFamily: 'var(--font-inter)', display: 'block', marginBottom: 6, opacity: isLoading ? 0.5 : 1, width: '100%', textAlign: 'center' }}
                     >
-                      Get more options
+                      ↻ Get more options
                     </button>
                     {avatarSelectedBubbles.length > 0 && (
                       <button
@@ -1452,23 +1505,15 @@ You have opinions. Use them.`
                       cursor: 'pointer', width: '100%',
                     }}
                   >
-                    EDIT SECTIONS
+                    REDO SECTIONS
                   </button>
                 </div>
 
               ) : (
                 /* ── AVATAR FUNNEL STEPS ── */
                 <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
-                  {/* Step indicator + back button */}
+                  {/* Step indicator */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    {avatarFunnelHistory.length > 0 && (
-                      <button
-                        onClick={goBackAvatarStep}
-                        style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', padding: '6px 12px', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)' }}
-                      >
-                        ←
-                      </button>
-                    )}
                     <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
                       Step {avatarStepIdx + 1} of {AVATAR_FUNNEL_STEPS.length - 1}
                     </span>
@@ -1492,20 +1537,11 @@ You have opinions. Use them.`
                   <button
                     onClick={handleGetMoreAvatarOptions}
                     disabled={isLoading}
-                    style={{ color: '#2990fa', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.72rem', padding: '4px 0', fontFamily: 'var(--font-inter)', display: 'block', marginBottom: 4, opacity: isLoading ? 0.5 : 1 }}
+                    style={{ color: '#2990fa', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 0', fontFamily: 'var(--font-inter)', display: 'block', marginBottom: 4, opacity: isLoading ? 0.5 : 1, width: '100%', textAlign: 'center' }}
                   >
-                    Get more options
+                    ↻ Get more options
                   </button>
 
-                  {/* Continue button */}
-                  {avatarSelectedBubbles.length > 0 && (
-                    <button
-                      onClick={handleAvatarContinue}
-                      style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: '10px 0', color: '#ffffff', width: '100%', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer', marginTop: 4 }}
-                    >
-                      Continue → ({avatarSelectedBubbles.length} selected)
-                    </button>
-                  )}
                 </div>
               )
 
@@ -1607,27 +1643,30 @@ You have opinions. Use them.`
             <div style={{ flexShrink: 0, marginBottom: 8 }}>
               {activeSection === 'avatar' && avatarFunnelStep !== 'review' && !avatarEditMode ? (
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <textarea
+                  <input
                     value={typeOwn}
                     onChange={e => setTypeOwn(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (typeOwn.trim()) handleAvatarTypeOwn(typeOwn.trim()) } }}
-                    placeholder="Type your own or ask a question..."
-                    rows={1}
+                    onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
+                    placeholder="Type your own or ask Jarvis..."
                     style={{
                       flex: 1, background: '#060d1f', border: '1px solid #2990fa',
                       color: '#ffffff', padding: '8px 14px', borderRadius: 8,
                       fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                      resize: 'none', minHeight: 36, maxHeight: 36, overflow: 'hidden', boxSizing: 'border-box',
+                      height: 36, boxSizing: 'border-box',
                     }}
                   />
-                  {typeOwn.trim() && (
-                    <button
-                      onClick={() => handleAvatarTypeOwn(typeOwn.trim())}
-                      style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0 }}
-                    >
-                      →
-                    </button>
-                  )}
+                  <button
+                    onClick={handleAvatarAdd}
+                    style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                  >
+                    ADD
+                  </button>
+                  <button
+                    onClick={handleAvatarAsk}
+                    style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                  >
+                    ASK
+                  </button>
                 </div>
               ) : activeSection !== null && activeSection !== 'avatar' ? (
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -1847,37 +1886,6 @@ You have opinions. Use them.`
                 style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', width: '100%', cursor: 'pointer' }}
               >
                 Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── DELETE CONFIRM DIALOG ── */}
-      {avatarDeleteConfirm && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(2,8,16,0.92)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={e => { if (e.target === e.currentTarget) setAvatarDeleteConfirm(null) }}
-        >
-          <div style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 360, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', marginBottom: 10 }}>
-              Delete Avatar?
-            </div>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginBottom: 24, lineHeight: 1.5 }}>
-              Delete <strong style={{ color: '#ffffff' }}>{avatarDeleteConfirm.name}</strong>? This cannot be undone.
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setAvatarDeleteConfirm(null)}
-                style={{ flex: 1, background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: '10px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteAvatar(avatarDeleteConfirm)}
-                style={{ flex: 1, background: '#ff4455', border: 'none', borderRadius: 6, padding: '10px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer' }}
-              >
-                Delete
               </button>
             </div>
           </div>
