@@ -1639,75 +1639,9 @@ You have opinions. Use them.`
 
             ) : null}
 
-            {/* 4. Main chat input — always visible */}
+            {/* 4. Input + action buttons row — unified, always visible */}
             <div style={{ flexShrink: 0, marginBottom: 8 }}>
-              {activeSection === 'avatar' && avatarFunnelStep !== 'review' && !avatarEditMode ? (
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    value={typeOwn}
-                    onChange={e => setTypeOwn(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
-                    placeholder="Type your own or ask Jarvis..."
-                    style={{
-                      flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                      color: '#ffffff', padding: '8px 14px', borderRadius: 8,
-                      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                      height: 36, boxSizing: 'border-box',
-                    }}
-                  />
-                  <button
-                    onClick={handleAvatarAdd}
-                    style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                  >
-                    ADD
-                  </button>
-                  <button
-                    onClick={handleAvatarAsk}
-                    style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                  >
-                    ASK
-                  </button>
-                </div>
-              ) : activeSection !== null && activeSection !== 'avatar' ? (
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    value={typeOwn}
-                    onChange={e => setTypeOwn(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        if (isQuestion(typeOwn.trim())) {
-                          handleAskJarvisNonAvatar(typeOwn.trim())
-                        } else {
-                          handleAddTypeOwn()
-                        }
-                      }
-                    }}
-                    placeholder="Type your own or ask a question..."
-                    style={{
-                      flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                      color: '#ffffff', padding: '8px 14px', borderRadius: 8,
-                      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                      height: 36, boxSizing: 'border-box',
-                    }}
-                  />
-                  {typeOwn.trim() && (
-                    <>
-                      <button
-                        onClick={() => handleAskJarvisNonAvatar(typeOwn.trim())}
-                        style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                      >
-                        ASK
-                      </button>
-                      <button
-                        onClick={handleAddTypeOwn}
-                        style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                      >
-                        ADD
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : (
+              {activeSection === null ? (
                 <input
                   disabled
                   placeholder="Select a section to start..."
@@ -1717,39 +1651,76 @@ You have opinions. Use them.`
                     fontSize: '0.9rem', fontFamily: 'var(--font-inter)', opacity: 0.5, boxSizing: 'border-box', cursor: 'default',
                   }}
                 />
+              ) : (activeSection === 'avatar' && (avatarFunnelStep === 'review' || avatarEditMode)) ? null : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={typeOwn}
+                    onChange={e => setTypeOwn(e.target.value)}
+                    onKeyDown={e => {
+                      if (activeSection === 'avatar') {
+                        if (e.key === 'Enter') e.preventDefault()
+                      } else {
+                        if (e.key === 'Enter') {
+                          if (isQuestion(typeOwn.trim())) {
+                            handleAskJarvisNonAvatar(typeOwn.trim())
+                          } else {
+                            handleAddTypeOwn()
+                          }
+                        }
+                      }
+                    }}
+                    placeholder={activeSection === 'avatar' ? 'Type your own or ask Jarvis...' : 'Type your own or ask a question...'}
+                    style={{
+                      flex: 1, background: '#060d1f', border: '1px solid #2990fa',
+                      color: '#ffffff', padding: '8px 14px', borderRadius: 8,
+                      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                      height: 36, boxSizing: 'border-box',
+                    }}
+                  />
+                  {typeOwn.trim() && (
+                    <button
+                      onClick={activeSection === 'avatar' ? handleAvatarAdd : handleAddTypeOwn}
+                      style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                    >
+                      ADD
+                    </button>
+                  )}
+                  {typeOwn.trim() && (
+                    <button
+                      onClick={activeSection === 'avatar' ? handleAvatarAsk : () => handleAskJarvisNonAvatar(typeOwn.trim())}
+                      style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                    >
+                      ASK
+                    </button>
+                  )}
+                  {activeSection === 'avatar' && (avatarSelectedBubbles.length > 0 || typeOwn.trim()) && (
+                    <button
+                      onClick={handleAvatarAdvance}
+                      style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                    >
+                      →
+                    </button>
+                  )}
+                  {activeSection !== 'avatar' && (
+                    <button
+                      onClick={handleRefine}
+                      disabled={isLoading}
+                      style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: isLoading ? 'not-allowed' : 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box', opacity: isLoading ? 0.5 : 1 }}
+                    >
+                      REFINE
+                    </button>
+                  )}
+                  {activeSection !== 'avatar' && canSubmit && (
+                    <button
+                      onClick={handleSubmit}
+                      style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                    >
+                      SUBMIT
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-
-            {/* 5. Refine + Submit — non-avatar sections only */}
-            {activeSection !== null && activeSection !== 'avatar' && (
-              <div style={{ flexShrink: 0, display: 'flex', gap: 10 }}>
-                <button
-                  onClick={handleRefine}
-                  disabled={isLoading}
-                  style={{
-                    border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
-                    padding: '10px 22px', borderRadius: 6, cursor: isLoading ? 'not-allowed' : 'pointer',
-                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', opacity: isLoading ? 0.5 : 1,
-                  }}
-                >
-                  REFINE
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={!canSubmit}
-                  style={{
-                    background: canSubmit ? '#2990fa' : '#152840',
-                    border: '1px solid #2990fa',
-                    color: canSubmit ? '#ffffff' : '#4a6a8a',
-                    padding: '10px 22px', borderRadius: 6,
-                    cursor: canSubmit ? 'pointer' : 'not-allowed',
-                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                  }}
-                >
-                  SUBMIT
-                </button>
-              </div>
-            )}
 
           </div>
 
