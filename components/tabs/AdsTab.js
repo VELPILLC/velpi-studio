@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Section constants ────────────────────────────────────────────────────────
 
 const SECTIONS = ['avatar', 'visual_format', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
 
@@ -26,6 +26,16 @@ const SECTION_PROMPTS = {
   cta: 'Generate 3 CTA options based on the ad type.',
 }
 
+const SECTION_OPENING_MESSAGES = {
+  visual_format: 'Based on your avatar I put together 3 visual directions. Pick what fits.',
+  hook: 'Here are 3 hook angles built from your avatar and visual format. Pick what resonates.',
+  image: '3 image concepts based on everything confirmed so far. Pick one or refine.',
+  headline: '3 headlines written for your avatar. Short, clear, direct.',
+  primary_text: '3 primary text options. First line carries the whole message.',
+  description: '3 short descriptions. Tight and punchy.',
+  cta: '3 calls to action matched to your offer.',
+}
+
 const SECTION_ANGLES = {
   visual_format: ['Newspaper', 'Raw Photo', 'News Chyron', 'Screenshot', 'Documentary', 'Text Only', 'Report Cover'],
   hook: ['Pain', 'Curiosity', 'Contrarian', 'Benefit', 'Social Proof', 'Fear', 'Authority', 'Story'],
@@ -39,6 +49,56 @@ const SECTION_ANGLES = {
 
 const AUTO_PROMPT_TEXTS = new Set(Object.values(SECTION_PROMPTS))
 
+// ─── Avatar funnel constants ──────────────────────────────────────────────────
+
+const INDUSTRY_BUBBLES = [
+  'Home Services', 'Health & Wellness', 'Real Estate', 'Finance', 'Coaching & Consulting',
+  'E-Commerce', 'Restaurants & Food', 'Fitness', 'Beauty & Aesthetics', 'Legal',
+  'Construction & Trades', 'Automotive', 'Education', 'Technology', 'Retail',
+  'Marketing & Advertising', 'Insurance', 'Dental & Medical', 'Accounting', 'Type your own',
+]
+
+const INDUSTRY_SUB_MAP = {
+  'Home Services': ['HVAC', 'Plumbing', 'Electrical', 'Roofing', 'Landscaping', 'Cleaning', 'Pest Control', 'Pool Service', 'General Contractor', 'Type your own'],
+  'Health & Wellness': ['Chiropractor', 'Physical Therapy', 'Acupuncture', 'Nutritionist', 'Mental Health', 'Med Spa', 'Type your own'],
+  'Real Estate': ['Residential Agent', 'Commercial Agent', 'Property Manager', 'Mortgage Broker', 'Real Estate Investor', 'Type your own'],
+  'Finance': ['Financial Advisor', 'Accountant', 'Tax Preparer', 'Bookkeeper', 'Insurance Agent', 'Type your own'],
+  'Fitness': ['Gym Owner', 'Personal Trainer', 'CrossFit Box', 'Yoga Studio', 'Martial Arts', 'Sports Performance', 'Type your own'],
+  'Construction & Trades': ['General Contractor', 'HVAC', 'Plumber', 'Electrician', 'Roofer', 'Painter', 'Flooring', 'Type your own'],
+}
+
+const TRADE_INDUSTRIES = new Set([
+  'HVAC', 'Plumbing', 'Electrical', 'Roofing', 'Landscaping', 'Cleaning', 'Pest Control',
+  'Pool Service', 'Construction & Trades', 'General Contractor', 'Plumber', 'Electrician',
+  'Roofer', 'Painter', 'Flooring', 'Home Services',
+])
+
+const ROLE_BUBBLES_DEFAULT = ['Business Owner', 'Independent Contractor', 'Manager', 'Employee', 'Freelancer', 'Investor', 'Executive', 'Type your own']
+const ROLE_BUBBLES_TRADES = ['Owner-Operator', 'Business Owner with team', 'Solo tech', 'Office manager', 'Type your own']
+
+const BUSINESS_SIZE_BUBBLES = ['Just themselves', '2 to 5 people', '6 to 20 people', '20 to 50 people', '50 plus people', "Doesn't matter", 'Type your own']
+const AGE_RANGE_BUBBLES = ['18 to 25', '25 to 35', '35 to 45', '45 to 55', '55 plus', 'Mix of ages', 'Not sure', 'Type your own']
+const MEDIA_TRUST_BUBBLES = ['Local news', 'Facebook groups', 'YouTube', 'Industry trade publications', 'Word of mouth from peers', 'Google search', 'Podcasts', 'Type your own']
+
+const AVATAR_FUNNEL_STEPS = ['industry', 'role', 'businessSize', 'ageRange', 'wants', 'fears', 'frustrations', 'statusDriver', 'mediaTrust', 'review']
+
+const AVATAR_STEP_MESSAGES = {
+  industry: 'What industry are you targeting? Pick one or type your own.',
+  role: 'What best describes them?',
+  businessSize: 'How big is their operation?',
+  ageRange: 'How old are they roughly?',
+  wants: 'What does this person want more than anything in their business?',
+  fears: 'What keeps them up at night?',
+  frustrations: 'What do they complain about most?',
+  statusDriver: 'What would make them feel like they\'ve won? Who would notice?',
+  mediaTrust: 'What do they read, watch, or trust?',
+  review: 'Here is your avatar. Review it and save when ready.',
+}
+
+const DYNAMIC_AVATAR_STEPS = new Set(['wants', 'fears', 'frustrations', 'statusDriver'])
+
+// ─── Shared constants ─────────────────────────────────────────────────────────
+
 const EMPTY_SECTION_OBJ = () => ({
   avatar: [], visual_format: [], hook: [], image: [],
   headline: [], primary_text: [], description: [], cta: [],
@@ -49,37 +109,22 @@ const EMPTY_VALUES_OBJ = () => ({
   headline: null, primary_text: null, description: null, cta: null,
 })
 
+const EMPTY_AVATAR_DATA = () => ({
+  industry: null, role: null, businessSize: null, ageRange: null,
+  location: null, wants: null, fears: null, frustrations: null,
+  statusDriver: null, mediaTrust: null, deepFear: null, winLooksLike: null,
+})
+
 const EMPTY_AVATAR_FORM = {
   name: '', age_range: '', niche: '',
   what_they_want: '', what_they_fear: '',
   what_they_trust: '', primary_emotion: '',
 }
 
-const AVATAR_QUESTIONS = [
-  'Who do you sell to? Just describe them like you would to a friend.',
-  'How old are they roughly?',
-  'What is the one thing they complain about most?',
-  'What do they want more than anything?',
-  'What would make them stop scrolling on Facebook?',
-]
-
-const AVATAR_BUILDER_SYSTEM = `You are building a marketing avatar from a conversation. Based on the answers given extract and return JSON only:
-{
-  "suggested_name": "short descriptive name for this avatar",
-  "age_range": "age range mentioned or inferred",
-  "niche": "who they sell to in simple terms",
-  "what_they_want": "what the avatar wants most",
-  "what_they_fear": "what they complain about or fear",
-  "what_they_trust": "what visual format or style would stop their scroll based on their age and description",
-  "primary_emotion": "the dominant emotion driving this person",
-  "_done": true
-}
-Return JSON only. Nothing else.`
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdsTab({ pendingRefine, onRefineConsumed }) {
-  // Section chat state
+  // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
   const [sectionValues, setSectionValues] = useState(EMPTY_VALUES_OBJ())
@@ -94,13 +139,18 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [isLoading, setIsLoading] = useState(false)
   const [imageFormat, setImageFormat] = useState('9/16')
 
-  // Avatar state
+  // Avatar funnel state
+  const [avatarFunnelStep, setAvatarFunnelStep] = useState('industry')
+  const [avatarData, setAvatarData] = useState(EMPTY_AVATAR_DATA())
+  const [avatarSubIndustries, setAvatarSubIndustries] = useState(null)
+  const [avatarNameInput, setAvatarNameInput] = useState('')
+
+  // Avatar bar state
   const [avatars, setAvatars] = useState([])
   const [selectedAvatar, setSelectedAvatar] = useState(null)
   const [avatarModal, setAvatarModal] = useState(null)
   const [avatarForm, setAvatarForm] = useState({ ...EMPTY_AVATAR_FORM })
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const [avatarBuilder, setAvatarBuilder] = useState(null)
 
   useEffect(() => { loadAvatars() }, [])
 
@@ -111,13 +161,12 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }, [pendingRefine])
 
-  // Reset angle selections and bubble selections when section changes
   useEffect(() => {
     setSelectedAngles([])
     setSelectedBubbles([])
   }, [activeSection])
 
-  // ─── Data ────────────────────────────────────────────────────────────────────
+  // ─── Data ─────────────────────────────────────────────────────────────────────
 
   async function loadAvatars() {
     try {
@@ -129,14 +178,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }
 
-  // ─── API ─────────────────────────────────────────────────────────────────────
+  // ─── API ──────────────────────────────────────────────────────────────────────
 
-  async function callAPI(section, messages, svs, av, angles = []) {
+  async function callAPI(section, messages, svs, av, angles = [], system = null) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages,
+        ...(system ? { system } : {}),
         avatar: av || null,
         sectionContext: svs,
         currentSection: section,
@@ -175,12 +225,239 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     return false
   }
 
-  // ─── Section management ──────────────────────────────────────────────────────
+  function isQuestion(text) {
+    if (!text) return false
+    const t = text.trim()
+    if (t.endsWith('?')) return true
+    const lower = t.toLowerCase()
+    const starters = ['what ', 'why ', 'how ', 'explain ', 'when ', 'where ', 'who ', 'which ', 'does ', 'can ', 'is ', 'are ', 'will ', 'should ', 'could ', 'would ']
+    return starters.some(w => lower.startsWith(w))
+  }
+
+  // ─── Avatar funnel ────────────────────────────────────────────────────────────
+
+  function initAvatarFunnel() {
+    setAvatarFunnelStep('industry')
+    setAvatarData(EMPTY_AVATAR_DATA())
+    setAvatarSubIndustries(null)
+    setAvatarNameInput('')
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: [{ role: 'assistant', content: AVATAR_STEP_MESSAGES.industry }],
+    }))
+    setCurrentBubbles(INDUSTRY_BUBBLES)
+  }
+
+  function startNewAvatarFunnel() {
+    setActiveSection('avatar')
+    initAvatarFunnel()
+  }
+
+  function restoreAvatarFunnel() {
+    const step = avatarFunnelStep
+    if (step === 'review') { setCurrentBubbles([]); return }
+    if (DYNAMIC_AVATAR_STEPS.has(step)) {
+      generateDynamicAvatarBubbles(step, avatarData)
+    } else if (step === 'industry') {
+      setCurrentBubbles(avatarSubIndustries || INDUSTRY_BUBBLES)
+    } else {
+      const staticBubbles = {
+        role: TRADE_INDUSTRIES.has(avatarData.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
+        businessSize: BUSINESS_SIZE_BUBBLES,
+        ageRange: AGE_RANGE_BUBBLES,
+        mediaTrust: MEDIA_TRUST_BUBBLES,
+      }
+      setCurrentBubbles(staticBubbles[step] || [])
+    }
+  }
+
+  function gotoAvatarStep(step, data) {
+    setAvatarFunnelStep(step)
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: [...prev.avatar, { role: 'assistant', content: AVATAR_STEP_MESSAGES[step] }],
+    }))
+    if (step === 'review') { setCurrentBubbles([]); return }
+    if (DYNAMIC_AVATAR_STEPS.has(step)) {
+      generateDynamicAvatarBubbles(step, data)
+    } else {
+      const staticBubbles = {
+        role: TRADE_INDUSTRIES.has(data?.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
+        businessSize: BUSINESS_SIZE_BUBBLES,
+        ageRange: AGE_RANGE_BUBBLES,
+        mediaTrust: MEDIA_TRUST_BUBBLES,
+      }
+      setCurrentBubbles(staticBubbles[step] || [])
+    }
+  }
+
+  async function generateDynamicAvatarBubbles(step, data) {
+    const d = data || avatarData
+    const dynamicSystem = `Generate exactly 4 short bubble options for this avatar funnel step.
+Context so far: industry=${d.industry || 'unknown'}, role=${d.role || 'unknown'}, businessSize=${d.businessSize || 'unknown'}, ageRange=${d.ageRange || 'unknown'}
+Current step: ${step}
+Each option must be specific to the industry and role already selected.
+Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4"]}`
+    setIsLoading(true)
+    try {
+      const raw = await callAPI(
+        'avatar',
+        [{ role: 'user', content: `Generate 4 options for step: ${step}` }],
+        sectionValues,
+        null,
+        [],
+        dynamicSystem,
+      )
+      const parsed = parseResponse(raw)
+      if (parsed && parsed.options) {
+        setCurrentBubbles([...parsed.options, 'Type your own'])
+      } else {
+        setCurrentBubbles(['Type your own'])
+      }
+    } catch (err) {
+      console.error('Dynamic avatar bubbles error:', err)
+      setCurrentBubbles(['Type your own'])
+    }
+    setIsLoading(false)
+  }
+
+  async function handleAvatarFunnelSelect(value) {
+    if (value === 'Type your own') return
+
+    const step = avatarFunnelStep
+
+    if (step === 'industry') {
+      if (avatarSubIndustries === null) {
+        setSectionChats(prev => ({
+          ...prev,
+          avatar: [...prev.avatar, { role: 'user', content: value }],
+        }))
+        const subMap = INDUSTRY_SUB_MAP[value]
+        if (subMap) {
+          setAvatarSubIndustries(subMap)
+          setSectionChats(prev => ({
+            ...prev,
+            avatar: [...prev.avatar, { role: 'assistant', content: `Which type of ${value}?` }],
+          }))
+          setCurrentBubbles(subMap)
+        } else {
+          const newData = { ...avatarData, industry: value }
+          setAvatarData(newData)
+          gotoAvatarStep('role', newData)
+        }
+      } else {
+        setSectionChats(prev => ({
+          ...prev,
+          avatar: [...prev.avatar, { role: 'user', content: value }],
+        }))
+        const newData = { ...avatarData, industry: value }
+        setAvatarData(newData)
+        setAvatarSubIndustries(null)
+        gotoAvatarStep('role', newData)
+      }
+      return
+    }
+
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: [...prev.avatar, { role: 'user', content: value }],
+    }))
+
+    const fieldMap = {
+      role: 'role', businessSize: 'businessSize', ageRange: 'ageRange',
+      wants: 'wants', fears: 'fears', frustrations: 'frustrations',
+      statusDriver: 'statusDriver', mediaTrust: 'mediaTrust',
+    }
+    const field = fieldMap[step]
+    const newData = field ? { ...avatarData, [field]: value } : avatarData
+    if (field) setAvatarData(newData)
+
+    const nextIdx = AVATAR_FUNNEL_STEPS.indexOf(step) + 1
+    if (nextIdx < AVATAR_FUNNEL_STEPS.length) {
+      gotoAvatarStep(AVATAR_FUNNEL_STEPS[nextIdx], newData)
+    }
+  }
+
+  async function handleAvatarTypeOwn(text) {
+    if (!text.trim()) return
+    setTypeOwn('')
+
+    if (isQuestion(text)) {
+      setSectionChats(prev => ({
+        ...prev,
+        avatar: [...prev.avatar, { role: 'user', content: text }],
+      }))
+      const questionSystem = `The user is building their avatar. They are on step: ${avatarFunnelStep}.
+They asked: ${text}
+Answer their question in 1-2 sentences using plain simple language.
+Then redirect them back to the current step question.
+Do not generate bubble options in this response.`
+      setIsLoading(true)
+      try {
+        const raw = await callAPI('avatar', [{ role: 'user', content: text }], sectionValues, null, [], questionSystem)
+        setSectionChats(prev => ({
+          ...prev,
+          avatar: [...prev.avatar, { role: 'assistant', content: raw }],
+        }))
+      } catch (err) {
+        console.error('Avatar question error:', err)
+      }
+      setIsLoading(false)
+    } else {
+      await handleAvatarFunnelSelect(text)
+    }
+  }
+
+  async function handleSaveAvatarFunnel() {
+    if (!avatarNameInput.trim()) return
+    try {
+      const primaryEmotion = [avatarData.fears, avatarData.frustrations].filter(Boolean).join(' / ')
+      const body = {
+        name: avatarNameInput.trim(),
+        age_range: avatarData.ageRange || '',
+        niche: [avatarData.industry, avatarData.role].filter(Boolean).join(' - '),
+        what_they_want: avatarData.wants || '',
+        what_they_fear: [avatarData.fears, avatarData.deepFear || avatarData.fears].filter(Boolean).join(' / '),
+        what_they_trust: avatarData.mediaTrust || '',
+        primary_emotion: primaryEmotion,
+      }
+      const res = await fetch('/api/avatars', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      await loadAvatars()
+      if (data.avatar) {
+        setSelectedAvatar(data.avatar)
+        const newSvs = { ...sectionValues, avatar: data.avatar.name }
+        setSectionValues(newSvs)
+        setSectionChats(prev => ({
+          ...prev,
+          avatar: [
+            ...prev.avatar,
+            { role: 'user', content: `Name: ${data.avatar.name}` },
+            { role: 'assistant', content: `Avatar "${data.avatar.name}" saved. Moving to visual format.` },
+          ],
+        }))
+        setAvatarFunnelStep('industry')
+        setAvatarData(EMPTY_AVATAR_DATA())
+        setAvatarNameInput('')
+        setActiveSection('visual_format')
+        openSection('visual_format', newSvs, data.avatar, [])
+      }
+    } catch (err) {
+      console.error('Save avatar funnel error:', err)
+    }
+  }
+
+  // ─── Section management ───────────────────────────────────────────────────────
 
   async function openSection(section, svs, av, angles = []) {
     if (section === 'avatar') return
     const prompt = SECTION_PROMPTS[section]
     if (!prompt) return
+    const openingMsg = SECTION_OPENING_MESSAGES[section]
 
     setIsLoading(true)
     try {
@@ -189,6 +466,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       setSectionChats(prev => ({
         ...prev,
         [section]: [
+          ...(openingMsg ? [{ role: 'assistant', content: openingMsg }] : []),
           { role: 'user', content: prompt },
           { role: 'assistant', content: raw },
         ],
@@ -208,20 +486,26 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setSelectedBubbles([])
 
     if (section === 'avatar') {
-      setCurrentBubbles([])
+      if (sectionValues.avatar !== null) {
+        setCurrentBubbles([])
+        return
+      }
+      if (sectionChats.avatar.length === 0) {
+        initAvatarFunnel()
+      } else {
+        restoreAvatarFunnel()
+      }
       return
     }
 
     const val = sectionValues[section]
     const chat = sectionChats[section]
 
-    // Section already locked — no bubbles needed
     if (val !== null) {
       setCurrentBubbles([])
       return
     }
 
-    // Has existing chat — restore last options
     if (chat.length > 0) {
       const lastAi = [...chat].reverse().find(m => m.role === 'assistant')
       if (lastAi) {
@@ -235,7 +519,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       return
     }
 
-    // Fresh section — fire opening call
     openSection(section, sectionValues, selectedAvatar, [])
   }
 
@@ -252,7 +535,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
     const userMsg = { role: 'user', content: refineText }
     const updatedChat = [...sectionChats[activeSection], userMsg]
-
     setSectionChats(prev => ({ ...prev, [activeSection]: updatedChat }))
     setIsLoading(true)
 
@@ -328,7 +610,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }
 
-  // ─── Avatar management ───────────────────────────────────────────────────────
+  // ─── Avatar bar management ────────────────────────────────────────────────────
 
   function handleAvatarSelect(av) {
     const newSelected = selectedAvatar?.id === av.id ? null : av
@@ -341,6 +623,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         ...prev,
         avatar: [{ role: 'assistant', content: `Avatar locked in. Writing for ${newSelected.name}.` }],
       }))
+      setAvatarFunnelStep('industry')
+      setAvatarData(EMPTY_AVATAR_DATA())
+      setAvatarSubIndustries(null)
+      setAvatarNameInput('')
       setActiveSection('visual_format')
       openSection('visual_format', newSvs, newSelected, [])
     } else {
@@ -381,81 +667,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       primary_emotion: av.primary_emotion || '',
     })
     setAvatarModal({ mode: 'edit', data: av })
-  }
-
-  async function handleAvatarBuilderSend() {
-    if (!avatarBuilder || !avatarBuilder.input.trim() || avatarBuilder.loading) return
-    const answer = avatarBuilder.input.trim()
-    const newMessages = [...avatarBuilder.messages, { role: 'user', text: answer }]
-    const newAnswers = [...avatarBuilder.answers, answer]
-    const newQuestionIdx = avatarBuilder.questionIdx + 1
-
-    if (newQuestionIdx < 5) {
-      setAvatarBuilder(b => ({
-        ...b,
-        messages: [...newMessages, { role: 'ai', text: AVATAR_QUESTIONS[newQuestionIdx] }],
-        input: '',
-        answers: newAnswers,
-        questionIdx: newQuestionIdx,
-      }))
-    } else {
-      setAvatarBuilder(b => ({ ...b, messages: newMessages, input: '', answers: newAnswers, loading: true }))
-      try {
-        const contextMessages = AVATAR_QUESTIONS.map((q, i) => [
-          { role: 'assistant', content: q },
-          { role: 'user', content: newAnswers[i] },
-        ]).flat()
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: contextMessages, system: AVATAR_BUILDER_SYSTEM }),
-        })
-        const data = await response.json()
-        let extracted = null
-        try {
-          extracted = JSON.parse((data.text || '').replace(/```json|```/g, '').trim())
-        } catch (_) {}
-        const summaryText = extracted
-          ? `Got it. Here is your avatar.\n${extracted.suggested_name}${extracted.niche ? ' — ' + extracted.niche : ''}`
-          : 'Got it. Here is your avatar.'
-        setAvatarBuilder(b => ({
-          ...b,
-          messages: [...newMessages, { role: 'ai', text: summaryText }],
-          extracted: extracted || {},
-          editName: extracted?.suggested_name || '',
-          loading: false,
-        }))
-      } catch (err) {
-        console.error('Avatar builder error:', err)
-        setAvatarBuilder(b => ({ ...b, loading: false }))
-      }
-    }
-  }
-
-  async function handleSaveBuiltAvatar() {
-    if (!avatarBuilder || !avatarBuilder.editName.trim() || !avatarBuilder.extracted) return
-    try {
-      const body = {
-        name: avatarBuilder.editName.trim(),
-        age_range: avatarBuilder.extracted.age_range || '',
-        niche: avatarBuilder.extracted.niche || '',
-        what_they_want: avatarBuilder.extracted.what_they_want || '',
-        what_they_fear: avatarBuilder.extracted.what_they_fear || '',
-        what_they_trust: avatarBuilder.extracted.what_they_trust || '',
-        primary_emotion: avatarBuilder.extracted.primary_emotion || '',
-      }
-      const res = await fetch('/api/avatars', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      await loadAvatars()
-      if (data.avatar) setSelectedAvatar(data.avatar)
-      setAvatarBuilder(null)
-    } catch (err) {
-      console.error('Save built avatar error:', err)
-    }
   }
 
   // ─── Library ──────────────────────────────────────────────────────────────────
@@ -513,10 +724,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }
 
-  // ─── Bubble management ───────────────────────────────────────────────────────
+  // ─── Bubble management (non-avatar sections) ──────────────────────────────────
 
   function handleAddTypeOwn() {
     if (!typeOwn.trim()) return
+    if (activeSection === 'avatar') {
+      handleAvatarTypeOwn(typeOwn.trim())
+      return
+    }
     const val = typeOwn.trim()
     setCurrentBubbles(prev => [...prev, val])
     setSelectedBubbles([val])
@@ -535,30 +750,31 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   function handleBubbleClick(bubble) {
     setSelectedBubbles(prev => {
-      if (prev.includes(bubble)) {
-        return prev.filter(b => b !== bubble)
-      }
-      if (prev.length < 2) {
-        return [...prev, bubble]
-      }
-      // 2 already selected — drop the first, add the new one
+      if (prev.includes(bubble)) return prev.filter(b => b !== bubble)
+      if (prev.length < 2) return [...prev, bubble]
       return [prev[1], bubble]
     })
   }
 
-  // ─── Derived ─────────────────────────────────────────────────────────────────
+  // ─── Derived ──────────────────────────────────────────────────────────────────
 
   const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
   const sectionAngles = SECTION_ANGLES[activeSection] || []
   const canSubmit = selectedBubbles.length === 1 && !isLoading
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  const FIELD_LABELS = {
+    industry: 'INDUSTRY', role: 'ROLE', businessSize: 'BUSINESS SIZE',
+    ageRange: 'AGE RANGE', wants: 'WANTS', fears: 'FEARS',
+    frustrations: 'FRUSTRATIONS', statusDriver: 'WHAT WINNING LOOKS LIKE',
+    mediaTrust: 'MEDIA TRUST',
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <>
-      {/* ── OUTER WRAPPER ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 110px)', overflow: 'hidden' }}>
 
         {/* ── AVATAR BAR ── */}
         <div style={{
@@ -598,10 +814,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
             ))}
           </div>
           <button
-            onClick={() => setAvatarBuilder({
-              messages: [{ role: 'ai', text: AVATAR_QUESTIONS[0] }],
-              input: '', questionIdx: 0, answers: [], extracted: null, editName: '', loading: false,
-            })}
+            onClick={startNewAvatarFunnel}
             style={{
               border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
               padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
@@ -614,15 +827,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
         {/* ── MAIN GRID ── */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '55% 45%', gap: 24,
-          flex: 1, minHeight: 0, overflow: 'hidden', paddingTop: 16,
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32,
+          flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 24px',
         }}>
 
           {/* ── LEFT COLUMN ── */}
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-            {/* Section header with arrows */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+            {/* Section header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 12px 0', flexShrink: 0 }}>
               {activeSectionIdx > 0 && (
                 <button
                   onClick={() => gotoSection(SECTIONS[activeSectionIdx - 1])}
@@ -631,7 +844,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                   ←
                 </button>
               )}
-              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1rem', color: '#2990fa', letterSpacing: '0.05em' }}>
+              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#2990fa', letterSpacing: '0.05em' }}>
                 {SECTION_LABELS[activeSection]}
               </div>
               {activeSectionIdx < SECTIONS.length - 1 && (
@@ -647,17 +860,17 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
             {/* Chat messages */}
             <div style={{
               flex: 1, overflowY: 'auto', minHeight: 0,
-              display: 'flex', flexDirection: 'column', gap: 8,
-              padding: 12, background: '#0a1628', border: '1px solid #2990fa',
-              borderRadius: 8, marginBottom: 10,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              padding: 12, background: '#060d1f', borderRadius: 10, border: '1px solid #152840',
+              marginBottom: 10,
             }}>
               {sectionChats[activeSection].filter(m => !shouldHideMessage(m)).map((msg, idx) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <div style={{
-                    background: msg.role === 'user' ? '#2990fa' : '#060d1f',
+                    background: msg.role === 'user' ? '#2990fa' : '#0a1628',
                     border: msg.role === 'assistant' ? '1px solid rgba(41,144,250,0.3)' : 'none',
-                    color: '#ffffff', padding: '8px 12px', borderRadius: 8,
-                    maxWidth: '75%', fontSize: '0.82rem', lineHeight: 1.4,
+                    color: '#ffffff', padding: '10px 14px', borderRadius: 10,
+                    maxWidth: '80%', fontSize: '0.92rem', lineHeight: 1.5,
                     fontFamily: 'var(--font-inter)', whiteSpace: 'pre-wrap',
                   }}>
                     {msg.content}
@@ -671,132 +884,234 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               )}
             </div>
 
-            {/* Angle buttons — above bubbles */}
-            {sectionAngles.length > 0 && (
-              <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                {sectionAngles.map(angle => (
-                  <button
-                    key={angle}
-                    onClick={() => setSelectedAngles(prev =>
-                      prev.includes(angle) ? prev.filter(a => a !== angle) : [...prev, angle]
+            {/* ── AVATAR SECTION CONTROLS ── */}
+            {activeSection === 'avatar' ? (
+              avatarFunnelStep === 'review' ? (
+                <div style={{ flexShrink: 0, overflowY: 'auto' }}>
+                  {/* Summary card */}
+                  <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                    {Object.entries(FIELD_LABELS).map(([field, label]) =>
+                      avatarData[field] ? (
+                        <div key={field} style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+                            {label}
+                          </div>
+                          <div style={{ fontSize: '0.88rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
+                            {avatarData[field]}
+                          </div>
+                        </div>
+                      ) : null
                     )}
+                  </div>
+                  {/* Name input */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                      AVATAR NAME
+                    </div>
+                    <input
+                      value={avatarNameInput}
+                      onChange={e => setAvatarNameInput(e.target.value)}
+                      placeholder="Give this avatar a name"
+                      style={{
+                        width: '100%', background: '#060d1f', border: '1px solid #2990fa',
+                        borderRadius: 8, color: '#ffffff', padding: '10px 14px',
+                        fontSize: '0.9rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  {/* Save button */}
+                  <button
+                    onClick={handleSaveAvatarFunnel}
+                    disabled={!avatarNameInput.trim()}
                     style={{
-                      border: `1px solid ${selectedAngles.includes(angle) ? '#2990fa' : '#152840'}`,
-                      background: selectedAngles.includes(angle) ? '#0a1628' : '#060d1f',
-                      color: selectedAngles.includes(angle) ? '#ffffff' : '#4a6a8a',
-                      padding: '6px 12px',
-                      borderRadius: 20,
-                      fontFamily: 'var(--font-ibm-plex-mono)',
-                      fontSize: '0.52rem',
-                      cursor: 'pointer',
+                      background: avatarNameInput.trim() ? '#2990fa' : '#0a1628',
+                      border: '1px solid #2990fa', borderRadius: 6,
+                      padding: '10px 22px', color: avatarNameInput.trim() ? '#ffffff' : '#4a6a8a',
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                      cursor: avatarNameInput.trim() ? 'pointer' : 'not-allowed', width: '100%',
                     }}
                   >
-                    {angle}
+                    SAVE AVATAR
                   </button>
-                ))}
-              </div>
-            )}
-
-            {/* Bubbles */}
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-              {currentBubbles.map((bubble, idx) => (
-                <div key={idx}>
-                  {editingBubble === idx ? (
-                    <div style={{ border: '1px solid #2990fa', background: '#060d1f', borderRadius: 8, padding: '8px 12px' }}>
-                      <textarea
-                        value={editingText}
-                        onChange={e => setEditingText(e.target.value)}
+                </div>
+              ) : (
+                <>
+                  {/* Avatar funnel bubbles */}
+                  <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
+                    {currentBubbles.map((bubble, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleAvatarFunnelSelect(bubble)}
                         style={{
-                          background: '#0a1628', color: '#ffffff', border: 'none', outline: 'none',
-                          width: '100%', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', resize: 'none', minHeight: 60,
+                          border: `1px solid ${bubble === 'Type your own' ? '#152840' : '#2990fa'}`,
+                          background: '#060d1f',
+                          color: bubble === 'Type your own' ? '#4a6a8a' : '#ffffff',
+                          padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                          fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                          lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center',
+                        }}
+                      >
+                        {bubble}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Type your own for avatar */}
+                  <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <textarea
+                        value={typeOwn}
+                        onChange={e => setTypeOwn(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAvatarTypeOwn(typeOwn.trim()) } }}
+                        placeholder="Type your own or ask a question..."
+                        rows={2}
+                        style={{
+                          flex: 1, background: '#060d1f', border: '1px solid #2990fa',
+                          color: '#ffffff', padding: '10px 14px', borderRadius: 8,
+                          fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                          resize: 'none', maxHeight: 52, boxSizing: 'border-box',
                         }}
                       />
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                        <button onClick={() => handleEditSave(idx)} style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 4, padding: '4px 10px', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Save</button>
-                        <button onClick={() => { setEditingBubble(null); setEditingText('') }} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '4px 10px', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Cancel</button>
-                      </div>
+                      {typeOwn.trim() && (
+                        <button
+                          onClick={() => handleAvatarTypeOwn(typeOwn.trim())}
+                          style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          →
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    <div
-                      onClick={() => handleBubbleClick(bubble)}
-                      style={{
-                        border: '1px solid #2990fa',
-                        background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
-                        color: '#ffffff', padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                      }}
-                    >
-                      <span style={{ fontSize: '0.82rem', fontFamily: 'var(--font-inter)', lineHeight: 1.4 }}>{bubble}</span>
-                      <span
-                        onClick={e => { e.stopPropagation(); setEditingBubble(idx); setEditingText(bubble) }}
-                        style={{ color: selectedBubbles.includes(bubble) ? 'rgba(255,255,255,0.7)' : '#2990fa', cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0 }}
-                        title="Edit"
+                  </div>
+                </>
+              )
+            ) : (
+              /* ── NON-AVATAR SECTION CONTROLS ── */
+              <>
+                {/* Angle buttons */}
+                {sectionAngles.length > 0 && (
+                  <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {sectionAngles.map(angle => (
+                      <button
+                        key={angle}
+                        onClick={() => setSelectedAngles(prev =>
+                          prev.includes(angle) ? prev.filter(a => a !== angle) : [...prev, angle]
+                        )}
+                        style={{
+                          border: `1px solid ${selectedAngles.includes(angle) ? '#2990fa' : '#152840'}`,
+                          background: selectedAngles.includes(angle) ? '#0a1628' : '#060d1f',
+                          color: selectedAngles.includes(angle) ? '#ffffff' : '#4a6a8a',
+                          padding: '6px 14px', borderRadius: 20,
+                          fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', cursor: 'pointer',
+                        }}
                       >
-                        ✎
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Type your own */}
-            <div style={{ flexShrink: 0, marginBottom: 8 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  value={typeOwn}
-                  onChange={e => setTypeOwn(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddTypeOwn() }}
-                  placeholder="Type your own or paste from above..."
-                  style={{
-                    flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                    color: '#ffffff', padding: '8px 12px', borderRadius: 6,
-                    fontSize: '0.8rem', fontFamily: 'var(--font-inter)',
-                  }}
-                />
-                {typeOwn.trim() && (
-                  <button
-                    onClick={handleAddTypeOwn}
-                    style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 6, padding: '8px 14px', fontSize: '0.78rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
-                  >
-                    Add
-                  </button>
+                        {angle}
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {/* Action buttons */}
-            <div style={{ flexShrink: 0, display: 'flex', gap: 8 }}>
-              <button
-                onClick={handleRefine}
-                disabled={isLoading}
-                style={{
-                  border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
-                  padding: '8px 16px', borderRadius: 6, cursor: isLoading ? 'not-allowed' : 'pointer',
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', opacity: isLoading ? 0.5 : 1,
-                }}
-              >
-                REFINE
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={!canSubmit}
-                style={{
-                  background: canSubmit ? '#2990fa' : '#0a1628',
-                  border: '1px solid #2990fa',
-                  color: canSubmit ? '#ffffff' : '#4a6a8a',
-                  padding: '8px 16px', borderRadius: 6,
-                  cursor: canSubmit ? 'pointer' : 'not-allowed',
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem',
-                }}
-              >
-                SUBMIT
-              </button>
-            </div>
+                {/* Bubbles */}
+                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
+                  {currentBubbles.map((bubble, idx) => (
+                    <div key={idx}>
+                      {editingBubble === idx ? (
+                        <div style={{ border: '1px solid #2990fa', background: '#060d1f', borderRadius: 10, padding: '10px 14px' }}>
+                          <textarea
+                            value={editingText}
+                            onChange={e => setEditingText(e.target.value)}
+                            style={{
+                              background: '#0a1628', color: '#ffffff', border: 'none', outline: 'none',
+                              width: '100%', fontSize: '0.9rem', fontFamily: 'var(--font-inter)', resize: 'none', minHeight: 60,
+                            }}
+                          />
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <button onClick={() => handleEditSave(idx)} style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 4, padding: '4px 10px', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Save</button>
+                            <button onClick={() => { setEditingBubble(null); setEditingText('') }} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '4px 10px', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => handleBubbleClick(bubble)}
+                          style={{
+                            border: '1px solid #2990fa',
+                            background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
+                            color: '#ffffff', padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                            fontSize: '0.9rem', fontFamily: 'var(--font-inter)', lineHeight: 1.4, minHeight: 44,
+                          }}
+                        >
+                          <span>{bubble}</span>
+                          <span
+                            onClick={e => { e.stopPropagation(); setEditingBubble(idx); setEditingText(bubble) }}
+                            style={{ color: selectedBubbles.includes(bubble) ? 'rgba(255,255,255,0.7)' : '#2990fa', cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0 }}
+                            title="Edit"
+                          >
+                            ✎
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Type your own */}
+                <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      value={typeOwn}
+                      onChange={e => setTypeOwn(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleAddTypeOwn() }}
+                      placeholder="Type your own or paste from above..."
+                      style={{
+                        flex: 1, background: '#060d1f', border: '1px solid #2990fa',
+                        color: '#ffffff', padding: '10px 14px', borderRadius: 8,
+                        fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                      }}
+                    />
+                    {typeOwn.trim() && (
+                      <button
+                        onClick={handleAddTypeOwn}
+                        style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
+                      >
+                        Add
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ flexShrink: 0, display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={handleRefine}
+                    disabled={isLoading}
+                    style={{
+                      border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
+                      padding: '10px 22px', borderRadius: 6, cursor: isLoading ? 'not-allowed' : 'pointer',
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', opacity: isLoading ? 0.5 : 1,
+                    }}
+                  >
+                    REFINE
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!canSubmit}
+                    style={{
+                      background: canSubmit ? '#2990fa' : '#0a1628',
+                      border: '1px solid #2990fa',
+                      color: canSubmit ? '#ffffff' : '#4a6a8a',
+                      padding: '10px 22px', borderRadius: 6,
+                      cursor: canSubmit ? 'pointer' : 'not-allowed',
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    }}
+                  >
+                    SUBMIT
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── RIGHT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', height: '100%', gap: 8, paddingRight: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', gap: 10 }}>
             {SECTIONS.map(section => (
               <div
                 key={section}
@@ -804,19 +1119,19 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                 style={{
                   background: '#0a1628',
                   border: `1px solid ${activeSection === section ? '#2990fa' : '#152840'}`,
-                  borderRadius: 8, padding: '10px 14px', cursor: 'pointer',
+                  borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
                   opacity: sectionValues[section] ? 1 : 0.35,
                 }}
               >
                 <div style={{
-                  fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa',
-                  textTransform: 'uppercase', letterSpacing: '0.08em',
-                  marginBottom: sectionValues[section] ? 6 : 0,
+                  fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa',
+                  textTransform: 'uppercase', letterSpacing: '0.12em',
+                  marginBottom: sectionValues[section] ? 4 : 0,
                 }}>
                   {SECTION_LABELS[section]}
                 </div>
                 {sectionValues[section] && (
-                  <div style={{ fontSize: '0.78rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.88rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
                     {sectionValues[section]}
                   </div>
                 )}
@@ -860,13 +1175,12 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               </div>
             ))}
 
-            {/* Save to Library */}
             {allConfirmed && (
               <button
                 onClick={saveToLibrary}
                 style={{
-                  background: '#2990fa', border: 'none', borderRadius: 8, padding: 12,
-                  color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem',
+                  background: '#2990fa', border: 'none', borderRadius: 10, padding: 14,
+                  color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
                   cursor: 'pointer', marginTop: 4,
                 }}
               >
@@ -904,14 +1218,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                   <textarea
                     value={avatarForm[field.key]}
                     onChange={e => setAvatarForm(f => ({ ...f, [field.key]: e.target.value }))}
-                    style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.82rem', resize: 'none', height: 70, boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.88rem', resize: 'none', height: 70, boxSizing: 'border-box' }}
                   />
                 ) : (
                   <input
                     value={avatarForm[field.key]}
                     placeholder={field.placeholder || ''}
                     onChange={e => setAvatarForm(f => ({ ...f, [field.key]: e.target.value }))}
-                    style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -920,95 +1234,13 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               <button
                 onClick={handleSaveAvatar}
                 disabled={!avatarForm.name.trim()}
-                style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', width: '100%', opacity: avatarForm.name.trim() ? 1 : 0.5, cursor: avatarForm.name.trim() ? 'pointer' : 'not-allowed' }}
+                style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', width: '100%', opacity: avatarForm.name.trim() ? 1 : 0.5, cursor: avatarForm.name.trim() ? 'pointer' : 'not-allowed' }}
               >
                 Save
               </button>
               <button
                 onClick={() => { setAvatarModal(null); setAvatarForm({ ...EMPTY_AVATAR_FORM }) }}
-                style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', width: '100%', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── AVATAR BUILDER MODAL ── */}
-      {avatarBuilder && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(2,8,16,0.92)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={e => { if (e.target === e.currentTarget) setAvatarBuilder(null) }}
-        >
-          <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 24, width: '100%', maxWidth: 460 }}>
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ffffff', marginBottom: 4 }}>
-              Build Your Avatar
-            </div>
-            <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.48rem', color: '#2990fa', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>
-              Jarvis will ask you a few questions
-            </div>
-            <div style={{ minHeight: 280, maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: 12, background: '#060d1f', borderRadius: 8, marginBottom: 12 }}>
-              {avatarBuilder.messages.map((msg, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  <div style={{
-                    background: msg.role === 'user' ? '#1a2d48' : '#0a1628',
-                    border: `1px solid ${msg.role === 'user' ? 'rgba(41,144,250,0.4)' : '#2990fa'}`,
-                    borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', color: '#ffffff',
-                    maxWidth: '85%', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontFamily: 'var(--font-inter)',
-                  }}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              {avatarBuilder.loading && (
-                <div style={{ color: '#2990fa', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>Building avatar...</div>
-              )}
-            </div>
-            {avatarBuilder.extracted && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-                  Avatar Name
-                </div>
-                <input
-                  value={avatarBuilder.editName}
-                  onChange={e => setAvatarBuilder(b => ({ ...b, editName: e.target.value }))}
-                  style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.82rem', boxSizing: 'border-box' }}
-                />
-              </div>
-            )}
-            {!avatarBuilder.extracted && (
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <textarea
-                  value={avatarBuilder.input}
-                  onChange={e => setAvatarBuilder(b => ({ ...b, input: e.target.value }))}
-                  disabled={avatarBuilder.loading}
-                  placeholder="Type your answer..."
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !avatarBuilder.loading) { e.preventDefault(); handleAvatarBuilderSend() } }}
-                  style={{ flex: 1, background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8, padding: '10px 14px', fontSize: '0.85rem', color: '#ffffff', resize: 'none', height: 52, fontFamily: 'var(--font-inter)', opacity: avatarBuilder.loading ? 0.4 : 1 }}
-                />
-                <button
-                  onClick={handleAvatarBuilderSend}
-                  disabled={avatarBuilder.loading || !avatarBuilder.input.trim()}
-                  style={{ background: '#2990fa', border: 'none', borderRadius: 8, padding: '10px 18px', color: '#ffffff', fontSize: '0.85rem', fontFamily: 'var(--font-ibm-plex-mono)', opacity: (avatarBuilder.loading || !avatarBuilder.input.trim()) ? 0.4 : 1, cursor: (avatarBuilder.loading || !avatarBuilder.input.trim()) ? 'not-allowed' : 'pointer' }}
-                >
-                  →
-                </button>
-              </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {avatarBuilder.extracted && (
-                <button
-                  onClick={handleSaveBuiltAvatar}
-                  disabled={!avatarBuilder.editName.trim()}
-                  style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', width: '100%', opacity: avatarBuilder.editName.trim() ? 1 : 0.5, cursor: avatarBuilder.editName.trim() ? 'pointer' : 'not-allowed' }}
-                >
-                  Save Avatar
-                </button>
-              )}
-              <button
-                onClick={() => setAvatarBuilder(null)}
-                style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', width: '100%', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', width: '100%', cursor: 'pointer' }}
               >
                 Cancel
               </button>
