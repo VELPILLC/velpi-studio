@@ -154,7 +154,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [avatarForm, setAvatarForm] = useState({ ...EMPTY_AVATAR_FORM })
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  useEffect(() => { loadAvatars() }, [])
+  useEffect(() => {
+    loadAvatars()
+    initAvatarFunnel()
+  }, [])
 
   useEffect(() => {
     if (pendingRefine) {
@@ -510,6 +513,7 @@ Do not generate bubble options in this response.`
   }
 
   function gotoSection(section) {
+    if (section === activeSection) return
     setActiveSection(section)
     setSelectedBubbles([])
 
@@ -753,57 +757,81 @@ Do not generate bubble options in this response.`
     }
   }
 
-  async function handleAngleToggle(angle) {
-    const newAngles = selectedAngles.includes(angle)
-      ? selectedAngles.filter(a => a !== angle)
-      : [...selectedAngles, angle]
-    setSelectedAngles(newAngles)
-
-    if (!isLoading && sectionValues[activeSection] === null && currentBubbles.length > 0) {
-      const prompt = SECTION_PROMPTS[activeSection]
-      if (!prompt) return
-      setIsLoading(true)
-      try {
-        const raw = await callAPI(
-          activeSection,
-          [{ role: 'user', content: prompt }],
-          sectionValues,
-          selectedAvatar,
-          newAngles,
-        )
-        const parsed = parseResponse(raw)
-        const openingMsg = SECTION_OPENING_MESSAGES[activeSection]
-        setSectionChats(prev => ({
-          ...prev,
-          [activeSection]: [
-            ...(openingMsg ? [{ role: 'assistant', content: openingMsg }] : []),
-            { role: 'user', content: prompt },
-            { role: 'assistant', content: raw },
-          ],
-        }))
-        if (parsed && parsed.options) {
-          setCurrentBubbles(parsed.options)
-          setSelectedBubbles([])
-        }
-      } catch (err) {
-        console.error('handleAngleToggle refire error:', err)
-      }
-      setIsLoading(false)
-    }
+  function handleAngleToggle(angle) {
+    setSelectedAngles(prev =>
+      prev.includes(angle) ? prev.filter(a => a !== angle) : [...prev, angle]
+    )
   }
 
   // ─── Bubble management (non-avatar sections) ──────────────────────────────────
 
-  function handleAddTypeOwn() {
+  async function handleAddTypeOwn() {
     if (!typeOwn.trim()) return
     if (activeSection === 'avatar') {
       handleAvatarTypeOwn(typeOwn.trim())
       return
     }
     const val = typeOwn.trim()
-    setCurrentBubbles(prev => [...prev, val])
-    setSelectedBubbles([val])
     setTypeOwn('')
+    const sectionLabel = activeSection.replace(/_/g, ' ')
+    const validationSystem = `You are a professional marketing strategist.
+A user just typed this as their ${sectionLabel} input. Analyze it. Does it make sense as ${sectionLabel} copy? Is it clear, specific, and strong enough to use in a Facebook ad?
+
+If YES: return JSON exactly: {"valid": true, "text": "<the submitted text verbatim>"}
+If NO or UNCLEAR: return JSON exactly: {"valid": false, "question": "<one direct clarifying question>"}
+
+Examples of invalid submissions:
+Single words with no context (now, yes, good).
+Vague phrases that communicate nothing specific.
+Random text that is not ad copy.
+
+If invalid ask ONE clarifying question to understand what they mean.
+Be direct. Sound like a strategist not a chatbot.
+You have opinions. Use them.`
+
+    setIsLoading(true)
+    try {
+      const raw = await callAPI(
+        activeSection,
+        [{ role: 'user', content: val }],
+        sectionValues,
+        selectedAvatar,
+        selectedAngles,
+        validationSystem,
+      )
+      let result = null
+      try {
+        const cleaned = raw.replace(/```json|```/g, '').trim()
+        result = JSON.parse(cleaned)
+      } catch (_) {
+        try {
+          const m = raw.match(/\{[\s\S]*\}/)
+          if (m) result = JSON.parse(m[0])
+        } catch (__) {}
+      }
+      if (result && result.valid === true) {
+        const finalText = result.text || val
+        setCurrentBubbles(prev => [...prev, finalText])
+        setSelectedBubbles([finalText])
+      } else if (result && result.valid === false && result.question) {
+        setSectionChats(prev => ({
+          ...prev,
+          [activeSection]: [
+            ...prev[activeSection],
+            { role: 'user', content: val },
+            { role: 'assistant', content: result.question },
+          ],
+        }))
+      } else {
+        setCurrentBubbles(prev => [...prev, val])
+        setSelectedBubbles([val])
+      }
+    } catch (err) {
+      console.error('Validation error:', err)
+      setCurrentBubbles(prev => [...prev, val])
+      setSelectedBubbles([val])
+    }
+    setIsLoading(false)
   }
 
   function handleEditSave(idx) {
@@ -1196,16 +1224,16 @@ Do not generate bubble options in this response.`
           </div>
 
           {/* ── RIGHT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 150px)', overflowY: 'auto', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 150px)', overflowY: 'auto', gap: 10, marginTop: 0, paddingTop: 0 }}>
             {SECTIONS.map(section => (
               <div
                 key={section}
                 onClick={() => gotoSection(section)}
                 style={{
-                  background: '#0a1628',
+                  background: activeSection === section ? '#0a1628' : 'transparent',
                   border: `1px solid ${activeSection === section ? '#2990fa' : '#152840'}`,
                   borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
-                  opacity: sectionValues[section] ? 1 : 0.35,
+                  opacity: (!sectionValues[section] && section !== activeSection) ? 0.4 : 1,
                 }}
               >
                 <div style={{
