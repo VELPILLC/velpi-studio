@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // ─── Section constants ────────────────────────────────────────────────────────
 
@@ -139,6 +139,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [isLoading, setIsLoading] = useState(false)
   const [imageFormat, setImageFormat] = useState('9/16')
 
+  const chatScrollRef = useRef(null)
+
   // Avatar funnel state
   const [avatarFunnelStep, setAvatarFunnelStep] = useState('industry')
   const [avatarData, setAvatarData] = useState(EMPTY_AVATAR_DATA())
@@ -165,6 +167,12 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setSelectedAngles([])
     setSelectedBubbles([])
   }, [activeSection])
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [sectionChats, activeSection])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -919,7 +927,7 @@ Do not generate bubble options in this response.`
             </div>
 
             {/* Chat messages */}
-            <div style={{
+            <div ref={chatScrollRef} style={{
               flex: 1, overflowY: 'auto', minHeight: 0,
               display: 'flex', flexDirection: 'column', gap: 10,
               padding: 12, background: '#060d1f', borderRadius: 10, border: '1px solid #152840',
