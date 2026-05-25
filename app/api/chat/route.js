@@ -17,8 +17,18 @@ YOU RECEIVE:
 - avatar: full avatar profile if one is selected
 - messages: the chat history for this section
 
-USE sectionContext to inform every response.
-The more sections confirmed above, the more targeted your options should be.
+CONTEXT RULE: You always receive confirmed values from previous sections.
+Every option you generate must be informed by and aligned with that context.
+Never generate options that ignore or contradict what was already confirmed.
+The more context you have the more targeted and specific your options must be.
+
+ANGLE RULE: If selectedAngles are provided, lean toward those angles.
+But do not ignore the confirmed context. Angles refine direction, context sets the foundation.
+
+REFINE RULE: When given two selected options generate:
+Option 1: refined version of first selection
+Option 2: refined version of second selection
+Option 3: intelligent blend of both
 
 RESPONSE FORMAT — always exactly this structure:
 {
@@ -45,9 +55,16 @@ export async function POST(request) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
-    const { messages, system, avatar = null, sectionContext = null, currentSection = null } = await request.json()
+    const {
+      messages,
+      system,
+      avatar = null,
+      sectionContext = null,
+      currentSection = null,
+      selectedAngles = [],
+    } = await request.json()
 
-    // Build confirmed-sections context string
+    // Build confirmed-sections context string (appended to system prompt)
     let contextStr = ''
     if (sectionContext && currentSection) {
       const currentIdx = SECTIONS_ORDER.indexOf(currentSection)
@@ -64,12 +81,35 @@ export async function POST(request) {
       }
     }
 
+    // Append selected angles to context string
+    if (selectedAngles && selectedAngles.length > 0) {
+      contextStr += `\n\nSELECTED ANGLES FOR THIS SECTION: ${selectedAngles.join(', ')}\nUse these angles to guide the 3 options but still align with all previous context.`
+    }
+
     // Use provided system prompt (e.g. avatar builder) or default Jarvis system
     let finalSystem = system || JARVIS_SYSTEM
     if (contextStr) finalSystem += contextStr
 
-    // Prepend avatar context as first two messages if an avatar is selected
-    let baseMessages = [...messages]
+    // Build context messages to inject as conversation turns (non-avatar sections only)
+    let contextMessages = []
+    if (sectionContext) {
+      const confirmedEntries = Object.entries(sectionContext)
+        .filter(([k, v]) => v !== null && k !== 'avatar')
+      if (confirmedEntries.length > 0) {
+        const contextContent =
+          'CONTEXT FROM PREVIOUS SECTIONS:\n' +
+          confirmedEntries
+            .map(([k, v]) => k.toUpperCase().replace(/_/g, ' ') + ': ' + v)
+            .join('\n')
+        contextMessages = [
+          { role: 'user', content: contextContent },
+          { role: 'assistant', content: 'Understood. I will use all of this context to generate options.' },
+        ]
+      }
+    }
+
+    // Build base messages: avatar context → section context → actual chat
+    let baseMessages
     if (avatar && avatar.name) {
       const avatarContext = [
         {
@@ -88,7 +128,9 @@ Primary emotion: ${avatar.primary_emotion || 'Not specified'}`,
           content: '{"step":"ready","message":"Avatar locked in. I know exactly who we are writing for."}',
         },
       ]
-      baseMessages = [...avatarContext, ...messages]
+      baseMessages = [...avatarContext, ...contextMessages, ...messages]
+    } else {
+      baseMessages = [...contextMessages, ...messages]
     }
 
     const response = await client.messages.create({

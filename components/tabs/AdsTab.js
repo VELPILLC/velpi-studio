@@ -26,6 +26,17 @@ const SECTION_PROMPTS = {
   cta: 'Generate 3 CTA options based on the ad type.',
 }
 
+const SECTION_ANGLES = {
+  visual_format: ['Newspaper', 'Raw Photo', 'News Chyron', 'Screenshot', 'Documentary', 'Text Only', 'Report Cover'],
+  hook: ['Pain', 'Curiosity', 'Contrarian', 'Benefit', 'Social Proof', 'Fear', 'Authority', 'Story'],
+  image: ['Cinematic', 'Editorial', 'Raw/Real', 'Bold Text', 'Lifestyle', 'Before/After'],
+  headline: ['Direct', 'Question', 'Bold Claim', 'Call Out', 'Curiosity', 'Number Based'],
+  primary_text: ['Story', 'Problem/Solution', 'Value Stack', 'Testimonial', 'Direct Offer', 'Educational'],
+  description: ['Urgency', 'Social Proof', 'Benefit', 'Simple CTA'],
+  cta: ['Book a Call', 'Fill Form', 'DM Us', 'Call Now', 'Click Link', 'Comment Below'],
+  avatar: [],
+}
+
 const AUTO_PROMPT_TEXTS = new Set(Object.values(SECTION_PROMPTS))
 
 const EMPTY_SECTION_OBJ = () => ({
@@ -72,7 +83,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
   const [sectionValues, setSectionValues] = useState(EMPTY_VALUES_OBJ())
-  const [selectedBubble, setSelectedBubble] = useState(null)
+  const [selectedBubbles, setSelectedBubbles] = useState([])
+  const [selectedAngles, setSelectedAngles] = useState([])
   const [currentBubbles, setCurrentBubbles] = useState([])
   const [typeOwn, setTypeOwn] = useState('')
   const [editingBubble, setEditingBubble] = useState(null)
@@ -99,6 +111,12 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
   }, [pendingRefine])
 
+  // Reset angle selections and bubble selections when section changes
+  useEffect(() => {
+    setSelectedAngles([])
+    setSelectedBubbles([])
+  }, [activeSection])
+
   // ─── Data ────────────────────────────────────────────────────────────────────
 
   async function loadAvatars() {
@@ -113,7 +131,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   // ─── API ─────────────────────────────────────────────────────────────────────
 
-  async function callAPI(section, messages, svs, av) {
+  async function callAPI(section, messages, svs, av, angles = []) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -122,6 +140,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         avatar: av || null,
         sectionContext: svs,
         currentSection: section,
+        selectedAngles: angles,
       }),
     })
     const data = await res.json()
@@ -158,14 +177,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   // ─── Section management ──────────────────────────────────────────────────────
 
-  async function openSection(section, svs, av) {
+  async function openSection(section, svs, av, angles = []) {
     if (section === 'avatar') return
     const prompt = SECTION_PROMPTS[section]
     if (!prompt) return
 
     setIsLoading(true)
     try {
-      const raw = await callAPI(section, [{ role: 'user', content: prompt }], svs, av)
+      const raw = await callAPI(section, [{ role: 'user', content: prompt }], svs, av, angles)
       const parsed = parseResponse(raw)
       setSectionChats(prev => ({
         ...prev,
@@ -176,7 +195,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       }))
       if (parsed && parsed.options) {
         setCurrentBubbles(parsed.options)
-        setSelectedBubble(null)
+        setSelectedBubbles([])
       }
     } catch (err) {
       console.error('openSection error:', err)
@@ -186,7 +205,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
 
   function gotoSection(section) {
     setActiveSection(section)
-    setSelectedBubble(null)
+    setSelectedBubbles([])
 
     if (section === 'avatar') {
       setCurrentBubbles([])
@@ -217,14 +236,19 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }
 
     // Fresh section — fire opening call
-    openSection(section, sectionValues, selectedAvatar)
+    openSection(section, sectionValues, selectedAvatar, [])
   }
 
   async function handleRefine() {
     if (isLoading) return
-    const refineText = selectedBubble
-      ? `Refine. I like the direction of: "${selectedBubble}". Give me 3 tighter variations.`
-      : 'Give me 3 completely different options.'
+    let refineText
+    if (selectedBubbles.length === 2) {
+      refineText = `The user selected these two options: "${selectedBubbles[0]}" and "${selectedBubbles[1]}". Generate exactly 3 refined options:\n1. Refined version of option 1\n2. Refined version of option 2\n3. A blend of both options combined`
+    } else if (selectedBubbles.length === 1) {
+      refineText = `Refine. I like the direction of: "${selectedBubbles[0]}". Give me 3 tighter variations.`
+    } else {
+      refineText = 'Give me 3 completely different options.'
+    }
 
     const userMsg = { role: 'user', content: refineText }
     const updatedChat = [...sectionChats[activeSection], userMsg]
@@ -237,7 +261,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         activeSection,
         updatedChat.map(m => ({ role: m.role, content: m.content })),
         sectionValues,
-        selectedAvatar
+        selectedAvatar,
+        selectedAngles,
       )
       const parsed = parseResponse(raw)
       setSectionChats(prev => ({
@@ -246,7 +271,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
       }))
       if (parsed && parsed.options) {
         setCurrentBubbles(parsed.options)
-        setSelectedBubble(null)
+        setSelectedBubbles([])
       }
     } catch (err) {
       console.error('handleRefine error:', err)
@@ -255,8 +280,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
   }
 
   async function handleSubmit() {
-    if (!selectedBubble || isLoading) return
-    const value = selectedBubble
+    if (selectedBubbles.length !== 1 || isLoading) return
+    const value = selectedBubbles[0]
     const section = activeSection
 
     const newSectionValues = { ...sectionValues, [section]: value }
@@ -272,7 +297,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     }))
 
     setCurrentBubbles([])
-    setSelectedBubble(null)
+    setSelectedBubbles([])
 
     if (section === 'image') {
       setDallePrompt(value)
@@ -283,7 +308,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     if (idx < SECTIONS.length - 1) {
       const nextSection = SECTIONS[idx + 1]
       setActiveSection(nextSection)
-      openSection(nextSection, newSectionValues, selectedAvatar)
+      openSection(nextSection, newSectionValues, selectedAvatar, [])
     }
   }
 
@@ -317,7 +342,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
         avatar: [{ role: 'assistant', content: `Avatar locked in. Writing for ${newSelected.name}.` }],
       }))
       setActiveSection('visual_format')
-      openSection('visual_format', newSvs, newSelected)
+      openSection('visual_format', newSvs, newSelected, [])
     } else {
       setSectionValues(prev => ({ ...prev, avatar: null }))
       setSectionChats(prev => ({ ...prev, avatar: [] }))
@@ -449,10 +474,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     setSectionValues(svs)
     setSectionChats(EMPTY_SECTION_OBJ())
     setCurrentBubbles([])
-    setSelectedBubble(null)
+    setSelectedBubbles([])
     setImageB64(ad.imageB64 || ad.image_b64 || null)
     setActiveSection('hook')
-    openSection('hook', svs, selectedAvatar)
+    openSection('hook', svs, selectedAvatar, [])
   }
 
   async function saveToLibrary() {
@@ -494,7 +519,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     if (!typeOwn.trim()) return
     const val = typeOwn.trim()
     setCurrentBubbles(prev => [...prev, val])
-    setSelectedBubble(val)
+    setSelectedBubbles([val])
     setTypeOwn('')
   }
 
@@ -503,15 +528,30 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     const oldVal = currentBubbles[idx]
     const newVal = editingText.trim()
     setCurrentBubbles(prev => prev.map((b, i) => (i === idx ? newVal : b)))
-    if (selectedBubble === oldVal) setSelectedBubble(newVal)
+    setSelectedBubbles(prev => prev.map(b => (b === oldVal ? newVal : b)))
     setEditingBubble(null)
     setEditingText('')
+  }
+
+  function handleBubbleClick(bubble) {
+    setSelectedBubbles(prev => {
+      if (prev.includes(bubble)) {
+        return prev.filter(b => b !== bubble)
+      }
+      if (prev.length < 2) {
+        return [...prev, bubble]
+      }
+      // 2 already selected — drop the first, add the new one
+      return [prev[1], bubble]
+    })
   }
 
   // ─── Derived ─────────────────────────────────────────────────────────────────
 
   const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
+  const sectionAngles = SECTION_ANGLES[activeSection] || []
+  const canSubmit = selectedBubbles.length === 1 && !isLoading
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -631,6 +671,32 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               )}
             </div>
 
+            {/* Angle buttons — above bubbles */}
+            {sectionAngles.length > 0 && (
+              <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {sectionAngles.map(angle => (
+                  <button
+                    key={angle}
+                    onClick={() => setSelectedAngles(prev =>
+                      prev.includes(angle) ? prev.filter(a => a !== angle) : [...prev, angle]
+                    )}
+                    style={{
+                      border: `1px solid ${selectedAngles.includes(angle) ? '#2990fa' : '#152840'}`,
+                      background: selectedAngles.includes(angle) ? '#0a1628' : '#060d1f',
+                      color: selectedAngles.includes(angle) ? '#ffffff' : '#4a6a8a',
+                      padding: '6px 12px',
+                      borderRadius: 20,
+                      fontFamily: 'var(--font-ibm-plex-mono)',
+                      fontSize: '0.52rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {angle}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Bubbles */}
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
               {currentBubbles.map((bubble, idx) => (
@@ -652,10 +718,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                     </div>
                   ) : (
                     <div
-                      onClick={() => setSelectedBubble(selectedBubble === bubble ? null : bubble)}
+                      onClick={() => handleBubbleClick(bubble)}
                       style={{
                         border: '1px solid #2990fa',
-                        background: selectedBubble === bubble ? '#2990fa' : '#060d1f',
+                        background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
                         color: '#ffffff', padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                       }}
@@ -663,7 +729,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
                       <span style={{ fontSize: '0.82rem', fontFamily: 'var(--font-inter)', lineHeight: 1.4 }}>{bubble}</span>
                       <span
                         onClick={e => { e.stopPropagation(); setEditingBubble(idx); setEditingText(bubble) }}
-                        style={{ color: selectedBubble === bubble ? 'rgba(255,255,255,0.7)' : '#2990fa', cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0 }}
+                        style={{ color: selectedBubbles.includes(bubble) ? 'rgba(255,255,255,0.7)' : '#2990fa', cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0 }}
                         title="Edit"
                       >
                         ✎
@@ -714,13 +780,13 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!selectedBubble || isLoading}
+                disabled={!canSubmit}
                 style={{
-                  background: (selectedBubble && !isLoading) ? '#2990fa' : '#0a1628',
+                  background: canSubmit ? '#2990fa' : '#0a1628',
                   border: '1px solid #2990fa',
-                  color: (selectedBubble && !isLoading) ? '#ffffff' : '#4a6a8a',
+                  color: canSubmit ? '#ffffff' : '#4a6a8a',
                   padding: '8px 16px', borderRadius: 6,
-                  cursor: (selectedBubble && !isLoading) ? 'pointer' : 'not-allowed',
+                  cursor: canSubmit ? 'pointer' : 'not-allowed',
                   fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem',
                 }}
               >
