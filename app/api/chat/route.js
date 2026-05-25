@@ -22,8 +22,12 @@ Every option you generate must be informed by and aligned with that context.
 Never generate options that ignore or contradict what was already confirmed.
 The more context you have the more targeted and specific your options must be.
 
-ANGLE RULE: If selectedAngles are provided, lean toward those angles.
-But do not ignore the confirmed context. Angles refine direction, context sets the foundation.
+ANGLE RULE: When ACTIVE ANGLE FILTERS are provided:
+- All 3 options must stay within the specified angle directions.
+- If one angle: all 3 options lean that direction.
+- If two angles: options blend those two directions.
+- If three or more angles: options rotate across all specified angles.
+- Never generate options that contradict or ignore active angle filters.
 
 REFINE RULE: When given two selected options generate:
 Option 1: refined version of first selection
@@ -81,9 +85,9 @@ export async function POST(request) {
       }
     }
 
-    // Append selected angles to context string
+    // Append active angle filters — hard requirement
     if (selectedAngles && selectedAngles.length > 0) {
-      contextStr += `\n\nSELECTED ANGLES FOR THIS SECTION: ${selectedAngles.join(', ')}\nUse these angles to guide the 3 options but still align with all previous context.`
+      contextStr += `\n\nACTIVE ANGLE FILTERS: ${selectedAngles.join(', ')}\nAll 3 options must stay within these angle directions.\nDo not generate anything outside these angles.`
     }
 
     // Use provided system prompt (e.g. avatar builder) or default Jarvis system

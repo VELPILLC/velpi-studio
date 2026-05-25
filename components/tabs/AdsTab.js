@@ -230,7 +230,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed }) {
     const t = text.trim()
     if (t.endsWith('?')) return true
     const lower = t.toLowerCase()
-    const starters = ['what ', 'why ', 'how ', 'explain ', 'when ', 'where ', 'who ', 'which ', 'does ', 'can ', 'is ', 'are ', 'will ', 'should ', 'could ', 'would ']
+    const starters = ['what ', 'why ', 'how ', 'explain ', 'when ', 'where ', 'who ', 'which ', 'does ', 'can ', 'is ', 'are ', 'will ', 'should ', 'could ', 'would ', 'tell me', 'can you']
     return starters.some(w => lower.startsWith(w))
   }
 
@@ -376,6 +376,26 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
     if (nextIdx < AVATAR_FUNNEL_STEPS.length) {
       gotoAvatarStep(AVATAR_FUNNEL_STEPS[nextIdx], newData)
     }
+  }
+
+  async function handleAskJarvisNonAvatar(text) {
+    if (!text.trim()) return
+    const questionText = text.trim()
+    setTypeOwn('')
+    const questionSystem = `User is asking a question while on section: ${activeSection}. Their question: ${questionText}. Answer in 1-2 simple sentences. Explain it like they have never done marketing before. Then in one sentence redirect them back to what they were doing. Do not generate bubble options in this response. Return plain text only not JSON.`
+    const userMsg = { role: 'user', content: questionText }
+    setSectionChats(prev => ({ ...prev, [activeSection]: [...prev[activeSection], userMsg] }))
+    setIsLoading(true)
+    try {
+      const raw = await callAPI(activeSection, [userMsg], sectionValues, selectedAvatar, selectedAngles, questionSystem)
+      setSectionChats(prev => ({
+        ...prev,
+        [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
+      }))
+    } catch (err) {
+      console.error('Ask Jarvis error:', err)
+    }
+    setIsLoading(false)
   }
 
   async function handleAvatarTypeOwn(text) {
@@ -568,6 +588,7 @@ Do not generate bubble options in this response.`
 
     const newSectionValues = { ...sectionValues, [section]: value }
     setSectionValues(newSectionValues)
+    setSelectedAngles([])
 
     setSectionChats(prev => ({
       ...prev,
@@ -724,6 +745,45 @@ Do not generate bubble options in this response.`
     }
   }
 
+  async function handleAngleToggle(angle) {
+    const newAngles = selectedAngles.includes(angle)
+      ? selectedAngles.filter(a => a !== angle)
+      : [...selectedAngles, angle]
+    setSelectedAngles(newAngles)
+
+    if (!isLoading && sectionValues[activeSection] === null && currentBubbles.length > 0) {
+      const prompt = SECTION_PROMPTS[activeSection]
+      if (!prompt) return
+      setIsLoading(true)
+      try {
+        const raw = await callAPI(
+          activeSection,
+          [{ role: 'user', content: prompt }],
+          sectionValues,
+          selectedAvatar,
+          newAngles,
+        )
+        const parsed = parseResponse(raw)
+        const openingMsg = SECTION_OPENING_MESSAGES[activeSection]
+        setSectionChats(prev => ({
+          ...prev,
+          [activeSection]: [
+            ...(openingMsg ? [{ role: 'assistant', content: openingMsg }] : []),
+            { role: 'user', content: prompt },
+            { role: 'assistant', content: raw },
+          ],
+        }))
+        if (parsed && parsed.options) {
+          setCurrentBubbles(parsed.options)
+          setSelectedBubbles([])
+        }
+      } catch (err) {
+        console.error('handleAngleToggle refire error:', err)
+      }
+      setIsLoading(false)
+    }
+  }
+
   // ─── Bubble management (non-avatar sections) ──────────────────────────────────
 
   function handleAddTypeOwn() {
@@ -829,6 +889,7 @@ Do not generate bubble options in this response.`
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32,
           flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 24px',
+          alignItems: 'start',
         }}>
 
           {/* ── LEFT COLUMN ── */}
@@ -937,7 +998,7 @@ Do not generate bubble options in this response.`
               ) : (
                 <>
                   {/* Avatar funnel bubbles */}
-                  <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
+                  <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 380, overflowY: 'auto', padding: '4px 2px', marginBottom: 8 }}>
                     {currentBubbles.map((bubble, idx) => (
                       <div
                         key={idx}
@@ -946,9 +1007,10 @@ Do not generate bubble options in this response.`
                           border: `1px solid ${bubble === 'Type your own' ? '#152840' : '#2990fa'}`,
                           background: '#060d1f',
                           color: bubble === 'Type your own' ? '#4a6a8a' : '#ffffff',
-                          padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
-                          fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                          lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center',
+                          padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                          fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
+                          lineHeight: 1.4, minHeight: 'auto', display: 'flex', alignItems: 'center',
+                          width: '100%', boxSizing: 'border-box',
                         }}
                       >
                         {bubble}
@@ -963,12 +1025,12 @@ Do not generate bubble options in this response.`
                         onChange={e => setTypeOwn(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAvatarTypeOwn(typeOwn.trim()) } }}
                         placeholder="Type your own or ask a question..."
-                        rows={2}
+                        rows={1}
                         style={{
                           flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                          color: '#ffffff', padding: '10px 14px', borderRadius: 8,
+                          color: '#ffffff', padding: '8px 14px', borderRadius: 8,
                           fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
-                          resize: 'none', maxHeight: 52, boxSizing: 'border-box',
+                          resize: 'none', minHeight: 36, maxHeight: 36, overflow: 'hidden', boxSizing: 'border-box',
                         }}
                       />
                       {typeOwn.trim() && (
@@ -992,15 +1054,13 @@ Do not generate bubble options in this response.`
                     {sectionAngles.map(angle => (
                       <button
                         key={angle}
-                        onClick={() => setSelectedAngles(prev =>
-                          prev.includes(angle) ? prev.filter(a => a !== angle) : [...prev, angle]
-                        )}
+                        onClick={() => handleAngleToggle(angle)}
                         style={{
                           border: `1px solid ${selectedAngles.includes(angle) ? '#2990fa' : '#152840'}`,
                           background: selectedAngles.includes(angle) ? '#0a1628' : '#060d1f',
                           color: selectedAngles.includes(angle) ? '#ffffff' : '#4a6a8a',
-                          padding: '6px 14px', borderRadius: 20,
-                          fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', cursor: 'pointer',
+                          padding: '7px 16px', borderRadius: 20,
+                          fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer',
                         }}
                       >
                         {angle}
@@ -1034,9 +1094,9 @@ Do not generate bubble options in this response.`
                           style={{
                             border: '1px solid #2990fa',
                             background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
-                            color: '#ffffff', padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                            color: '#ffffff', padding: '14px 18px', borderRadius: 10, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                            fontSize: '0.9rem', fontFamily: 'var(--font-inter)', lineHeight: 1.4, minHeight: 44,
+                            fontSize: '1rem', fontFamily: 'var(--font-inter)', lineHeight: 1.5, minHeight: 44,
                           }}
                         >
                           <span>{bubble}</span>
@@ -1059,21 +1119,38 @@ Do not generate bubble options in this response.`
                     <input
                       value={typeOwn}
                       onChange={e => setTypeOwn(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddTypeOwn() }}
-                      placeholder="Type your own or paste from above..."
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          if (isQuestion(typeOwn.trim())) {
+                            handleAskJarvisNonAvatar(typeOwn.trim())
+                          } else {
+                            handleAddTypeOwn()
+                          }
+                        }
+                      }}
+                      placeholder="Type your own or ask a question..."
                       style={{
                         flex: 1, background: '#060d1f', border: '1px solid #2990fa',
-                        color: '#ffffff', padding: '10px 14px', borderRadius: 8,
+                        color: '#ffffff', padding: '8px 14px', borderRadius: 8,
                         fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                        height: 36, boxSizing: 'border-box',
                       }}
                     />
                     {typeOwn.trim() && (
-                      <button
-                        onClick={handleAddTypeOwn}
-                        style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
-                      >
-                        Add
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleAskJarvisNonAvatar(typeOwn.trim())}
+                          style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                        >
+                          ASK
+                        </button>
+                        <button
+                          onClick={handleAddTypeOwn}
+                          style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                        >
+                          ADD
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1095,7 +1172,7 @@ Do not generate bubble options in this response.`
                     onClick={handleSubmit}
                     disabled={!canSubmit}
                     style={{
-                      background: canSubmit ? '#2990fa' : '#0a1628',
+                      background: canSubmit ? '#2990fa' : '#152840',
                       border: '1px solid #2990fa',
                       color: canSubmit ? '#ffffff' : '#4a6a8a',
                       padding: '10px 22px', borderRadius: 6,
@@ -1111,7 +1188,7 @@ Do not generate bubble options in this response.`
           </div>
 
           {/* ── RIGHT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 150px)', overflowY: 'auto', gap: 10 }}>
             {SECTIONS.map(section => (
               <div
                 key={section}
