@@ -109,6 +109,7 @@ export default function ProfileTab({ selectedProfile, onProfileSelect }) {
   const [profiles, setProfiles] = useState([])
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileDropdown, setProfileDropdown] = useState(null)
+  const [profileDeleteConfirm, setProfileDeleteConfirm] = useState(null)
 
   // Funnel state
   const [funnelStep, setFunnelStep] = useState('industry')
@@ -599,7 +600,7 @@ Do not generate bubble options in this response.`
                           ✎ Edit
                         </div>
                         <div
-                          onClick={() => { setProfileDropdown(null); if (window.confirm(`Delete ${p.name}? This cannot be undone.`)) handleDeleteProfile(p) }}
+                          onClick={() => { setProfileDropdown(null); setDropdownOpen(false); setProfileDeleteConfirm(p) }}
                           style={{ padding: '8px 12px', color: '#ff4455', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4 }}
                           onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -948,6 +949,59 @@ Do not generate bubble options in this response.`
         </div>
 
       </div>
+
+      {/* ── PROFILE DELETE CONFIRM ── */}
+      {profileDeleteConfirm && (
+        <div
+          onClick={() => setProfileDeleteConfirm(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 3000,
+            background: 'rgba(2,8,16,0.88)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#0a1628', border: '1px solid #ff4455',
+              borderRadius: 12, padding: 28, width: '100%', maxWidth: 360,
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+              Delete Profile
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
+              Delete <strong>{profileDeleteConfirm.name}</strong>? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { handleDeleteProfile(profileDeleteConfirm); setProfileDeleteConfirm(null) }}
+                style={{
+                  flex: 1, background: '#ff4455', border: 'none', borderRadius: 8,
+                  padding: '11px 0', color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                  cursor: 'pointer', letterSpacing: '0.06em',
+                }}
+              >
+                DELETE
+              </button>
+              <button
+                onClick={() => setProfileDeleteConfirm(null)}
+                style={{
+                  flex: 1, background: 'transparent', border: '1px solid #2990fa',
+                  borderRadius: 8, padding: '11px 0', color: '#2990fa',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                  cursor: 'pointer', letterSpacing: '0.06em',
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
