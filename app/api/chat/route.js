@@ -218,25 +218,7 @@ Who they serve: ${profile.who_they_serve || 'Not specified'}${profile.differenti
     if (profileStr) finalSystem += profileStr
     if (contextStr) finalSystem += contextStr
 
-    // Build context messages to inject as conversation turns (non-avatar sections only)
-    let contextMessages = []
-    if (sectionContext) {
-      const confirmedEntries = Object.entries(sectionContext)
-        .filter(([k, v]) => v !== null && k !== 'avatar')
-      if (confirmedEntries.length > 0) {
-        const contextContent =
-          'CONTEXT FROM PREVIOUS SECTIONS:\n' +
-          confirmedEntries
-            .map(([k, v]) => k.toUpperCase().replace(/_/g, ' ') + ': ' + v)
-            .join('\n')
-        contextMessages = [
-          { role: 'user', content: contextContent },
-          { role: 'assistant', content: 'Understood. I will use all of this context to generate options.' },
-        ]
-      }
-    }
-
-    // Build base messages: avatar context → section context → actual chat
+    // Build base messages: avatar context → actual chat
     let baseMessages
     if (avatar && avatar.name) {
       const avatarContext = [
@@ -256,9 +238,9 @@ Primary emotion: ${avatar.primary_emotion || 'Not specified'}`,
           content: '{"step":"ready","message":"Avatar locked in. I know exactly who we are writing for."}',
         },
       ]
-      baseMessages = [...avatarContext, ...contextMessages, ...messages]
+      baseMessages = [...avatarContext, ...messages]
     } else {
-      baseMessages = [...contextMessages, ...messages]
+      baseMessages = [...messages]
     }
 
     const response = await client.messages.create({

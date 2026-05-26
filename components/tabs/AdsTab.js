@@ -174,12 +174,6 @@ const EMPTY_AVATAR_DATA = () => ({
   statusDriver: null, mediaTrust: null, deepFear: null, winLooksLike: null,
 })
 
-const EMPTY_AVATAR_FORM = {
-  name: '', age_range: '', niche: '',
-  what_they_want: '', what_they_fear: '',
-  what_they_trust: '', primary_emotion: '',
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfile, onGoToProfile }) {
@@ -210,8 +204,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   // Avatar bar state
   const [avatars, setAvatars] = useState([])
   const [selectedAvatar, setSelectedAvatar] = useState(null)
-  const [avatarModal, setAvatarModal] = useState(null)
-  const [avatarForm, setAvatarForm] = useState({ ...EMPTY_AVATAR_FORM })
   const [saveSuccess, setSaveSuccess] = useState(false)
 
   // NEW: Multi-select + back + edit + dropdown + delete
@@ -253,6 +245,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
 
   // Reset everything when profile changes
   useEffect(() => {
+    if (!selectedProfile?.id) return
     setSectionChats(EMPTY_SECTION_OBJ())
     setSectionValues(EMPTY_VALUES_OBJ())
     setActiveSection('avatar')
@@ -360,19 +353,30 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   // ─── Avatar funnel ────────────────────────────────────────────────────────────
 
   function initAvatarFunnel() {
-    setAvatarFunnelStep('industry')
-    setAvatarData(EMPTY_AVATAR_DATA())
+    const prefillIndustry = selectedProfile?.industry || null
+    const startStep = prefillIndustry ? 'role' : 'industry'
+    const initialData = prefillIndustry
+      ? { ...EMPTY_AVATAR_DATA(), industry: prefillIndustry }
+      : EMPTY_AVATAR_DATA()
+    setAvatarFunnelStep(startStep)
+    setAvatarData(initialData)
     setAvatarNameInput('')
     setAvatarSelectedBubbles([])
     setAvatarFunnelHistory([])
     setAvatarEditMode(false)
     setAvatarEditingField(null)
     setAvatarEditingId(null)
+    const firstMessage = prefillIndustry
+      ? `Industry set from your profile: ${prefillIndustry}. ${AVATAR_STEP_MESSAGES.role}`
+      : AVATAR_STEP_MESSAGES.industry
     setSectionChats(prev => ({
       ...prev,
-      avatar: [{ role: 'assistant', content: AVATAR_STEP_MESSAGES.industry }],
+      avatar: [{ role: 'assistant', content: firstMessage }],
     }))
-    setCurrentBubbles(INDUSTRY_BUBBLES)
+    setCurrentBubbles(prefillIndustry
+      ? (isTrade(prefillIndustry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT)
+      : INDUSTRY_BUBBLES
+    )
   }
 
   function startNewAvatarFunnel() {
@@ -831,43 +835,6 @@ Do not generate bubble options in this response.`
     setIsLoading(false)
   }
 
-  // ─── Avatar bar modal edit ────────────────────────────────────────────────────
-
-  async function handleSaveAvatar() {
-    if (!avatarForm.name.trim()) return
-    try {
-      const isEdit = avatarModal?.mode === 'edit'
-      const method = isEdit ? 'PATCH' : 'POST'
-      const body = isEdit ? { id: avatarModal.data.id, ...avatarForm } : avatarForm
-      const res = await fetch('/api/avatars', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      await loadAvatars()
-      if (!isEdit && data.avatar) setSelectedAvatar(data.avatar)
-      setAvatarModal(null)
-      setAvatarForm({ ...EMPTY_AVATAR_FORM })
-    } catch (err) {
-      console.error('Save avatar error:', err)
-    }
-  }
-
-  function openEditAvatar(av) {
-    setAvatarForm({
-      name: av.name || '',
-      age_range: av.age_range || '',
-      niche: av.niche || '',
-      what_they_want: av.what_they_want || '',
-      what_they_fear: av.what_they_fear || '',
-      what_they_trust: av.what_they_trust || '',
-      primary_emotion: av.primary_emotion || '',
-    })
-    setAvatarModal({ mode: 'edit', data: av })
-    setAvatarDropdown(null)
-  }
-
   // ─── Section management ───────────────────────────────────────────────────────
 
   async function openSection(section, svs, av, angles = []) {
@@ -1106,13 +1073,13 @@ Do not generate bubble options in this response.`
   function handleResetSection(section) {
     setSectionChats(prev => ({ ...prev, [section]: [] }))
     setSectionValues(prev => ({ ...prev, [section]: null }))
+    if (section === 'image') setImageB64(null)
     if (section === activeSection) {
       setCurrentBubbles([])
       setSelectedBubbles([])
       setSelectedAngles([])
       setSelectedSubcategories([])
       setExpandedCategories([])
-      if (section === 'image') setImageB64(null)
       const newSvs = { ...sectionValues, [section]: null }
       openSection(section, newSvs, selectedAvatar, [])
     }
@@ -1812,64 +1779,6 @@ Do not generate bubble options in this response.`
           </div>
         </div>
       </div>
-
-      {/* ── AVATAR EDIT MODAL ── */}
-      {avatarModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(2,8,16,0.92)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={e => { if (e.target === e.currentTarget) { setAvatarModal(null); setAvatarForm({ ...EMPTY_AVATAR_FORM }) } }}
-        >
-          <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 24, width: '100%', maxWidth: 420, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ffffff', marginBottom: 20 }}>
-              Edit Avatar
-            </div>
-            {[
-              { label: 'Name', key: 'name', type: 'input', required: true },
-              { label: 'Age Range', key: 'age_range', type: 'input', placeholder: '35-50' },
-              { label: 'Niche / Industry', key: 'niche', type: 'input', placeholder: 'HVAC business owners' },
-              { label: 'What they want', key: 'what_they_want', type: 'textarea' },
-              { label: 'What they fear', key: 'what_they_fear', type: 'textarea' },
-              { label: 'What they trust visually', key: 'what_they_trust', type: 'input', placeholder: 'News formats, authority figures' },
-              { label: 'Primary emotion', key: 'primary_emotion', type: 'input', placeholder: 'Fear of falling behind' },
-            ].map(field => (
-              <div key={field.key} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-                  {field.label}{field.required ? ' *' : ''}
-                </div>
-                {field.type === 'textarea' ? (
-                  <textarea
-                    value={avatarForm[field.key]}
-                    onChange={e => setAvatarForm(f => ({ ...f, [field.key]: e.target.value }))}
-                    style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.88rem', resize: 'none', height: 70, boxSizing: 'border-box' }}
-                  />
-                ) : (
-                  <input
-                    value={avatarForm[field.key]}
-                    placeholder={field.placeholder || ''}
-                    onChange={e => setAvatarForm(f => ({ ...f, [field.key]: e.target.value }))}
-                    style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 4, color: '#ffffff', padding: 8, fontFamily: 'var(--font-inter)', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                  />
-                )}
-              </div>
-            ))}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              <button
-                onClick={handleSaveAvatar}
-                disabled={!avatarForm.name.trim()}
-                style={{ background: '#2990fa', border: 'none', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', width: '100%', opacity: avatarForm.name.trim() ? 1 : 0.5, cursor: avatarForm.name.trim() ? 'pointer' : 'not-allowed' }}
-              >
-                Save
-              </button>
-              <button
-                onClick={() => { setAvatarModal(null); setAvatarForm({ ...EMPTY_AVATAR_FORM }) }}
-                style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: 10, color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', width: '100%', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── SAVE SUCCESS TOAST ── */}
       {saveSuccess && (
