@@ -17,7 +17,7 @@ const SECTION_LABELS = {
 }
 
 const SECTION_PROMPTS = {
-  visual_format: 'Generate 3 visual format options for this ad based on the avatar.',
+  visual_format: 'Generate 3 visual format style options for this ad.\nVisual format means the overall style and format of the image or creative.\nExamples: Newspaper front page style, Raw documentary photo, News chyron breaking news format, Screenshot of a conversation, Behind the scenes candid, Bold text on solid background.\nDo NOT suggest what the image should contain or what text should appear.\nOnly suggest the visual style and format.\nBase suggestions on the avatar context.',
   hook: 'Generate 3 hook options based on what we know so far.',
   image: 'Generate 3 image concept descriptions for the visual.',
   headline: 'Generate 3 headline options. Max 40 characters each.',
@@ -1152,7 +1152,7 @@ Do not generate bubble options in this response.`
 
   // ─── Bubble management (non-avatar sections) ──────────────────────────────────
 
-  async function handleAddTypeOwn() {
+  function handleAddTypeOwn() {
     if (!typeOwn.trim()) return
     if (activeSection === 'avatar') {
       handleAvatarTypeOwn(typeOwn.trim())
@@ -1160,65 +1160,8 @@ Do not generate bubble options in this response.`
     }
     const val = typeOwn.trim()
     setTypeOwn('')
-    const sectionLabel = activeSection.replace(/_/g, ' ')
-    const validationSystem = `You are a professional marketing strategist.
-A user just typed this as their ${sectionLabel} input. Analyze it. Does it make sense as ${sectionLabel} copy? Is it clear, specific, and strong enough to use in a Facebook ad?
-
-If YES: return JSON exactly: {"valid": true, "text": "<the submitted text verbatim>"}
-If NO or UNCLEAR: return JSON exactly: {"valid": false, "question": "<one direct clarifying question>"}
-
-Examples of invalid submissions:
-Single words with no context (now, yes, good).
-Vague phrases that communicate nothing specific.
-Random text that is not ad copy.
-
-If invalid ask ONE clarifying question to understand what they mean.
-Be direct. Sound like a strategist not a chatbot.
-You have opinions. Use them.`
-
-    setIsLoading(true)
-    try {
-      const raw = await callAPI(
-        activeSection,
-        [{ role: 'user', content: val }],
-        sectionValues,
-        selectedAvatar,
-        selectedAngles,
-        validationSystem,
-      )
-      let result = null
-      try {
-        const cleaned = raw.replace(/```json|```/g, '').trim()
-        result = JSON.parse(cleaned)
-      } catch (_) {
-        try {
-          const m = raw.match(/\{[\s\S]*\}/)
-          if (m) result = JSON.parse(m[0])
-        } catch (__) {}
-      }
-      if (result && result.valid === true) {
-        const finalText = result.text || val
-        setCurrentBubbles(prev => [...prev, finalText])
-        setSelectedBubbles([finalText])
-      } else if (result && result.valid === false && result.question) {
-        setSectionChats(prev => ({
-          ...prev,
-          [activeSection]: [
-            ...prev[activeSection],
-            { role: 'user', content: val },
-            { role: 'assistant', content: result.question },
-          ],
-        }))
-      } else {
-        setCurrentBubbles(prev => [...prev, val])
-        setSelectedBubbles([val])
-      }
-    } catch (err) {
-      console.error('Validation error:', err)
-      setCurrentBubbles(prev => [...prev, val])
-      setSelectedBubbles([val])
-    }
-    setIsLoading(false)
+    setCurrentBubbles(prev => prev.includes(val) ? prev : [...prev, val])
+    setSelectedBubbles([val])
   }
 
   function handleEditSave(idx) {
