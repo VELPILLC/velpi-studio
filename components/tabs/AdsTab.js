@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 
 // ─── Section constants ────────────────────────────────────────────────────────
 
-const SECTIONS = ['avatar', 'visual_format', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
+const SECTIONS = ['avatar', 'hook', 'visual_format', 'image', 'headline', 'primary_text', 'description', 'cta']
 
 const SECTION_LABELS = {
   avatar: 'AVATAR',
@@ -27,10 +27,10 @@ const SECTION_PROMPTS = {
 }
 
 const SECTION_OPENING_MESSAGES = {
-  visual_format: 'Based on your avatar I put together 3 visual directions. Pick what fits.',
-  hook: 'Here are 3 hook angles built from your avatar and visual format. Pick what resonates.',
-  image: '3 image concepts based on everything confirmed so far. Pick one or refine.',
-  headline: '3 headlines written for your avatar. Short, clear, direct.',
+  hook: 'Here are 3 hook angles built from your avatar. Pick what resonates.',
+  visual_format: 'Based on your avatar and hook I put together 3 visual directions that best deliver your hook. Pick what fits.',
+  image: '3 image concepts based on your hook and visual format.',
+  headline: '3 headlines built from your hook and avatar.',
   primary_text: '3 primary text options. First line carries the whole message.',
   description: '3 short descriptions. Tight and punchy.',
   cta: '3 calls to action matched to your offer.',

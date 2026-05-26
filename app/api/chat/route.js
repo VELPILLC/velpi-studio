@@ -1,4 +1,4 @@
-const SECTIONS_ORDER = ['avatar', 'visual_format', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
+const SECTIONS_ORDER = ['avatar', 'hook', 'visual_format', 'image', 'headline', 'primary_text', 'description', 'cta']
 
 const JARVIS_SYSTEM = `CRITICAL IDENTITY RULE:
 You are talking TO the business owner or marketer who is BUILDING the ad.
