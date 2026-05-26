@@ -346,11 +346,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
     return industry.split(' / ').some(ind => TRADE_INDUSTRIES.has(ind.trim()))
   }
 
-  function suggestAvatarName(data) {
-    const parts = [data.industry, data.role].filter(Boolean)
-    return parts.length > 0 ? parts.join(' ') : ''
-  }
-
   // ─── Avatar funnel ────────────────────────────────────────────────────────────
 
   function initAvatarFunnel() {
@@ -411,8 +406,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
       avatar: [...prev.avatar, { role: 'assistant', content: AVATAR_STEP_MESSAGES[step] }],
     }))
     if (step === 'review') {
-      const suggested = suggestAvatarName(data || avatarData)
-      setAvatarNameInput(suggested)
+      setAvatarNameInput('')
       setCurrentBubbles([])
       return
     }
@@ -1442,7 +1436,7 @@ Do not generate bubble options in this response.`
                     <input
                       value={avatarNameInput}
                       onChange={e => setAvatarNameInput(e.target.value)}
-                      placeholder="Give this avatar a name"
+                      placeholder="Give this avatar a name..."
                       style={{
                         width: '100%', background: '#060d1f', border: '1px solid #2990fa',
                         borderRadius: 8, color: '#ffffff', padding: '10px 14px',

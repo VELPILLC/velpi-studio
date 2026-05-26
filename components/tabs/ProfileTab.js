@@ -236,9 +236,7 @@ export default function ProfileTab({ selectedProfile, onProfileSelect }) {
     setSubcategoriesOpen([])
     setChatMessages(prev => [...prev, { role: 'assistant', content: PROFILE_STEP_MESSAGES[step] }])
     if (step === 'review') {
-      const d = data || profileData
-      const suggested = [d.industry, d.services?.split(' / ')[0]].filter(Boolean).join(' ')
-      setProfileNameInput(suggested)
+      setProfileNameInput('')
       setCurrentBubbles([])
       return
     }
@@ -779,7 +777,7 @@ Do not generate bubble options in this response.`
                 <input
                   value={profileNameInput}
                   onChange={e => setProfileNameInput(e.target.value)}
-                  placeholder="Give this profile a name"
+                  placeholder="Give this profile a name..."
                   style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 8, color: '#ffffff', padding: '10px 14px', fontSize: '0.9rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
                 />
               </div>
