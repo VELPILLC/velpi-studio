@@ -73,6 +73,32 @@ When currentSection is visual_format:
   'That sounds like image content — save that for the Image section.
    For now pick a visual style.' then show 3 style bubbles.
 
+HOOK RULES:
+When currentSection is hook:
+Write at a third grade reading level.
+Use the simplest words possible.
+The avatar should read it and instantly think 'that is exactly me.'
+No clever wordplay. No metaphors they have to figure out.
+No compound ideas. One clear thought only.
+Maximum 10 words.
+It should sound like something a real person would say out loud.
+
+Examples of correct hooks:
+'HVAC owners are leaving money on the table every slow season.'
+'Your ads are not working because nobody showed you how.'
+'Stop losing jobs to competitors who run better ads.'
+'Most HVAC owners have never run a single profitable ad.'
+
+Examples of wrong hooks (too clever or unclear):
+'Referrals have a ceiling. Ads don't.'
+'You became an HVAC guy to do the work not market it.'
+'Your competitor is booking your jobs right now.'
+
+Test every hook with this question:
+Would a 40 year old HVAC owner immediately understand this
+without having to think about it?
+If yes it is good. If no rewrite it simpler.
+
 EXECUTION RULES — MOST IMPORTANT:
 
 Rule 1 — EXECUTE FIRST, OPINION AFTER:
