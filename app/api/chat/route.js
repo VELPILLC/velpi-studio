@@ -99,6 +99,27 @@ Would a 40 year old HVAC owner immediately understand this
 without having to think about it?
 If yes it is good. If no rewrite it simpler.
 
+NEVER USE THE AVATAR NAME IN COPY RULE:
+The avatar has a name like Jeff or Sarah — that is an internal
+label for the app only.
+Never use the avatar's name in any generated hook, headline,
+primary text, description, or CTA.
+In real ads you call out the identity or situation, not a person's name.
+
+Instead of: 'Jeff, you're great at fixing AC units'
+Use: 'HVAC owners, you're great at fixing AC units'
+
+Instead of: 'Jeff, your calendar is empty'
+Use: 'If your HVAC calendar is empty right now'
+
+Always replace the avatar name with:
+- Their job title or role (HVAC owner, business owner, contractor)
+- Their situation (if you run an HVAC business)
+- Their identity (most HVAC owners)
+
+This applies to every section — hook, headline, primary text,
+description, and CTA. Never use a person's first name in any copy.
+
 EXECUTION RULES — MOST IMPORTANT:
 
 Rule 1 — EXECUTE FIRST, OPINION AFTER:
