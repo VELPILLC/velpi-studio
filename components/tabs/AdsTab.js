@@ -823,8 +823,19 @@ Do not generate bubble options in this response.`
     if (!text.trim()) return
     const questionText = text.trim()
     setTypeOwn('')
-    const questionSystem = `User is asking a question while on section: ${activeSection}. Their question: ${questionText}. Answer in 1-2 simple sentences. Explain it like they have never done marketing before. Then in one sentence redirect them back to what they were doing. Do not generate bubble options in this response. Return plain text only not JSON.`
-    const userMsg = { role: 'user', content: questionText }
+
+    let userContent = questionText
+    let questionSystem = null
+
+    if (selectedBubbles.length === 1) {
+      userContent = `${questionText} — apply this to the selected option: '${selectedBubbles[0]}'`
+    } else if (selectedBubbles.length === 2) {
+      userContent = `${questionText} — apply this to these selected options: '${selectedBubbles[0]}' and '${selectedBubbles[1]}'`
+    } else {
+      questionSystem = `User is asking a question while on section: ${activeSection}. Their question: ${questionText}. Answer in 1-2 simple sentences. Explain it like they have never done marketing before. Then in one sentence redirect them back to what they were doing. Do not generate bubble options in this response. Return plain text only not JSON.`
+    }
+
+    const userMsg = { role: 'user', content: userContent }
     setSectionChats(prev => ({ ...prev, [activeSection]: [...prev[activeSection], userMsg] }))
     setIsLoading(true)
     setIsChatLoading(true)
@@ -834,6 +845,13 @@ Do not generate bubble options in this response.`
         ...prev,
         [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
       }))
+      if (selectedBubbles.length > 0) {
+        const parsed = parseResponse(raw)
+        if (parsed && parsed.options) {
+          setCurrentBubbles(parsed.options)
+          setSelectedBubbles([])
+        }
+      }
     } catch (err) {
       console.error('Ask Jarvis error:', err)
     }
