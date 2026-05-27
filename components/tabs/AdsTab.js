@@ -1918,7 +1918,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           </div>
 
           {/* ── RIGHT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 150px)', overflowY: 'auto', gap: 10, marginTop: 0, paddingTop: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)' }}>
+            {/* Scrollable panels area */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
 
             {/* ── PLATFORM SELECTOR ── */}
             <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: '12px 14px', marginBottom: 2 }}>
@@ -2031,34 +2033,39 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               </div>
             ))}
 
-            {sectionValues.cta && sectionValues.image && !imageB64 && (
-              <button
-                onClick={handleGenerateImageClick}
-                disabled={isGeneratingImage}
-                style={{
-                  background: isGeneratingImage ? '#0a1628' : '#00e5c8',
-                  border: '1px solid #00e5c8', borderRadius: 10, padding: 14,
-                  color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                  cursor: isGeneratingImage ? 'not-allowed' : 'pointer', marginTop: 4,
-                  opacity: isGeneratingImage ? 0.7 : 1,
-                  letterSpacing: '0.06em',
-                }}
-              >
-                {isGeneratingImage ? 'Generating Image...' : '⚡ Generate Image'}
-              </button>
-            )}
-            {allConfirmed && (
-              <button
-                onClick={saveToLibrary}
-                style={{
-                  background: '#2990fa', border: 'none', borderRadius: 10, padding: 14,
-                  color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                  cursor: 'pointer', marginTop: 4,
-                }}
-              >
-                {saveSuccess ? 'Saved!' : 'Save to Library'}
-              </button>
-            )}
+            </div>{/* end scrollable panels */}
+
+            {/* Action buttons — fixed below scroll, always visible */}
+            <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {sectionValues.cta && sectionValues.image && !imageB64 && (
+                <button
+                  onClick={handleGenerateImageClick}
+                  disabled={isGeneratingImage}
+                  style={{
+                    background: isGeneratingImage ? '#0a1628' : '#00e5c8',
+                    border: '1px solid #00e5c8', borderRadius: 10, padding: 16,
+                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.9rem',
+                    cursor: isGeneratingImage ? 'not-allowed' : 'pointer',
+                    opacity: isGeneratingImage ? 0.7 : 1,
+                    letterSpacing: '0.08em', width: '100%',
+                  }}
+                >
+                  {isGeneratingImage ? 'Generating Image...' : '⚡ Generate Image'}
+                </button>
+              )}
+              {allConfirmed && (
+                <button
+                  onClick={saveToLibrary}
+                  style={{
+                    background: '#2990fa', border: 'none', borderRadius: 10, padding: 14,
+                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    cursor: 'pointer', width: '100%',
+                  }}
+                >
+                  {saveSuccess ? 'Saved!' : 'Save to Library'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
