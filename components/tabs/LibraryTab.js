@@ -1,17 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-const STATUS_COLORS = {
-  Working: '#00e5c8',
-  'Not Working': '#ff4455',
-  unrated: 'rgba(255,255,255,0.4)',
-}
-
 function normalizeAd(ad) {
   return {
     ...ad,
     imageB64: ad.imageB64 || ad.image_b64 || null,
     imageConcept: ad.imageConcept || ad.image_concept || '',
+    visualFormat: ad.visualFormat || ad.visual_format || '',
     primaryText: ad.primaryText || ad.primary_text || '',
     adType: ad.adType || ad.ad_type || '',
     avatarName: ad.avatarName || ad.avatar_name || '',
@@ -22,11 +17,12 @@ function normalizeAd(ad) {
   }
 }
 
-export default function LibraryTab({ onRefine }) {
+export default function LibraryTab({ onEdit }) {
   const [ads, setAds] = useState([])
   const [selectedAd, setSelectedAd] = useState(null)
   const [selectedVersionIdx, setSelectedVersionIdx] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
 
   useEffect(() => {
     loadAds()
@@ -68,6 +64,30 @@ export default function LibraryTab({ onRefine }) {
     const newAds = ads.map(a => (a.id === ad.id ? { ...a, versions } : a))
     setAds(newAds)
     if (selectedAd?.id === ad.id) setSelectedAd(a => ({ ...a, versions }))
+  }
+
+  async function generateImageForModal() {
+    if (!selectedAd || isGeneratingImage) return
+    const concept = selectedAd.imageConcept
+    const visualFormat = selectedAd.visualFormat
+    if (!concept) return
+    const prompt = `cinematic 9:16 vertical photo, ${concept}${visualFormat ? ', ' + visualFormat : ''}, no text, no logos, photorealistic, documentary style`
+    setIsGeneratingImage(true)
+    try {
+      const res = await fetch('/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+      const data = await res.json()
+      if (data.b64) {
+        setSelectedAd(a => ({ ...a, imageB64: data.b64 }))
+        await updateAd(selectedAd.id, { image_b64: data.b64 })
+      }
+    } catch (err) {
+      console.error('Modal generate image error:', err)
+    }
+    setIsGeneratingImage(false)
   }
 
   async function deleteAd(id) {
@@ -435,82 +455,51 @@ export default function LibraryTab({ onRefine }) {
               )}
             </div>
 
-            {/* Action buttons row 1 */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            {/* Generate Image — shown when no image exists */}
+            {!displayAd?.imageB64 && selectedAd.imageConcept && (
               <button
-                onClick={() => updateAd(selectedAd.id, { status: 'Working' })}
+                onClick={generateImageForModal}
+                disabled={isGeneratingImage}
                 style={{
-                  flex: 1,
-                  background:
-                    selectedAd.status === 'Working' ? 'rgba(0,229,200,0.15)' : 'transparent',
+                  width: '100%',
+                  background: isGeneratingImage ? '#0a1628' : '#00e5c8',
                   border: '1px solid #00e5c8',
                   borderRadius: 8,
-                  padding: 8,
-                  color: '#00e5c8',
+                  padding: 10,
+                  color: '#ffffff',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: 'pointer',
+                  cursor: isGeneratingImage ? 'not-allowed' : 'pointer',
+                  letterSpacing: '0.06em',
+                  marginBottom: 8,
+                  opacity: isGeneratingImage ? 0.7 : 1,
                 }}
               >
-                ✓ Working
+                {isGeneratingImage ? 'Generating...' : '⚡ Generate Image'}
               </button>
-              <button
-                onClick={() => updateAd(selectedAd.id, { status: 'Not Working' })}
-                style={{
-                  flex: 1,
-                  background:
-                    selectedAd.status === 'Not Working'
-                      ? 'rgba(255,68,85,0.15)'
-                      : 'transparent',
-                  border: '1px solid #ff4455',
-                  borderRadius: 8,
-                  padding: 8,
-                  color: '#ff4455',
-                  fontSize: '0.75rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: 'pointer',
-                }}
-              >
-                ✗ Not Working
-              </button>
-            </div>
+            )}
 
-            {/* Action buttons row 2 */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            {/* Edit button */}
+            <div style={{ marginBottom: 8 }}>
               <button
                 onClick={() => {
-                  onRefine?.(selectedAd)
+                  onEdit?.(selectedAd)
                   setSelectedAd(null)
                 }}
                 style={{
-                  flex: 1,
+                  width: '100%',
                   background: '#2990fa',
                   border: 'none',
                   borderRadius: 8,
-                  padding: 8,
+                  padding: 10,
                   color: '#ffffff',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
                   cursor: 'pointer',
+                  letterSpacing: '0.06em',
                 }}
               >
-                Refine
-              </button>
-              <button
-                onClick={() => addVersion(selectedAd)}
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: '1px solid #2990fa',
-                  borderRadius: 8,
-                  padding: 8,
-                  color: '#2990fa',
-                  fontSize: '0.75rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: 'pointer',
-                }}
-              >
-                Split Test
+                Edit
               </button>
             </div>
 

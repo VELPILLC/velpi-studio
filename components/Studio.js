@@ -29,10 +29,16 @@ const tabs = [
 export default function Studio() {
   const [activeTab, setActiveTab] = useState('profile')
   const [pendingRefine, setPendingRefine] = useState(null)
+  const [pendingLoadAd, setPendingLoadAd] = useState(null)
   const [selectedProfile, setSelectedProfile] = useState(null)
 
   function handleRefineFromLibrary(ad) {
     setPendingRefine(ad)
+    setActiveTab('ads')
+  }
+
+  function handleEditFromLibrary(ad) {
+    setPendingLoadAd(ad)
     setActiveTab('ads')
   }
 
@@ -115,11 +121,13 @@ export default function Studio() {
           <AdsTab
             pendingRefine={pendingRefine}
             onRefineConsumed={() => setPendingRefine(null)}
+            pendingLoadAd={pendingLoadAd}
+            onLoadAdConsumed={() => setPendingLoadAd(null)}
             selectedProfile={selectedProfile}
             onGoToProfile={() => setActiveTab('profile')}
           />
         )}
-        {activeTab === 'library' && <LibraryTab onRefine={handleRefineFromLibrary} />}
+        {activeTab === 'library' && <LibraryTab onEdit={handleEditFromLibrary} />}
       </div>
     </div>
   )

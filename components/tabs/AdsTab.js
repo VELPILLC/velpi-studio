@@ -5,6 +5,16 @@ import { useState, useEffect, useRef } from 'react'
 
 const SECTIONS = ['avatar', 'hook', 'visual_format', 'image', 'headline', 'primary_text', 'description', 'cta']
 
+const SECTION_PREREQUISITES = {
+  hook: 'avatar',
+  visual_format: 'hook',
+  image: 'visual_format',
+  headline: 'image',
+  primary_text: 'headline',
+  description: 'primary_text',
+  cta: 'description',
+}
+
 const SECTION_LABELS = {
   avatar: 'AVATAR',
   visual_format: 'VISUAL FORMAT',
@@ -182,7 +192,7 @@ const EMPTY_AVATAR_DATA = () => ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfile, onGoToProfile }) {
+export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile }) {
   // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
@@ -203,6 +213,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   const [extraSubcategories, setExtraSubcategories] = useState({})
   const [moreSubsLoading, setMoreSubsLoading] = useState({})
   const [selectedPlatform, setSelectedPlatform] = useState(null)
+  const [sectionLockMsg, setSectionLockMsg] = useState(null)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
 
   const chatScrollRef = useRef(null)
 
@@ -239,6 +251,13 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
       onRefineConsumed?.()
     }
   }, [pendingRefine])
+
+  useEffect(() => {
+    if (pendingLoadAd) {
+      loadFullAdFromLibrary(pendingLoadAd)
+      onLoadAdConsumed?.()
+    }
+  }, [pendingLoadAd])
 
   useEffect(() => {
     setSelectedAngles([])
@@ -685,7 +704,7 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
           avatar: [
             ...prev.avatar,
             { role: 'user', content: `Name: ${data.avatar.name}` },
-            { role: 'assistant', content: `Avatar "${data.avatar.name}" saved. Moving to visual format.` },
+            { role: 'assistant', content: `Avatar "${data.avatar.name}" saved. Moving to hook.` },
           ],
         }))
         setAvatarFunnelStep('industry')
@@ -696,8 +715,8 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
         setAvatarEditMode(false)
         setAvatarEditingField(null)
         setAvatarEditingId(null)
-        setActiveSection('visual_format')
-        openSection('visual_format', newSvs, data.avatar, [])
+        setActiveSection('hook')
+        openSection('hook', newSvs, data.avatar, [])
       }
     } catch (err) {
       console.error('Save avatar funnel error:', err)
@@ -764,8 +783,8 @@ Do not generate bubble options in this response.`
       setAvatarEditMode(false)
       setAvatarEditingField(null)
       setAvatarEditingId(null)
-      setActiveSection('visual_format')
-      openSection('visual_format', newSvs, newSelected, [])
+      setActiveSection('hook')
+      openSection('hook', newSvs, newSelected, [])
     } else {
       setSectionValues(prev => ({ ...prev, avatar: null }))
       setSectionChats(prev => ({ ...prev, avatar: [] }))
@@ -902,6 +921,17 @@ Do not generate bubble options in this response.`
       setSelectedBubbles([])
       return
     }
+
+    // Section flow lock — only blocks when prerequisite is unconfirmed AND this section is also unconfirmed
+    if (section !== 'avatar') {
+      const prereq = SECTION_PREREQUISITES[section]
+      if (prereq && !sectionValues[prereq] && !sectionValues[section]) {
+        setSectionLockMsg(section)
+        setTimeout(() => setSectionLockMsg(s => s === section ? null : s), 3000)
+        return
+      }
+    }
+
     setActiveSection(section)
     setSelectedBubbles([])
 
@@ -1019,7 +1049,6 @@ Do not generate bubble options in this response.`
 
     if (section === 'image') {
       setDallePrompt(value)
-      generateImage(value)
     }
 
     const idx = SECTIONS.indexOf(section)
@@ -1028,6 +1057,14 @@ Do not generate bubble options in this response.`
       setActiveSection(nextSection)
       openSection(nextSection, newSectionValues, selectedAvatar, [])
     }
+  }
+
+  async function handleGenerateImageClick() {
+    const concept = dallePrompt || sectionValues.image
+    if (!concept || isGeneratingImage) return
+    setIsGeneratingImage(true)
+    await generateImage(concept)
+    setIsGeneratingImage(false)
   }
 
   async function generateImage(concept) {
@@ -1047,6 +1084,26 @@ Do not generate bubble options in this response.`
   }
 
   // ─── Library ──────────────────────────────────────────────────────────────────
+
+  function loadFullAdFromLibrary(ad) {
+    const svs = {
+      avatar: ad.angle || ad.avatar_name || null,
+      visual_format: null,
+      hook: ad.hook || null,
+      image: ad.image_concept || ad.imageConcept || null,
+      headline: ad.headline || null,
+      primary_text: ad.primary_text || ad.primaryText || null,
+      description: ad.description || null,
+      cta: ad.cta || null,
+    }
+    setSectionValues(svs)
+    setSectionChats(EMPTY_SECTION_OBJ())
+    setCurrentBubbles([])
+    setSelectedBubbles([])
+    setImageB64(ad.image_b64 || ad.imageB64 || null)
+    setDallePrompt(ad.image_concept || ad.imageConcept || '')
+    setActiveSection('hook')
+  }
 
   function loadForRefine(ad) {
     const svs = {
@@ -1922,6 +1979,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     Reset
                   </button>
                 </div>
+                {sectionLockMsg === section && (
+                  <div style={{ fontSize: '0.65rem', color: '#e5c07b', fontFamily: 'var(--font-ibm-plex-mono)', marginTop: 4, letterSpacing: '0.04em' }}>
+                    Complete {SECTION_LABELS[SECTION_PREREQUISITES[section]]} first.
+                  </div>
+                )}
                 {sectionValues[section] && (
                   <div style={{ fontSize: '0.88rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
                     {sectionValues[section]}
@@ -1967,6 +2029,22 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               </div>
             ))}
 
+            {sectionValues.cta && sectionValues.image && !imageB64 && (
+              <button
+                onClick={handleGenerateImageClick}
+                disabled={isGeneratingImage}
+                style={{
+                  background: isGeneratingImage ? '#0a1628' : '#00e5c8',
+                  border: '1px solid #00e5c8', borderRadius: 10, padding: 14,
+                  color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                  cursor: isGeneratingImage ? 'not-allowed' : 'pointer', marginTop: 4,
+                  opacity: isGeneratingImage ? 0.7 : 1,
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {isGeneratingImage ? 'Generating Image...' : '⚡ Generate Image'}
+              </button>
+            )}
             {allConfirmed && (
               <button
                 onClick={saveToLibrary}
@@ -1976,7 +2054,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   cursor: 'pointer', marginTop: 4,
                 }}
               >
-                Save to Library
+                {saveSuccess ? 'Saved!' : 'Save to Library'}
               </button>
             )}
           </div>
