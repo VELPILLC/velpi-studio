@@ -26,6 +26,7 @@ export default function LibraryTab({ onRefine }) {
   const [ads, setAds] = useState([])
   const [selectedAd, setSelectedAd] = useState(null)
   const [selectedVersionIdx, setSelectedVersionIdx] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   useEffect(() => {
     loadAds()
@@ -234,6 +235,59 @@ export default function LibraryTab({ onRefine }) {
           </div>
         </div>
       ))}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirm && (
+        <div
+          onClick={() => setDeleteConfirm(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 3000,
+            background: 'rgba(2,8,16,0.88)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#0a1628', border: '1px solid #ff4455',
+              borderRadius: 12, padding: 28, width: '100%', maxWidth: 360,
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+              Delete Ad
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
+              Delete this ad? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { deleteAd(deleteConfirm); setDeleteConfirm(null) }}
+                style={{
+                  flex: 1, background: '#ff4455', border: 'none', borderRadius: 8,
+                  padding: '11px 0', color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                  cursor: 'pointer', letterSpacing: '0.06em',
+                }}
+              >
+                DELETE
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                style={{
+                  flex: 1, background: 'transparent', border: '1px solid #2990fa',
+                  borderRadius: 8, padding: '11px 0', color: '#2990fa',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                  cursor: 'pointer', letterSpacing: '0.06em',
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal ── */}
       {selectedAd && (
@@ -463,7 +517,7 @@ export default function LibraryTab({ onRefine }) {
             {/* Delete + Close */}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
-                onClick={() => deleteAd(selectedAd.id)}
+                onClick={() => setDeleteConfirm(selectedAd.id)}
                 style={{
                   flex: 1,
                   background: 'transparent',

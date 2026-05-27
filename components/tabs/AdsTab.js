@@ -135,7 +135,7 @@ const MEDIA_TRUST_BUBBLES = ['Local news', 'Facebook groups', 'YouTube', 'Indust
 const AVATAR_FUNNEL_STEPS = ['industry', 'role', 'businessSize', 'ageRange', 'wants', 'fears', 'frustrations', 'statusDriver', 'mediaTrust', 'review']
 
 const AVATAR_STEP_MESSAGES = {
-  industry: 'What industry are you targeting? Pick one or more.',
+  industry: 'What industry is your target customer in? Pick one or more.',
   role: 'What best describes them?',
   businessSize: 'How big is their operation?',
   ageRange: 'How old are they roughly?',
@@ -190,6 +190,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   const [imageB64, setImageB64] = useState(null)
   const [dallePrompt, setDallePrompt] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isChatLoading, setIsChatLoading] = useState(false)
   const [imageFormat, setImageFormat] = useState('9/16')
   const [expandedCategories, setExpandedCategories] = useState([])
   const [selectedSubcategories, setSelectedSubcategories] = useState([])
@@ -349,30 +350,19 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   // ─── Avatar funnel ────────────────────────────────────────────────────────────
 
   function initAvatarFunnel() {
-    const prefillIndustry = selectedProfile?.industry || null
-    const startStep = prefillIndustry ? 'role' : 'industry'
-    const initialData = prefillIndustry
-      ? { ...EMPTY_AVATAR_DATA(), industry: prefillIndustry }
-      : EMPTY_AVATAR_DATA()
-    setAvatarFunnelStep(startStep)
-    setAvatarData(initialData)
+    setAvatarFunnelStep('industry')
+    setAvatarData(EMPTY_AVATAR_DATA())
     setAvatarNameInput('')
     setAvatarSelectedBubbles([])
     setAvatarFunnelHistory([])
     setAvatarEditMode(false)
     setAvatarEditingField(null)
     setAvatarEditingId(null)
-    const firstMessage = prefillIndustry
-      ? `Industry set from your profile: ${prefillIndustry}. ${AVATAR_STEP_MESSAGES.role}`
-      : AVATAR_STEP_MESSAGES.industry
     setSectionChats(prev => ({
       ...prev,
-      avatar: [{ role: 'assistant', content: firstMessage }],
+      avatar: [{ role: 'assistant', content: AVATAR_STEP_MESSAGES.industry }],
     }))
-    setCurrentBubbles(prefillIndustry
-      ? (isTrade(prefillIndustry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT)
-      : INDUSTRY_BUBBLES
-    )
+    setCurrentBubbles(INDUSTRY_BUBBLES)
   }
 
   function startNewAvatarFunnel() {
@@ -550,6 +540,7 @@ Answer their question in 1-2 sentences using plain simple language.
 Then redirect them back to the current step question.
 Do not generate bubble options in this response.`
     setIsLoading(true)
+    setIsChatLoading(true)
     try {
       const raw = await callAPI('avatar', [{ role: 'user', content: fullQuestion }], sectionValues, null, [], questionSystem)
       setSectionChats(prev => ({
@@ -560,6 +551,7 @@ Do not generate bubble options in this response.`
       console.error('Avatar ask error:', err)
     }
     setIsLoading(false)
+    setIsChatLoading(false)
   }
 
   // Back button: restore previous step
@@ -588,6 +580,7 @@ Do NOT repeat these already-shown options: [${excludeList}]
 Options must be specific, practical, and different from what is already shown.
 Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4"]}`
     setIsLoading(true)
+    setIsChatLoading(true)
     try {
       const raw = await callAPI('avatar', [{ role: 'user', content: `More options for: ${step}` }], sectionValues, null, [], system)
       const parsed = parseResponse(raw)
@@ -599,6 +592,7 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
       console.error('Get more options error:', err)
     }
     setIsLoading(false)
+    setIsChatLoading(false)
   }
 
   // ─── Avatar edit mode (re-edit fields after creation) ─────────────────────────
@@ -640,7 +634,7 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
         age_range: avatarData.ageRange || '',
         niche: [avatarData.industry, avatarData.role].filter(Boolean).join(' - '),
         what_they_want: avatarData.wants || '',
-        what_they_fear: [avatarData.fears, avatarData.deepFear || avatarData.fears].filter(Boolean).join(' / '),
+        what_they_fear: avatarData.fears || '',
         what_they_trust: avatarData.mediaTrust || '',
         primary_emotion: primaryEmotion,
       }
@@ -818,6 +812,7 @@ Do not generate bubble options in this response.`
     const userMsg = { role: 'user', content: questionText }
     setSectionChats(prev => ({ ...prev, [activeSection]: [...prev[activeSection], userMsg] }))
     setIsLoading(true)
+    setIsChatLoading(true)
     try {
       const raw = await callAPI(activeSection, [userMsg], sectionValues, selectedAvatar, selectedAngles, questionSystem)
       setSectionChats(prev => ({
@@ -828,6 +823,7 @@ Do not generate bubble options in this response.`
       console.error('Ask Jarvis error:', err)
     }
     setIsLoading(false)
+    setIsChatLoading(false)
   }
 
   // ─── Section management ───────────────────────────────────────────────────────
@@ -934,6 +930,7 @@ Do not generate bubble options in this response.`
     const updatedChat = [...sectionChats[activeSection], userMsg]
     setSectionChats(prev => ({ ...prev, [activeSection]: updatedChat }))
     setIsLoading(true)
+    setIsChatLoading(true)
 
     try {
       const raw = await callAPI(
@@ -956,6 +953,7 @@ Do not generate bubble options in this response.`
       console.error('handleRefine error:', err)
     }
     setIsLoading(false)
+    setIsChatLoading(false)
   }
 
   async function handleSubmit() {
@@ -1066,6 +1064,12 @@ Do not generate bubble options in this response.`
   // ─── Section reset ────────────────────────────────────────────────────────────
 
   function handleResetSection(section) {
+    const sectionIdx = SECTIONS.indexOf(section)
+    const downstreamConfirmed = SECTIONS.slice(sectionIdx + 1).filter(s => sectionValues[s] !== null)
+    const warningMsg = downstreamConfirmed.length > 0
+      ? `${SECTION_LABELS[section]} was reset. Your downstream sections (${downstreamConfirmed.map(s => SECTION_LABELS[s]).join(', ')}) were built from the old ${SECTION_LABELS[section]}. Consider resetting those too for consistency.`
+      : null
+
     setSectionChats(prev => ({ ...prev, [section]: [] }))
     setSectionValues(prev => ({ ...prev, [section]: null }))
     if (section === 'image') setImageB64(null)
@@ -1076,7 +1080,21 @@ Do not generate bubble options in this response.`
       setSelectedSubcategories([])
       setExpandedCategories([])
       const newSvs = { ...sectionValues, [section]: null }
-      openSection(section, newSvs, selectedAvatar, [])
+      openSection(section, newSvs, selectedAvatar, []).then(() => {
+        if (warningMsg) {
+          setSectionChats(prev => ({
+            ...prev,
+            [section]: [...prev[section], { role: 'assistant', content: warningMsg }],
+          }))
+        }
+      })
+    } else {
+      if (warningMsg) {
+        setSectionChats(prev => ({
+          ...prev,
+          [section]: [{ role: 'assistant', content: warningMsg }],
+        }))
+      }
     }
   }
 
@@ -1332,7 +1350,7 @@ Do not generate bubble options in this response.`
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {isChatLoading && (
                 <div style={{ color: '#2990fa', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', padding: '4px 0' }}>
                   Generating...
                 </div>
