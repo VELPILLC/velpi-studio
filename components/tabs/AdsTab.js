@@ -1162,6 +1162,7 @@ Do not generate bubble options in this response.`
     setActiveSection('hook')
     // If loading a draft, track its ID so saves update the same record
     setCurrentDraftId(ad.status === 'draft' ? (ad.id || null) : null)
+    openSection('hook', svs, selectedAvatar, [])
   }
 
   function loadForRefine(ad) {
@@ -2187,18 +2188,19 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
             {/* Action buttons — fixed below scroll, always visible */}
             <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {sectionValues.image && !imageB64 && !isGeneratingImage && (
+              {sectionValues.image && !imageB64 && (
                 <button
                   onClick={handleGenerateImageClick}
+                  disabled={isGeneratingImage}
                   style={{
-                    background: '#00e5c8',
+                    background: isGeneratingImage ? 'rgba(0,229,200,0.4)' : '#00e5c8',
                     border: '1px solid #00e5c8', borderRadius: 10, padding: 14,
                     color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                    cursor: 'pointer',
+                    cursor: isGeneratingImage ? 'default' : 'pointer',
                     letterSpacing: '0.08em', width: '100%',
                   }}
                 >
-                  ⚡ Generate Image
+                  {isGeneratingImage ? 'Generating Image...' : '⚡ Generate Image'}
                 </button>
               )}
               {allConfirmed && (
@@ -2244,41 +2246,52 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
             {canSaveDraft && (
               <>
-                <button
-                  onClick={async () => {
-                    await saveDraft(false)
-                    unsavedPrompt.onContinue?.()
-                  }}
-                  style={{
-                    background: '#2990fa', border: 'none', borderRadius: 8,
-                    padding: '12px 0', color: '#ffffff',
-                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                    cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
-                  }}
-                >
-                  {currentDraftId ? 'Save as current draft' : 'Save as draft'}
-                </button>
                 {currentDraftId && (
                   <button
                     onClick={async () => {
-                      await saveDraft(true)
-                      unsavedPrompt.onContinue?.()
+                      const { onContinue } = unsavedPrompt
+                      setUnsavedPrompt(null)
+                      await saveDraft(false)
+                      onContinue?.()
                     }}
                     style={{
-                      background: 'transparent', border: '1px solid #2990fa', borderRadius: 8,
-                      padding: '12px 0', color: '#2990fa',
+                      background: '#2990fa', border: 'none', borderRadius: 8,
+                      padding: '12px 0', color: '#ffffff',
                       fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
                       cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
                     }}
                   >
-                    Save as new draft
+                    Save as current draft
                   </button>
                 )}
+                <button
+                  onClick={async () => {
+                    const { onContinue } = unsavedPrompt
+                    setUnsavedPrompt(null)
+                    await saveDraft(true)
+                    onContinue?.()
+                  }}
+                  style={{
+                    background: currentDraftId ? 'transparent' : '#2990fa',
+                    border: currentDraftId ? '1px solid #2990fa' : 'none',
+                    borderRadius: 8,
+                    padding: '12px 0',
+                    color: currentDraftId ? '#2990fa' : '#ffffff',
+                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+                  }}
+                >
+                  Save as new draft
+                </button>
               </>
             )}
 
             <button
-              onClick={() => unsavedPrompt.onContinue?.()}
+              onClick={() => {
+                const { onContinue } = unsavedPrompt
+                setUnsavedPrompt(null)
+                onContinue?.()
+              }}
               style={{
                 background: 'transparent', border: '1px solid rgba(255,68,85,0.5)', borderRadius: 8,
                 padding: '12px 0', color: '#ff4455',
@@ -2290,7 +2303,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             </button>
 
             <button
-              onClick={() => unsavedPrompt.onCancel?.()}
+              onClick={() => {
+                const { onCancel } = unsavedPrompt
+                setUnsavedPrompt(null)
+                onCancel?.()
+              }}
               style={{
                 background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8,
                 padding: '12px 0', color: 'rgba(255,255,255,0.6)',
