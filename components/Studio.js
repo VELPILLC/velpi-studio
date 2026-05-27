@@ -31,6 +31,17 @@ export default function Studio() {
   const [pendingRefine, setPendingRefine] = useState(null)
   const [pendingLoadAd, setPendingLoadAd] = useState(null)
   const [selectedProfile, setSelectedProfile] = useState(null)
+  const [pendingTabChange, setPendingTabChange] = useState(null)
+
+  function handleTabClick(tabId) {
+    if (activeTab === 'ads' && tabId !== 'ads') {
+      // Ask AdsTab to handle — it will show prompt if there's unsaved work
+      setPendingTabChange(tabId)
+    } else {
+      setActiveTab(tabId)
+      setPendingTabChange(null)
+    }
+  }
 
   function handleRefineFromLibrary(ad) {
     setPendingRefine(ad)
@@ -89,7 +100,7 @@ export default function Studio() {
         {tabs.map(t => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => handleTabClick(t.id)}
             style={{
               background: 'transparent',
               border: 'none',
@@ -99,6 +110,7 @@ export default function Studio() {
               fontSize: '0.6rem',
               fontFamily: 'var(--font-ibm-plex-mono)',
               letterSpacing: '0.06em',
+              cursor: 'pointer',
             }}
           >
             {t.label}
@@ -125,6 +137,14 @@ export default function Studio() {
             onLoadAdConsumed={() => setPendingLoadAd(null)}
             selectedProfile={selectedProfile}
             onGoToProfile={() => setActiveTab('profile')}
+            pendingTabChange={pendingTabChange}
+            onTabChangeApproved={() => {
+              if (pendingTabChange) {
+                setActiveTab(pendingTabChange)
+                setPendingTabChange(null)
+              }
+            }}
+            onTabChangeCancelled={() => setPendingTabChange(null)}
           />
         )}
         {activeTab === 'library' && <LibraryTab onEdit={handleEditFromLibrary} />}

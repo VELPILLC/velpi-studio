@@ -192,7 +192,7 @@ const EMPTY_AVATAR_DATA = () => ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile }) {
+export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled }) {
   // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
@@ -215,6 +215,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [selectedPlatform, setSelectedPlatform] = useState(null)
   const [sectionLockMsg, setSectionLockMsg] = useState(null)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [currentDraftId, setCurrentDraftId] = useState(null)
+  const [unsavedPrompt, setUnsavedPrompt] = useState(null)
 
   const chatScrollRef = useRef(null)
 
@@ -273,6 +275,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setExtraSubcategories({})
     setTypeOwn('')
     setImageB64(null)
+    setCurrentDraftId(null)
+    setUnsavedPrompt(null)
     initAvatarFunnel()
   }, [selectedProfile?.id])
 
@@ -291,6 +295,40 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
       onLoadAdConsumed?.()
     }
   }, [pendingLoadAd])
+
+  // Handle tab-change requests from Studio — show prompt if unsaved work
+  useEffect(() => {
+    if (pendingTabChange === null) return
+    const work = SECTIONS.some(s => sectionValues[s] !== null)
+    if (!work) {
+      onTabChangeApproved?.()
+      return
+    }
+    setUnsavedPrompt({
+      onContinue: () => {
+        setUnsavedPrompt(null)
+        onTabChangeApproved?.()
+      },
+      onCancel: () => {
+        setUnsavedPrompt(null)
+        onTabChangeCancelled?.()
+      },
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTabChange])
+
+  // Warn before browser refresh/close when there is unsaved work
+  useEffect(() => {
+    function handleBeforeUnload(e) {
+      const work = SECTIONS.some(s => sectionValues[s] !== null)
+      if (work) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [sectionValues])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -386,8 +424,14 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   }
 
   function startNewAvatarFunnel() {
-    setActiveSection('avatar')
-    initAvatarFunnel()
+    promptUnsaved({
+      onContinue: () => {
+        setCurrentDraftId(null)
+        setActiveSection('avatar')
+        initAvatarFunnel()
+      },
+      onCancel: () => {},
+    })
   }
 
   function restoreAvatarFunnel() {
@@ -766,31 +810,39 @@ Do not generate bubble options in this response.`
     }
   }
 
-  function handleAvatarSelect(av) {
-    const newSelected = selectedAvatar?.id === av.id ? null : av
-    setSelectedAvatar(newSelected)
+  function doAvatarSelect(av) {
+    const newSvs = { ...sectionValues, avatar: av.name }
+    setSelectedAvatar(av)
+    setSectionValues(newSvs)
+    setSectionChats(prev => ({
+      ...prev,
+      avatar: [{ role: 'assistant', content: `Avatar locked in. Writing for ${av.name}.` }],
+    }))
+    setAvatarFunnelStep('industry')
+    setAvatarData(EMPTY_AVATAR_DATA())
+    setAvatarNameInput('')
+    setAvatarSelectedBubbles([])
+    setAvatarFunnelHistory([])
+    setAvatarEditMode(false)
+    setAvatarEditingField(null)
+    setAvatarEditingId(null)
+    setActiveSection('hook')
+    openSection('hook', newSvs, av, [])
+  }
 
-    if (newSelected) {
-      const newSvs = { ...sectionValues, avatar: newSelected.name }
-      setSectionValues(newSvs)
-      setSectionChats(prev => ({
-        ...prev,
-        avatar: [{ role: 'assistant', content: `Avatar locked in. Writing for ${newSelected.name}.` }],
-      }))
-      setAvatarFunnelStep('industry')
-      setAvatarData(EMPTY_AVATAR_DATA())
-      setAvatarNameInput('')
-      setAvatarSelectedBubbles([])
-      setAvatarFunnelHistory([])
-      setAvatarEditMode(false)
-      setAvatarEditingField(null)
-      setAvatarEditingId(null)
-      setActiveSection('hook')
-      openSection('hook', newSvs, newSelected, [])
-    } else {
+  function handleAvatarSelect(av) {
+    // Deselect current avatar — no prompt needed
+    if (selectedAvatar?.id === av.id) {
+      setSelectedAvatar(null)
       setSectionValues(prev => ({ ...prev, avatar: null }))
       setSectionChats(prev => ({ ...prev, avatar: [] }))
+      return
     }
+    // Switching to a different avatar — prompt if there is unsaved work
+    promptUnsaved({
+      onContinue: () => doAvatarSelect(av),
+      onCancel: () => {},
+    })
   }
 
   function handleEditAvatarFromBar(av) {
@@ -1051,6 +1103,9 @@ Do not generate bubble options in this response.`
 
     if (section === 'image') {
       setDallePrompt(value)
+      // Auto-start image generation in background so user can continue working
+      setIsGeneratingImage(true)
+      generateImage(value).finally(() => setIsGeneratingImage(false))
     }
 
     const idx = SECTIONS.indexOf(section)
@@ -1105,6 +1160,8 @@ Do not generate bubble options in this response.`
     setImageB64(ad.image_b64 || ad.imageB64 || null)
     setDallePrompt(ad.image_concept || ad.imageConcept || '')
     setActiveSection('hook')
+    // If loading a draft, track its ID so saves update the same record
+    setCurrentDraftId(ad.status === 'draft' ? (ad.id || null) : null)
   }
 
   function loadForRefine(ad) {
@@ -1146,18 +1203,69 @@ Do not generate bubble options in this response.`
           cta: sectionValues.cta,
           angle: sectionValues.avatar,
           ad_type: '',
-          status: 'unrated',
+          status: 'complete',
           version_number: 1,
           parent_id: null,
         }),
       })
       if (res.ok) {
+        setCurrentDraftId(null)
         setSaveSuccess(true)
         setTimeout(() => setSaveSuccess(false), 2000)
       }
     } catch (err) {
       console.error('saveToLibrary error:', err)
     }
+  }
+
+  // ─── Draft system ────────────────────────────────────────────────────────────
+
+  async function saveDraft(asNew = false) {
+    const body = {
+      avatar_id: selectedAvatar?.id || null,
+      avatar_name: selectedAvatar?.name || 'No Avatar',
+      hook: sectionValues.hook,
+      image_concept: sectionValues.image,
+      image_b64: imageB64,
+      headline: sectionValues.headline,
+      primary_text: sectionValues.primary_text,
+      description: sectionValues.description,
+      cta: sectionValues.cta,
+      angle: sectionValues.avatar,
+      ad_type: '',
+      status: 'draft',
+      version_number: 1,
+      parent_id: null,
+    }
+    try {
+      if (!asNew && currentDraftId) {
+        await fetch('/api/library', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentDraftId, ...body }),
+        })
+      } else {
+        const res = await fetch('/api/library', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (data.ad?.id) setCurrentDraftId(data.ad.id)
+      }
+    } catch (err) {
+      console.error('saveDraft error:', err)
+    }
+  }
+
+  // Show unsaved-work prompt if any sections are confirmed; otherwise call onContinue directly
+  function promptUnsaved(callbacks) {
+    const work = SECTIONS.some(s => sectionValues[s] !== null)
+    if (!work) {
+      callbacks.onContinue()
+      return
+    }
+    setUnsavedPrompt(callbacks)
   }
 
   // ─── Section reset ────────────────────────────────────────────────────────────
@@ -1322,6 +1430,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
   const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
+  const hasUnsavedWork = SECTIONS.some(s => sectionValues[s] !== null)
+  const canSaveDraft = sectionValues.hook !== null
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
   const sectionAngles = SECTION_ANGLES[activeSection] || []
   const canSubmit = selectedBubbles.length === 1 && !isLoading
@@ -1957,100 +2067,138 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               </div>
             </div>
 
-            {SECTIONS.map(section => (
-              <div
-                key={section}
-                onClick={() => gotoSection(section)}
-                style={{
-                  background: activeSection === section ? '#0a1628' : 'transparent',
-                  border: `1px solid ${activeSection === section ? '#2990fa' : '#152840'}`,
-                  borderRadius: 10, padding: '14px 16px', cursor: 'pointer',
-                  opacity: activeSection === null ? 0.4 : (!sectionValues[section] && section !== activeSection) ? 0.4 : 1,
-                  position: 'relative',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sectionValues[section] ? 4 : 0 }}>
-                  <div style={{
-                    fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa',
-                    textTransform: 'uppercase', letterSpacing: '0.12em',
-                  }}>
-                    {SECTION_LABELS[section]}
-                  </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleResetSection(section) }}
-                    style={{ color: '#ff4455', fontSize: '0.58rem', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 6px', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}
-                  >
-                    Reset
-                  </button>
-                </div>
-                {sectionLockMsg === section && (
-                  <div style={{ fontSize: '0.65rem', color: '#e5c07b', fontFamily: 'var(--font-ibm-plex-mono)', marginTop: 4, letterSpacing: '0.04em' }}>
-                    Complete {SECTION_LABELS[SECTION_PREREQUISITES[section]]} first.
-                  </div>
-                )}
-                {sectionValues[section] && (
-                  <div style={{ fontSize: '0.88rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.6 }}>
-                    {sectionValues[section]}
-                  </div>
-                )}
-                {section === 'image' && imageB64 && sectionValues.image && (
-                  <div style={{ marginTop: 8 }}>
+            {SECTIONS.map(section => {
+              const isActive = activeSection === section
+              const hasValue = !!sectionValues[section]
+              const isLocked = sectionLockMsg === section
+              return (
+                <div
+                  key={section}
+                  onClick={() => gotoSection(section)}
+                  style={{
+                    background: isActive ? '#0a1628' : 'transparent',
+                    border: `1px solid ${isActive ? '#2990fa' : '#152840'}`,
+                    borderRadius: 10,
+                    padding: isActive ? '12px 16px' : '7px 12px',
+                    cursor: 'pointer',
+                    opacity: activeSection === null ? 0.4 : (!hasValue && !isActive) ? 0.4 : 1,
+                    position: 'relative',
+                  }}
+                >
+                  {/* Label row — Reset only visible when active */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{
-                      width: '100%',
-                      aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16',
-                      overflow: 'hidden', borderRadius: 4,
+                      fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa',
+                      textTransform: 'uppercase', letterSpacing: '0.12em',
                     }}>
-                      <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {SECTION_LABELS[section]}
                     </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                      {['9/16', '1:1', '4:5'].map(f => (
+                    {isActive && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleResetSection(section) }}
+                        style={{ color: '#ff4455', fontSize: '0.58rem', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 6px', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Lock message */}
+                  {isLocked && (
+                    <div style={{ fontSize: '0.65rem', color: '#e5c07b', fontFamily: 'var(--font-ibm-plex-mono)', marginTop: 4, letterSpacing: '0.04em' }}>
+                      Complete {SECTION_LABELS[SECTION_PREREQUISITES[section]]} first.
+                    </div>
+                  )}
+
+                  {/* Confirmed value — full text when active, one-line truncated when not */}
+                  {hasValue && (
+                    <div style={{
+                      fontSize: '0.82rem',
+                      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      fontFamily: 'var(--font-inter)',
+                      lineHeight: 1.5,
+                      marginTop: 4,
+                      ...(isActive ? {} : {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }),
+                    }}>
+                      {sectionValues[section]}
+                    </div>
+                  )}
+
+                  {/* Image generating indicator — shows regardless of active state */}
+                  {section === 'image' && isGeneratingImage && (
+                    <div style={{
+                      marginTop: 6,
+                      fontSize: '0.58rem',
+                      color: '#2990fa',
+                      fontFamily: 'var(--font-ibm-plex-mono)',
+                      letterSpacing: '0.04em',
+                    }}>
+                      ⚡ Generating image...
+                    </div>
+                  )}
+
+                  {/* Image preview — only when active and not generating */}
+                  {isActive && section === 'image' && imageB64 && hasValue && !isGeneratingImage && (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{
+                        width: '100%',
+                        aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16',
+                        overflow: 'hidden', borderRadius: 4,
+                      }}>
+                        <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                        {['9/16', '1:1', '4:5'].map(f => (
+                          <button
+                            key={f}
+                            onClick={e => { e.stopPropagation(); setImageFormat(f) }}
+                            style={{
+                              background: imageFormat === f ? '#2990fa' : 'transparent',
+                              border: '1px solid #2990fa', borderRadius: 4,
+                              padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff',
+                              fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
+                            }}
+                          >
+                            {f}
+                          </button>
+                        ))}
                         <button
-                          key={f}
-                          onClick={e => { e.stopPropagation(); setImageFormat(f) }}
+                          onClick={e => { e.stopPropagation(); generateImage(dallePrompt || sectionValues.image) }}
                           style={{
-                            background: imageFormat === f ? '#2990fa' : 'transparent',
-                            border: '1px solid #2990fa', borderRadius: 4,
-                            padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff',
+                            background: 'transparent', border: '1px solid #2990fa', borderRadius: 4,
+                            padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa',
                             fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
                           }}
                         >
-                          {f}
+                          New Image
                         </button>
-                      ))}
-                      <button
-                        onClick={e => { e.stopPropagation(); generateImage(dallePrompt || sectionValues.image) }}
-                        style={{
-                          background: 'transparent', border: '1px solid #2990fa', borderRadius: 4,
-                          padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa',
-                          fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
-                        }}
-                      >
-                        New Image
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              )
+            })}
 
             </div>{/* end scrollable panels */}
 
             {/* Action buttons — fixed below scroll, always visible */}
             <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {sectionValues.cta && sectionValues.image && !imageB64 && (
+              {sectionValues.image && !imageB64 && !isGeneratingImage && (
                 <button
                   onClick={handleGenerateImageClick}
-                  disabled={isGeneratingImage}
                   style={{
-                    background: isGeneratingImage ? '#0a1628' : '#00e5c8',
-                    border: '1px solid #00e5c8', borderRadius: 10, padding: 16,
-                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.9rem',
-                    cursor: isGeneratingImage ? 'not-allowed' : 'pointer',
-                    opacity: isGeneratingImage ? 0.7 : 1,
+                    background: '#00e5c8',
+                    border: '1px solid #00e5c8', borderRadius: 10, padding: 14,
+                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    cursor: 'pointer',
                     letterSpacing: '0.08em', width: '100%',
                   }}
                 >
-                  {isGeneratingImage ? 'Generating Image...' : '⚡ Generate Image'}
+                  ⚡ Generate Image
                 </button>
               )}
               {allConfirmed && (
@@ -2069,6 +2217,92 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           </div>
         </div>
       </div>
+
+      {/* ── UNSAVED WORK PROMPT ── */}
+      {unsavedPrompt && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 4000,
+            background: 'rgba(2,8,16,0.94)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: '#0a1628', border: '1px solid #2990fa',
+              borderRadius: 12, padding: 28, width: '100%', maxWidth: 420,
+              display: 'flex', flexDirection: 'column', gap: 12,
+            }}
+          >
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ffffff', letterSpacing: '0.05em' }}>
+              Unsaved Work
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 4 }}>
+              You have unsaved work. What do you want to do?
+            </div>
+
+            {canSaveDraft && (
+              <>
+                <button
+                  onClick={async () => {
+                    await saveDraft(false)
+                    unsavedPrompt.onContinue?.()
+                  }}
+                  style={{
+                    background: '#2990fa', border: 'none', borderRadius: 8,
+                    padding: '12px 0', color: '#ffffff',
+                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+                  }}
+                >
+                  {currentDraftId ? 'Save as current draft' : 'Save as draft'}
+                </button>
+                {currentDraftId && (
+                  <button
+                    onClick={async () => {
+                      await saveDraft(true)
+                      unsavedPrompt.onContinue?.()
+                    }}
+                    style={{
+                      background: 'transparent', border: '1px solid #2990fa', borderRadius: 8,
+                      padding: '12px 0', color: '#2990fa',
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                      cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+                    }}
+                  >
+                    Save as new draft
+                  </button>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={() => unsavedPrompt.onContinue?.()}
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,68,85,0.5)', borderRadius: 8,
+                padding: '12px 0', color: '#ff4455',
+                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+              }}
+            >
+              Discard and continue
+            </button>
+
+            <button
+              onClick={() => unsavedPrompt.onCancel?.()}
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8,
+                padding: '12px 0', color: 'rgba(255,255,255,0.6)',
+                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── AVATAR THREE DOTS POPUP ── */}
       {avatarDropdown && (

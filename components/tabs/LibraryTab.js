@@ -5,7 +5,20 @@ const STATUS_COLORS = {
   Working: '#00e5c8',
   'Not Working': '#ff4455',
   unrated: 'rgba(255,255,255,0.4)',
+  complete: 'rgba(255,255,255,0.4)',
+  draft: '#e5c07b',
 }
+
+// Fields to check for draft completion indicators
+const DRAFT_FIELDS = [
+  { key: 'angle', label: 'AVATAR' },
+  { key: 'hook', label: 'HOOK' },
+  { key: 'imageConcept', label: 'IMAGE' },
+  { key: 'headline', label: 'HEADLINE' },
+  { key: 'primaryText', label: 'PRIMARY TEXT' },
+  { key: 'description', label: 'DESCRIPTION' },
+  { key: 'cta', label: 'CTA' },
+]
 
 function normalizeAd(ad) {
   return {
@@ -21,6 +34,14 @@ function normalizeAd(ad) {
     parentId: ad.parentId || ad.parent_id || null,
     createdAt: ad.createdAt || ad.created_at || null,
   }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  } catch (_) { return '' }
 }
 
 export default function LibraryTab({ onEdit }) {
@@ -83,8 +104,12 @@ export default function LibraryTab({ onEdit }) {
     } catch (_) {}
   }
 
-  // Group by adType
-  const grouped = ads.reduce((acc, ad) => {
+  // Separate drafts from completed ads
+  const drafts = ads.filter(ad => ad.status === 'draft')
+  const completedAds = ads.filter(ad => ad.status !== 'draft')
+
+  // Group completed by adType
+  const grouped = completedAds.reduce((acc, ad) => {
     const key = ad.adType || 'Uncategorized'
     if (!acc[key]) acc[key] = []
     acc[key].push(ad)
@@ -118,39 +143,52 @@ export default function LibraryTab({ onEdit }) {
         </div>
       )}
 
-      {Object.entries(grouped).map(([type, groupAds]) => (
-        <div key={type} style={{ marginBottom: 32 }}>
+      {/* ── DRAFTS SECTION ── */}
+      {drafts.length > 0 && (
+        <div style={{ marginBottom: 40 }}>
           <div
             style={{
               fontSize: '0.6rem',
               fontFamily: 'var(--font-ibm-plex-mono)',
-              color: '#2990fa',
+              color: '#e5c07b',
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
             }}
           >
-            {type}
+            DRAFTS
+            <span
+              style={{
+                background: '#e5c07b22',
+                border: '1px solid #e5c07b',
+                borderRadius: 10,
+                padding: '1px 7px',
+                fontSize: '0.52rem',
+                color: '#e5c07b',
+              }}
+            >
+              {drafts.length}
+            </span>
           </div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            {groupAds.map(ad => (
+            {drafts.map(ad => (
               <div
                 key={ad.id}
-                onClick={() => {
-                  setSelectedAd(ad)
-                  setSelectedVersionIdx(null)
-                }}
+                onClick={() => { onEdit?.(ad) }}
                 style={{
                   width: 180,
                   background: '#0a1628',
-                  border: '1px solid #2990fa',
+                  border: '1px solid #e5c07b',
                   borderRadius: 8,
                   overflow: 'hidden',
                   cursor: 'pointer',
                   position: 'relative',
                 }}
               >
-                {/* 9:16 thumbnail */}
+                {/* Thumbnail area */}
                 <div
                   style={{
                     width: '100%',
@@ -158,84 +196,240 @@ export default function LibraryTab({ onEdit }) {
                     background: '#060d1f',
                     position: 'relative',
                     overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 12,
                   }}
                 >
-                  {ad.imageB64 ? (
+                  {ad.imageB64 && (
                     <img
                       src={`data:image/png;base64,${ad.imageB64}`}
                       alt=""
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        height: '100%',
-                        color: 'rgba(255,255,255,0.2)',
-                        fontSize: '0.65rem',
-                        fontFamily: 'var(--font-ibm-plex-mono)',
+                        position: 'absolute', inset: 0,
+                        width: '100%', height: '100%',
+                        objectFit: 'cover', opacity: 0.35,
                       }}
-                    >
-                      No image
-                    </div>
+                    />
                   )}
-                  {/* Status badge */}
+                  {/* Confirmed section chips */}
+                  <div
+                    style={{
+                      position: 'relative', zIndex: 1,
+                      display: 'flex', flexWrap: 'wrap',
+                      gap: 4, justifyContent: 'center',
+                    }}
+                  >
+                    {DRAFT_FIELDS.map(({ key, label }) =>
+                      ad[key] ? (
+                        <span
+                          key={key}
+                          style={{
+                            background: '#e5c07b22',
+                            border: '1px solid #e5c07b',
+                            borderRadius: 3,
+                            padding: '2px 5px',
+                            fontSize: '0.42rem',
+                            color: '#e5c07b',
+                            fontFamily: 'var(--font-ibm-plex-mono)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {label}
+                        </span>
+                      ) : null
+                    )}
+                  </div>
+                  {/* DRAFT badge */}
                   <div
                     style={{
                       position: 'absolute',
-                      top: 6,
-                      right: 6,
-                      background: 'rgba(0,0,0,0.7)',
+                      top: 6, right: 6,
+                      background: '#e5c07b',
                       borderRadius: 4,
                       padding: '2px 6px',
-                      fontSize: '0.55rem',
+                      fontSize: '0.5rem',
                       fontFamily: 'var(--font-ibm-plex-mono)',
-                      color: STATUS_COLORS[ad.status] || STATUS_COLORS.unrated,
+                      color: '#000000',
+                      letterSpacing: '0.04em',
+                      fontWeight: 600,
                     }}
                   >
-                    {ad.status === 'unrated' ? '—' : ad.status}
+                    DRAFT
                   </div>
-                  {/* Version count badge */}
-                  {ad.versions && ad.versions.length > 0 && (
+                </div>
+                {/* Bottom info */}
+                <div style={{ padding: '8px 10px' }}>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#ffffff',
+                      fontFamily: 'var(--font-inter)',
+                      lineHeight: 1.4,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {ad.hook || ad.avatarName || 'Untitled draft'}
+                  </div>
+                  {ad.createdAt && (
                     <div
                       style={{
-                        position: 'absolute',
-                        top: 6,
-                        left: 6,
-                        background: '#2990fa',
-                        borderRadius: 4,
-                        padding: '2px 6px',
-                        fontSize: '0.55rem',
+                        fontSize: '0.52rem',
+                        color: 'rgba(255,255,255,0.35)',
                         fontFamily: 'var(--font-ibm-plex-mono)',
-                        color: '#ffffff',
+                        marginTop: 3,
                       }}
                     >
-                      V{ad.versions.length + 1}
+                      {formatDate(ad.createdAt)}
                     </div>
                   )}
-                </div>
-                {/* Headline */}
-                <div
-                  style={{
-                    padding: '8px 10px',
-                    fontSize: '0.72rem',
-                    color: '#ffffff',
-                    fontFamily: 'var(--font-inter)',
-                    lineHeight: 1.4,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {ad.headline || 'No headline'}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      ))}
+      )}
+
+      {/* ── COMPLETED ADS ── */}
+      {completedAds.length > 0 && (
+        <div>
+          {drafts.length > 0 && (
+            <div
+              style={{
+                fontSize: '0.6rem',
+                fontFamily: 'var(--font-ibm-plex-mono)',
+                color: '#2990fa',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                marginBottom: 20,
+              }}
+            >
+              COMPLETED
+            </div>
+          )}
+          {Object.entries(grouped).map(([type, groupAds]) => (
+            <div key={type} style={{ marginBottom: 32 }}>
+              <div
+                style={{
+                  fontSize: '0.6rem',
+                  fontFamily: 'var(--font-ibm-plex-mono)',
+                  color: drafts.length > 0 ? 'rgba(41,144,250,0.6)' : '#2990fa',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  marginBottom: 16,
+                }}
+              >
+                {type}
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {groupAds.map(ad => (
+                  <div
+                    key={ad.id}
+                    onClick={() => {
+                      setSelectedAd(ad)
+                      setSelectedVersionIdx(null)
+                    }}
+                    style={{
+                      width: 180,
+                      background: '#0a1628',
+                      border: '1px solid #2990fa',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      position: 'relative',
+                    }}
+                  >
+                    {/* 9:16 thumbnail */}
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '9 / 16',
+                        background: '#060d1f',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {ad.imageB64 ? (
+                        <img
+                          src={`data:image/png;base64,${ad.imageB64}`}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '100%',
+                            color: 'rgba(255,255,255,0.2)',
+                            fontSize: '0.65rem',
+                            fontFamily: 'var(--font-ibm-plex-mono)',
+                          }}
+                        >
+                          No image
+                        </div>
+                      )}
+                      {/* Status badge */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 6, right: 6,
+                          background: 'rgba(0,0,0,0.7)',
+                          borderRadius: 4,
+                          padding: '2px 6px',
+                          fontSize: '0.55rem',
+                          fontFamily: 'var(--font-ibm-plex-mono)',
+                          color: STATUS_COLORS[ad.status] || STATUS_COLORS.unrated,
+                        }}
+                      >
+                        {(ad.status === 'unrated' || ad.status === 'complete') ? '—' : ad.status}
+                      </div>
+                      {/* Version count badge */}
+                      {ad.versions && ad.versions.length > 0 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 6, left: 6,
+                            background: '#2990fa',
+                            borderRadius: 4,
+                            padding: '2px 6px',
+                            fontSize: '0.55rem',
+                            fontFamily: 'var(--font-ibm-plex-mono)',
+                            color: '#ffffff',
+                          }}
+                        >
+                          V{ad.versions.length + 1}
+                        </div>
+                      )}
+                    </div>
+                    {/* Headline */}
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        fontSize: '0.72rem',
+                        color: '#ffffff',
+                        fontFamily: 'var(--font-inter)',
+                        lineHeight: 1.4,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {ad.headline || 'No headline'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Delete Confirmation Modal ── */}
       {deleteConfirm && (
