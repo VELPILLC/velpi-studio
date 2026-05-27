@@ -1,6 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+const STATUS_COLORS = {
+  Working: '#00e5c8',
+  'Not Working': '#ff4455',
+  unrated: 'rgba(255,255,255,0.4)',
+}
+
 function normalizeAd(ad) {
   return {
     ...ad,
