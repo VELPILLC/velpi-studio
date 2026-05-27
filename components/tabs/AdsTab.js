@@ -416,8 +416,23 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
 
   async function generateDynamicAvatarBubbles(step, data) {
     const d = data || avatarData
-    const dynamicSystem = `Generate exactly 4 short bubble options for this avatar funnel step.
-Context so far: industry=${d.industry || 'unknown'}, role=${d.role || 'unknown'}, businessSize=${d.businessSize || 'unknown'}, ageRange=${d.ageRange || 'unknown'}
+    const context = `industry=${d.industry || 'unknown'}, role=${d.role || 'unknown'}, businessSize=${d.businessSize || 'unknown'}, ageRange=${d.ageRange || 'unknown'}`
+    const dynamicSystem = step === 'statusDriver'
+      ? `Generate 4 bubble options for what winning looks like for this avatar.
+These should describe success moments, achievements, and status wins.
+Examples of correct answers:
+- Fully booked calendar with a waitlist
+- Hiring their first office manager
+- Taking a vacation without the business falling apart
+- Their peers asking how they grew so fast
+Examples of WRONG answers (do not generate these):
+- Anything about marketing not working
+- Anything about problems or pain points
+- Anything about wasting money
+Context: ${context}
+Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4"]}`
+      : `Generate exactly 4 short bubble options for this avatar funnel step.
+Context so far: ${context}
 Current step: ${step}
 Each option must be specific to the industry and role already selected.
 Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4"]}`
