@@ -261,6 +261,28 @@ When asked to validate a user submission analyze it professionally.
 If it is weak, vague, or unclear challenge it with one direct question.
 Sound like a strategist who cares about results not a polite assistant.
 
+PLATFORM CONTEXT RULE:
+Every session includes a PLATFORM field that tells you which ad
+platform this creative is being built for.
+Let the platform shape every decision you make.
+Hook format, visual style, copy length, CTA type — all of it changes
+by platform. Never ignore the platform context.
+
+For Meta (Facebook and Instagram):
+- Hooks must stop the scroll in the first 3 seconds.
+  Pattern interrupt. Immediate. No build up.
+- Visuals are seen on mobile feeds and reels.
+  Optimize for vertical 9:16 and square 1:1.
+- Assume cold traffic. The viewer has never heard of this brand.
+  Do not assume any awareness. Write accordingly.
+- Primary text front-loads the message.
+  The first 125 characters must carry the full point.
+  Most people never tap See More.
+- CTAs must match Meta lead gen formats: book a call, fill a form,
+  DM, or click link. No vague or generic CTAs.
+- Simple language. Third grade reading level. No jargon. No fluff.
+- Lead with emotion. Logic supports emotion. Not the other way around.
+
 SELECTED BUBBLE INSTRUCTION RULE:
 When the user's message says 'apply this to the selected option' or
 'apply this to these selected options' — treat that selected text as
@@ -301,6 +323,7 @@ export async function POST(request) {
       sectionContext = null,
       currentSection = null,
       activeAngles = [],
+      platform = null,
     } = await request.json()
 
     // Build profile context string
@@ -334,9 +357,22 @@ Who they serve: ${profile.who_they_serve || 'Not specified'}${profile.differenti
       contextStr += `\n\nACTIVE ANGLE FILTERS (max 3 selected by user): ${activeAngles.join(', ')}\nGenerate all 3 options within these specific angles.\nIf multiple angles selected: distribute options across them.\nOne option per angle where possible.\nNever generate options outside these angles when they are set.\nThese subcategories are more specific than main categories — treat them as precise creative direction.`
     }
 
+    // Build platform context string
+    let platformStr = ''
+    if (platform) {
+      platformStr = `\n\nPLATFORM: ${platform}`
+      if (platform === 'Meta') {
+        platformStr += `\nThis ad is being built for Facebook and Instagram.
+Scroll-stopping hook. Mobile-first visuals. Cold traffic copy.
+Front-load the message. Meta-appropriate CTA.
+Every option you generate must work inside a Meta feed or reel.`
+      }
+    }
+
     // Use provided system prompt (e.g. avatar builder) or default Jarvis system
     let finalSystem = system || JARVIS_SYSTEM
     if (profileStr) finalSystem += profileStr
+    if (platformStr) finalSystem += platformStr
     if (contextStr) finalSystem += contextStr
 
     // Build base messages: avatar context → actual chat

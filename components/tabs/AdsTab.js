@@ -202,6 +202,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   const [selectedSubcategories, setSelectedSubcategories] = useState([])
   const [extraSubcategories, setExtraSubcategories] = useState({})
   const [moreSubsLoading, setMoreSubsLoading] = useState({})
+  const [selectedPlatform, setSelectedPlatform] = useState(null)
 
   const chatScrollRef = useRef(null)
 
@@ -296,6 +297,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
         sectionContext: svs,
         currentSection: section,
         activeAngles: angles,
+        platform: selectedPlatform || null,
       }),
     })
     const data = await res.json()
@@ -505,9 +507,16 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
     }
   }
 
-  // Advance funnel via → button (guards empty selection)
+  // Advance funnel via → button (guards platform + empty selection)
   function handleAvatarAdvance() {
     if (avatarFunnelStep === 'review' || avatarEditMode) return
+    if (!selectedPlatform) {
+      setSectionChats(prev => ({
+        ...prev,
+        avatar: [...prev.avatar, { role: 'assistant', content: 'Select a platform above before continuing.' }],
+      }))
+      return
+    }
     if (avatarSelectedBubbles.length === 0) {
       setSectionChats(prev => ({
         ...prev,
@@ -1847,6 +1856,42 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
           {/* ── RIGHT COLUMN ── */}
           <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 150px)', overflowY: 'auto', gap: 10, marginTop: 0, paddingTop: 0 }}>
+
+            {/* ── PLATFORM SELECTOR ── */}
+            <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: '12px 14px', marginBottom: 2 }}>
+              <div style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+                PLATFORM
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[
+                  { id: 'Meta', locked: false },
+                  { id: 'TikTok', locked: true },
+                  { id: 'YouTube', locked: true },
+                  { id: 'Google', locked: true },
+                  { id: 'LinkedIn', locked: true },
+                ].map(({ id, locked }) => (
+                  <button
+                    key={id}
+                    onClick={locked ? undefined : () => setSelectedPlatform(prev => prev === id ? null : id)}
+                    disabled={locked}
+                    style={{
+                      border: `1px solid ${selectedPlatform === id ? '#2990fa' : locked ? '#0d1e2e' : '#152840'}`,
+                      background: selectedPlatform === id ? '#2990fa' : '#060d1f',
+                      color: selectedPlatform === id ? '#ffffff' : locked ? '#1d3a58' : '#ffffff',
+                      padding: '6px 14px', borderRadius: 6,
+                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.65rem',
+                      cursor: locked ? 'default' : 'pointer',
+                      letterSpacing: '0.04em',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    {id}
+                    {locked && <span style={{ fontSize: '0.48rem', color: '#1d3a58', letterSpacing: '0.06em' }}>SOON</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {SECTIONS.map(section => (
               <div
                 key={section}
