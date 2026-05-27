@@ -108,6 +108,12 @@ const SECTION_SUBCATEGORIES = {
   avatar: {},
 }
 
+const ANGLE_COLORS = [
+  '#e06c75', '#61afef', '#e5c07b', '#98c379',
+  '#c678dd', '#56b6c2', '#d19a66', '#be5046',
+  '#4ec9b0', '#f0a500',
+]
+
 const AUTO_PROMPT_TEXTS = new Set(Object.values(SECTION_PROMPTS))
 
 // ─── Avatar funnel constants ──────────────────────────────────────────────────
@@ -192,8 +198,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   const [isLoading, setIsLoading] = useState(false)
   const [isChatLoading, setIsChatLoading] = useState(false)
   const [imageFormat, setImageFormat] = useState('9/16')
-  const [expandedCategories, setExpandedCategories] = useState([])
+  const [expandedCategory, setExpandedCategory] = useState(null)
   const [selectedSubcategories, setSelectedSubcategories] = useState([])
+  const [extraSubcategories, setExtraSubcategories] = useState({})
+  const [moreSubsLoading, setMoreSubsLoading] = useState({})
 
   const chatScrollRef = useRef(null)
 
@@ -235,7 +243,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
     setSelectedAngles([])
     setSelectedBubbles([])
     setSelectedSubcategories([])
-    setExpandedCategories([])
+    setExpandedCategory(null)
+    setExtraSubcategories({})
   }, [activeSection])
 
   useEffect(() => {
@@ -254,7 +263,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
     setSelectedBubbles([])
     setSelectedAngles([])
     setSelectedSubcategories([])
-    setExpandedCategories([])
+    setExpandedCategory(null)
+    setExtraSubcategories({})
     setTypeOwn('')
     setImageB64(null)
     initAvatarFunnel()
@@ -928,7 +938,8 @@ Do not generate bubble options in this response.`
 
     const activeAngles = [
       ...selectedAngles.filter(a => !selectedSubcategories.some(s =>
-        SECTION_SUBCATEGORIES[activeSection]?.[a]?.includes(s)
+        (SECTION_SUBCATEGORIES[activeSection]?.[a] || []).includes(s) ||
+        (extraSubcategories[a] || []).includes(s)
       )),
       ...selectedSubcategories,
     ]
@@ -1098,7 +1109,8 @@ Do not generate bubble options in this response.`
       setSelectedBubbles([])
       setSelectedAngles([])
       setSelectedSubcategories([])
-      setExpandedCategories([])
+      setExpandedCategory(null)
+      setExtraSubcategories({})
       const newSvs = { ...sectionValues, [section]: null }
       openSection(section, newSvs, selectedAvatar, []).then(() => {
         if (warningMsg) {
@@ -1118,19 +1130,72 @@ Do not generate bubble options in this response.`
     }
   }
 
+  function getAngleColor(angle) {
+    const angles = SECTION_ANGLES[activeSection] || []
+    const idx = angles.indexOf(angle)
+    return ANGLE_COLORS[idx % ANGLE_COLORS.length]
+  }
+
+  function getParentAngle(sub) {
+    const subs = SECTION_SUBCATEGORIES[activeSection] || {}
+    for (const [angle, subList] of Object.entries(subs)) {
+      if (subList.includes(sub)) return angle
+      if ((extraSubcategories[angle] || []).includes(sub)) return angle
+    }
+    return null
+  }
+
   function handleAngleToggle(angle) {
-    const isExpanded = expandedCategories.includes(angle)
-    if (isExpanded) {
-      setExpandedCategories(prev => prev.filter(c => c !== angle))
+    if (expandedCategory === angle) {
+      // Collapse + remove from filters + clear its subcategory selections
+      setExpandedCategory(null)
       setSelectedAngles(prev => prev.filter(a => a !== angle))
-      const subs = SECTION_SUBCATEGORIES[activeSection]?.[angle] || []
+      const subs = [
+        ...(SECTION_SUBCATEGORIES[activeSection]?.[angle] || []),
+        ...(extraSubcategories[angle] || []),
+      ]
       setSelectedSubcategories(prev => prev.filter(s => !subs.includes(s)))
     } else {
-      const total = selectedAngles.length + selectedSubcategories.length
-      if (total >= 3) return
-      setExpandedCategories(prev => [...prev, angle])
-      setSelectedAngles(prev => [...prev, angle])
+      // Expand this angle (collapse any previous)
+      setExpandedCategory(angle)
+      if (!selectedAngles.includes(angle)) {
+        const total = selectedAngles.length + selectedSubcategories.length
+        if (total < 3) {
+          setSelectedAngles(prev => [...prev, angle])
+        }
+      }
     }
+  }
+
+  async function handleMoreSubOptions(angle) {
+    const existing = [
+      ...(SECTION_SUBCATEGORIES[activeSection]?.[angle] || []),
+      ...(extraSubcategories[angle] || []),
+    ]
+    const system = `Generate exactly 6 niche subcategory options for the angle "${angle}" in the "${activeSection}" section of a Facebook/Instagram ad builder.
+Do NOT repeat these: [${existing.join(', ')}]
+Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
+    setMoreSubsLoading(prev => ({ ...prev, [angle]: true }))
+    try {
+      const raw = await callAPI(
+        activeSection,
+        [{ role: 'user', content: `More subcategory options for angle: ${angle}` }],
+        sectionValues,
+        selectedAvatar,
+        [],
+        system,
+      )
+      const parsed = parseResponse(raw)
+      if (parsed?.options) {
+        setExtraSubcategories(prev => ({
+          ...prev,
+          [angle]: [...(prev[angle] || []), ...parsed.options],
+        }))
+      }
+    } catch (err) {
+      console.error('More sub options error:', err)
+    }
+    setMoreSubsLoading(prev => ({ ...prev, [angle]: false }))
   }
 
   function handleSubcategoryToggle(parentAngle, sub) {
@@ -1218,7 +1283,7 @@ Do not generate bubble options in this response.`
         <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.8rem', color: '#ffffff', letterSpacing: '0.05em', textAlign: 'center' }}>
           Create your profile first
         </div>
-        <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.65rem', color: '#4a6a8a', textAlign: 'center', maxWidth: 320, lineHeight: 1.6 }}>
+        <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.65rem', color: '#ffffff', textAlign: 'center', maxWidth: 320, lineHeight: 1.6 }}>
           Jarvis needs to know who you are before building ads.
         </div>
         <button
@@ -1245,7 +1310,7 @@ Do not generate bubble options in this response.`
           </div>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flex: 1, alignItems: 'center' }}>
             {avatars.length === 0 && (
-              <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-ibm-plex-mono)', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '0.6rem', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', whiteSpace: 'nowrap' }}>
                 No avatars yet
               </div>
             )}
@@ -1495,7 +1560,7 @@ Do not generate bubble options in this response.`
                 <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
                   {/* Step indicator */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                    <span style={{ fontSize: '0.6rem', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)' }}>
                       Step {avatarStepIdx + 1} of {AVATAR_FUNNEL_STEPS.length - 1}
                     </span>
                     {avatarSelectedBubbles.length > 0 && (
@@ -1533,46 +1598,121 @@ Do not generate bubble options in this response.`
                 {/* Angle buttons with subcategories */}
                 {sectionAngles.length > 0 && (
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: expandedCategories.length > 0 ? 6 : 0 }}>
-                      {sectionAngles.map(angle => (
-                        <button
-                          key={angle}
-                          onClick={() => handleAngleToggle(angle)}
-                          style={{
-                            border: `1px solid ${expandedCategories.includes(angle) ? '#2990fa' : '#152840'}`,
-                            background: expandedCategories.includes(angle) ? '#0a1628' : '#060d1f',
-                            color: expandedCategories.includes(angle) ? '#ffffff' : '#4a6a8a',
-                            padding: '7px 16px', borderRadius: 20,
-                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer',
-                          }}
-                        >
-                          {angle}
-                        </button>
-                      ))}
-                    </div>
-                    {sectionAngles.filter(a => expandedCategories.includes(a)).map(angle => {
-                      const subs = SECTION_SUBCATEGORIES[activeSection]?.[angle] || []
-                      if (!subs.length) return null
-                      return (
-                        <div key={angle} style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4, paddingLeft: 4 }}>
-                          {subs.map(sub => (
+                    {/* Active filter chips */}
+                    {(selectedAngles.length > 0 || selectedSubcategories.length > 0) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                        {selectedAngles.map(angle => {
+                          const color = getAngleColor(angle)
+                          return (
                             <button
-                              key={sub}
-                              onClick={() => handleSubcategoryToggle(angle, sub)}
+                              key={angle}
+                              onClick={() => {
+                                setSelectedAngles(prev => prev.filter(a => a !== angle))
+                                if (expandedCategory === angle) setExpandedCategory(null)
+                                const subs = [
+                                  ...(SECTION_SUBCATEGORIES[activeSection]?.[angle] || []),
+                                  ...(extraSubcategories[angle] || []),
+                                ]
+                                setSelectedSubcategories(prev => prev.filter(s => !subs.includes(s)))
+                              }}
                               style={{
-                                background: selectedSubcategories.includes(sub) ? '#0a2a1a' : '#060d1f',
-                                border: `1px solid ${selectedSubcategories.includes(sub) ? '#00e5c8' : '#1d3a58'}`,
-                                color: selectedSubcategories.includes(sub) ? '#00e5c8' : '#4a6a8a',
-                                padding: '4px 10px', borderRadius: 12,
-                                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', cursor: 'pointer',
+                                background: color + '22', border: `1px solid ${color}`, color,
+                                padding: '3px 8px', borderRadius: 12, fontSize: '0.65rem',
+                                fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 4,
                               }}
                             >
-                              {sub}
+                              {angle} ×
                             </button>
-                          ))}
+                          )
+                        })}
+                        {selectedSubcategories.map(sub => {
+                          const parent = getParentAngle(sub)
+                          const color = parent ? getAngleColor(parent) : '#2990fa'
+                          return (
+                            <button
+                              key={sub}
+                              onClick={() => setSelectedSubcategories(prev => prev.filter(s => s !== sub))}
+                              style={{
+                                background: color + '22', border: `1px solid ${color}`, color,
+                                padding: '3px 8px', borderRadius: 12, fontSize: '0.65rem',
+                                fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              {sub} ×
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Category buttons */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: expandedCategory ? 6 : 0 }}>
+                      {sectionAngles.map(angle => {
+                        const color = getAngleColor(angle)
+                        const isActive = expandedCategory === angle || selectedAngles.includes(angle)
+                        return (
+                          <button
+                            key={angle}
+                            onClick={() => handleAngleToggle(angle)}
+                            style={{
+                              border: `1px solid ${isActive ? color : '#152840'}`,
+                              background: isActive ? color + '22' : '#060d1f',
+                              color: isActive ? color : '#ffffff',
+                              padding: '7px 16px', borderRadius: 20,
+                              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer',
+                            }}
+                          >
+                            {angle}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Expanded subcategory list — only one at a time */}
+                    {expandedCategory && (() => {
+                      const angle = expandedCategory
+                      const color = getAngleColor(angle)
+                      const baseSubs = SECTION_SUBCATEGORIES[activeSection]?.[angle] || []
+                      const extraSubs = extraSubcategories[angle] || []
+                      const allSubs = [...baseSubs, ...extraSubs]
+                      if (!allSubs.length) return null
+                      return (
+                        <div style={{ marginBottom: 4, paddingLeft: 4 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                            {allSubs.map(sub => (
+                              <button
+                                key={sub}
+                                onClick={() => handleSubcategoryToggle(angle, sub)}
+                                style={{
+                                  background: selectedSubcategories.includes(sub) ? color + '22' : '#060d1f',
+                                  border: `1px solid ${selectedSubcategories.includes(sub) ? color : '#1d3a58'}`,
+                                  color: selectedSubcategories.includes(sub) ? color : '#ffffff',
+                                  padding: '4px 10px', borderRadius: 12,
+                                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', cursor: 'pointer',
+                                }}
+                              >
+                                {sub}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => handleMoreSubOptions(angle)}
+                            disabled={moreSubsLoading[angle]}
+                            style={{
+                              color, background: 'transparent', border: 'none',
+                              cursor: moreSubsLoading[angle] ? 'not-allowed' : 'pointer',
+                              fontSize: '0.65rem', padding: '2px 0',
+                              fontFamily: 'var(--font-inter)',
+                              opacity: moreSubsLoading[angle] ? 0.5 : 1,
+                            }}
+                          >
+                            {moreSubsLoading[angle] ? 'Loading...' : '+ More options'}
+                          </button>
                         </div>
                       )
-                    })}
+                    })()}
                   </div>
                 )}
 
