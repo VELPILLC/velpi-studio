@@ -131,7 +131,7 @@ export default function ProfileTab({ selectedProfile, onProfileSelect }) {
 
   const chatScrollRef = useRef(null)
   const dropdownRef = useRef(null)
-  const profileDropdownRef = useRef(null)
+  const [profileMenuPos, setProfileMenuPos] = useState({ top: 0, left: 0 })
 
   useEffect(() => {
     loadProfiles()
@@ -153,17 +153,6 @@ export default function ProfileTab({ selectedProfile, onProfileSelect }) {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [dropdownOpen])
-
-  useEffect(() => {
-    if (profileDropdown === null) return
-    function handleClick(e) {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
-        setProfileDropdown(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [profileDropdown])
 
   async function loadProfiles() {
     try {
@@ -557,7 +546,6 @@ Do not generate bubble options in this response.`
                     borderLeft: selectedProfile?.id === p.id ? '3px solid #2990fa' : '3px solid transparent',
                     padding: '0 8px 0 0',
                   }}
-                  ref={profileDropdown === p.id ? profileDropdownRef : null}
                 >
                   <div
                     onClick={() => { onProfileSelect(p); setDropdownOpen(false) }}
@@ -576,37 +564,18 @@ Do not generate bubble options in this response.`
                       </div>
                     )}
                   </div>
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{ flexShrink: 0 }}>
                     <button
-                      onClick={e => { e.stopPropagation(); setProfileDropdown(prev => prev === p.id ? null : p.id) }}
+                      onClick={e => {
+                        e.stopPropagation()
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        setProfileMenuPos({ top: rect.bottom, left: rect.left })
+                        setProfileDropdown(prev => prev === p.id ? null : p.id)
+                      }}
                       style={{ background: 'transparent', border: 'none', color: '#2990fa', fontSize: '1rem', cursor: 'pointer', padding: '2px 6px' }}
                     >
                       ⋯
                     </button>
-                    {profileDropdown === p.id && (
-                      <div style={{
-                        position: 'absolute', top: '100%', right: 0, zIndex: 300,
-                        background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8,
-                        padding: 4, minWidth: 110, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                      }}>
-                        <div
-                          onClick={() => handleEditProfile(p)}
-                          style={{ padding: '8px 12px', color: '#ffffff', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4 }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#152840'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          ✎ Edit
-                        </div>
-                        <div
-                          onClick={() => { setProfileDropdown(null); setDropdownOpen(false); setProfileDeleteConfirm(p) }}
-                          style={{ padding: '8px 12px', color: '#ff4455', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4 }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          🗑 Delete
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -947,6 +916,45 @@ Do not generate bubble options in this response.`
         </div>
 
       </div>
+
+      {/* ── PROFILE THREE DOTS POPUP ── */}
+      {profileDropdown && (
+        <>
+          <div
+            onClick={() => setProfileDropdown(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: profileMenuPos.top,
+            left: profileMenuPos.left,
+            zIndex: 9999,
+            background: '#0a1628',
+            border: '1px solid #2990fa',
+            borderRadius: 8,
+            padding: 4,
+            minWidth: 120,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+          }}>
+            <div
+              onClick={() => { const p = profiles.find(x => x.id === profileDropdown); if (p) handleEditProfile(p) }}
+              style={{ padding: '8px 12px', color: '#ffffff', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              ✎ Edit
+            </div>
+            <div
+              onClick={() => { const p = profiles.find(x => x.id === profileDropdown); if (p) { setProfileDropdown(null); setDropdownOpen(false); setProfileDeleteConfirm(p) } }}
+              style={{ padding: '8px 12px', color: '#ff4455', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              🗑 Delete
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── PROFILE DELETE CONFIRM ── */}
       {profileDeleteConfirm && (

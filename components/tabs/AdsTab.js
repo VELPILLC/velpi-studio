@@ -215,8 +215,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
   const [avatarEditingId, setAvatarEditingId] = useState(null)
   const [avatarDropdown, setAvatarDropdown] = useState(null)
   const [avatarDeleteConfirm, setAvatarDeleteConfirm] = useState(null)
-
-  const avatarDropdownRef = useRef(null)
+  const [avatarMenuPos, setAvatarMenuPos] = useState({ top: 0, left: 0 })
 
   // ─── useEffects ───────────────────────────────────────────────────────────────
 
@@ -260,18 +259,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, selectedProfil
     setImageB64(null)
     initAvatarFunnel()
   }, [selectedProfile?.id])
-
-  // Close avatar dropdown on outside click
-  useEffect(() => {
-    if (avatarDropdown === null) return
-    function handleClickOutside(e) {
-      if (avatarDropdownRef.current && !avatarDropdownRef.current.contains(e.target)) {
-        setAvatarDropdown(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [avatarDropdown])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -1263,7 +1250,7 @@ Do not generate bubble options in this response.`
               </div>
             )}
             {avatars.map(av => (
-              <div key={av.id} style={{ position: 'relative', flexShrink: 0 }} ref={avatarDropdown === av.id ? avatarDropdownRef : null}>
+              <div key={av.id} style={{ flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <div
                     onClick={() => handleAvatarSelect(av)}
@@ -1278,7 +1265,12 @@ Do not generate bubble options in this response.`
                     {av.name}
                   </div>
                   <button
-                    onClick={e => { e.stopPropagation(); setAvatarDropdown(prev => prev === av.id ? null : av.id) }}
+                    onClick={e => {
+                      e.stopPropagation()
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      setAvatarMenuPos({ top: rect.bottom, left: rect.left })
+                      setAvatarDropdown(prev => prev === av.id ? null : av.id)
+                    }}
                     style={{
                       background: 'transparent', border: 'none',
                       color: '#2990fa', fontSize: '1rem',
@@ -1288,30 +1280,6 @@ Do not generate bubble options in this response.`
                     ⋯
                   </button>
                 </div>
-                {avatarDropdown === av.id && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, zIndex: 100, marginTop: 4,
-                    background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8,
-                    padding: 4, minWidth: 120, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                  }}>
-                    <div
-                      onClick={() => handleEditAvatarFromBar(av)}
-                      style={{ padding: '8px 14px', color: '#ffffff', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#152840'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      ✎ Edit
-                    </div>
-                    <div
-                      onClick={() => { setAvatarDropdown(null); setAvatarDeleteConfirm(av) }}
-                      style={{ padding: '8px 14px', color: '#ff4455', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      🗑 Delete
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -1825,6 +1793,45 @@ Do not generate bubble options in this response.`
           </div>
         </div>
       </div>
+
+      {/* ── AVATAR THREE DOTS POPUP ── */}
+      {avatarDropdown && (
+        <>
+          <div
+            onClick={() => setAvatarDropdown(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: avatarMenuPos.top,
+            left: avatarMenuPos.left,
+            zIndex: 9999,
+            background: '#0a1628',
+            border: '1px solid #2990fa',
+            borderRadius: 8,
+            padding: 4,
+            minWidth: 120,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+          }}>
+            <div
+              onClick={() => { const av = avatars.find(a => a.id === avatarDropdown); if (av) handleEditAvatarFromBar(av) }}
+              style={{ padding: '8px 14px', color: '#ffffff', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              ✎ Edit
+            </div>
+            <div
+              onClick={() => { const av = avatars.find(a => a.id === avatarDropdown); if (av) { setAvatarDropdown(null); setAvatarDeleteConfirm(av) } }}
+              style={{ padding: '8px 14px', color: '#ff4455', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              🗑 Delete
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── AVATAR DELETE CONFIRM ── */}
       {avatarDeleteConfirm && (
