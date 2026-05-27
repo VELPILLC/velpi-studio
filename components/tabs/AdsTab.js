@@ -1235,7 +1235,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     const val = typeOwn.trim()
     setTypeOwn('')
     setCurrentBubbles(prev => prev.includes(val) ? prev : [...prev, val])
-    setSelectedBubbles([val])
+    setSelectedBubbles(prev => {
+      if (prev.includes(val)) return prev
+      if (prev.length < 2) return [...prev, val]
+      return [prev[1], val]
+    })
   }
 
   function handleEditSave(idx) {
