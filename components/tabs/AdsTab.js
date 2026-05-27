@@ -28,7 +28,7 @@ const SECTION_PROMPTS = {
 
 const SECTION_OPENING_MESSAGES = {
   hook: 'Here are 3 hook angles built from your avatar. Pick what resonates.',
-  visual_format: 'Based on your avatar and hook I put together 3 visual directions that best deliver your hook. Pick what fits.',
+  visual_format: 'Based on your hook and avatar I put together 3 visual directions. Each one describes exactly what the image looks and feels like. Pick the one that fits your ad.',
   image: '3 image concepts based on your hook and visual format.',
   headline: '3 headlines built from your hook and avatar.',
   primary_text: '3 primary text options. First line carries the whole message.',
@@ -37,7 +37,7 @@ const SECTION_OPENING_MESSAGES = {
 }
 
 const SECTION_ANGLES = {
-  visual_format: ['Newspaper', 'Raw Photo', 'News Chyron', 'Screenshot', 'Documentary', 'Text Only', 'Report Cover'],
+  visual_format: ['Real and unpolished', 'Clean and bold', 'Familiar and trusted', 'Before and after', 'Dramatic moment', 'Simple and direct', 'Authoritative', 'Emotional and human'],
   hook: ['Pain', 'Curiosity', 'Contrarian', 'Benefit', 'Social Proof', 'Fear', 'Authority', 'Story'],
   image: ['Cinematic', 'Editorial', 'Raw/Real', 'Bold Text', 'Lifestyle', 'Before/After'],
   headline: ['Direct', 'Question', 'Bold Claim', 'Call Out', 'Curiosity', 'Number Based'],
