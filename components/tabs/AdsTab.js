@@ -246,20 +246,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   }, [])
 
   useEffect(() => {
-    if (pendingRefine) {
-      loadForRefine(pendingRefine)
-      onRefineConsumed?.()
-    }
-  }, [pendingRefine])
-
-  useEffect(() => {
-    if (pendingLoadAd) {
-      loadFullAdFromLibrary(pendingLoadAd)
-      onLoadAdConsumed?.()
-    }
-  }, [pendingLoadAd])
-
-  useEffect(() => {
     setSelectedAngles([])
     setSelectedBubbles([])
     setSelectedSubcategories([])
@@ -273,7 +259,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     }
   }, [sectionChats, activeSection])
 
-  // Reset everything when profile changes
+  // Reset everything when profile changes — must run BEFORE library load effects
   useEffect(() => {
     if (!selectedProfile?.id) return
     setSectionChats(EMPTY_SECTION_OBJ())
@@ -289,6 +275,22 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setImageB64(null)
     initAvatarFunnel()
   }, [selectedProfile?.id])
+
+  // Library load effects — declared after profile reset so they fire last on mount
+  // and their values are not overwritten by the profile reset
+  useEffect(() => {
+    if (pendingRefine) {
+      loadForRefine(pendingRefine)
+      onRefineConsumed?.()
+    }
+  }, [pendingRefine])
+
+  useEffect(() => {
+    if (pendingLoadAd) {
+      loadFullAdFromLibrary(pendingLoadAd)
+      onLoadAdConsumed?.()
+    }
+  }, [pendingLoadAd])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -2014,7 +2016,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                         </button>
                       ))}
                       <button
-                        onClick={e => { e.stopPropagation(); generateImage(dallePrompt) }}
+                        onClick={e => { e.stopPropagation(); generateImage(dallePrompt || sectionValues.image) }}
                         style={{
                           background: 'transparent', border: '1px solid #2990fa', borderRadius: 4,
                           padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa',

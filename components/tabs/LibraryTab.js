@@ -28,7 +28,6 @@ export default function LibraryTab({ onEdit }) {
   const [selectedAd, setSelectedAd] = useState(null)
   const [selectedVersionIdx, setSelectedVersionIdx] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
 
   useEffect(() => {
     loadAds()
@@ -70,30 +69,6 @@ export default function LibraryTab({ onEdit }) {
     const newAds = ads.map(a => (a.id === ad.id ? { ...a, versions } : a))
     setAds(newAds)
     if (selectedAd?.id === ad.id) setSelectedAd(a => ({ ...a, versions }))
-  }
-
-  async function generateImageForModal() {
-    if (!selectedAd || isGeneratingImage) return
-    const concept = selectedAd.imageConcept
-    const visualFormat = selectedAd.visualFormat
-    if (!concept) return
-    const prompt = `cinematic 9:16 vertical photo, ${concept}${visualFormat ? ', ' + visualFormat : ''}, no text, no logos, photorealistic, documentary style`
-    setIsGeneratingImage(true)
-    try {
-      const res = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-      })
-      const data = await res.json()
-      if (data.b64) {
-        setSelectedAd(a => ({ ...a, imageB64: data.b64 }))
-        await updateAd(selectedAd.id, { image_b64: data.b64 })
-      }
-    } catch (err) {
-      console.error('Modal generate image error:', err)
-    }
-    setIsGeneratingImage(false)
   }
 
   async function deleteAd(id) {
@@ -460,30 +435,6 @@ export default function LibraryTab({ onEdit }) {
                 ) : null
               )}
             </div>
-
-            {/* Generate Image — shown when no image exists */}
-            {!displayAd?.imageB64 && selectedAd.imageConcept && (
-              <button
-                onClick={generateImageForModal}
-                disabled={isGeneratingImage}
-                style={{
-                  width: '100%',
-                  background: isGeneratingImage ? '#0a1628' : '#00e5c8',
-                  border: '1px solid #00e5c8',
-                  borderRadius: 8,
-                  padding: 10,
-                  color: '#ffffff',
-                  fontSize: '0.75rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: isGeneratingImage ? 'not-allowed' : 'pointer',
-                  letterSpacing: '0.06em',
-                  marginBottom: 8,
-                  opacity: isGeneratingImage ? 0.7 : 1,
-                }}
-              >
-                {isGeneratingImage ? 'Generating...' : '⚡ Generate Image'}
-              </button>
-            )}
 
             {/* Edit button */}
             <div style={{ marginBottom: 8 }}>
