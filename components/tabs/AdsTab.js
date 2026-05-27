@@ -21,8 +21,8 @@ const SECTION_PROMPTS = {
   hook: 'Generate 3 hook options based on what we know so far.',
   image: 'Generate 3 image concept descriptions for the visual.',
   headline: 'Generate 3 headline options. Max 40 characters each.',
-  primary_text: 'Generate 3 primary text options. First 125 characters must carry the full message.',
-  description: 'Generate 3 description options. Max 30 characters each.',
+  primary_text: 'Generate 3 primary text options. This is the main body copy that appears ABOVE the image in a Meta ad. Tell the story, agitate the problem, present the solution. First 125 characters are critical — they show before See More is clicked. Write longer copy that builds desire and earns the click.',
+  description: 'Generate 3 description options. This is the short line that appears BELOW the headline, under the image in a Meta ad. Max 30 characters. One tight punchy line — urgency, social proof, or a reinforcing benefit.',
   cta: 'Generate 3 CTA options based on the ad type.',
 }
 
@@ -31,8 +31,8 @@ const SECTION_OPENING_MESSAGES = {
   visual_format: 'Based on your hook and avatar I put together 3 visual directions. Each one describes exactly what the image looks and feels like. Pick the one that fits your ad.',
   image: '3 image concepts based on your hook and visual format.',
   headline: '3 headlines built from your hook and avatar.',
-  primary_text: '3 primary text options. First line carries the whole message.',
-  description: '3 short descriptions. Tight and punchy.',
+  primary_text: '3 primary text options. This is the body copy above the image — longer copy that tells the story and builds desire. First 125 characters carry the most weight.',
+  description: '3 description options. Short line below the headline, under the image. Max 30 characters. Tight and punchy.',
   cta: '3 calls to action matched to your offer.',
 }
 
