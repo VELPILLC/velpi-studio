@@ -1303,7 +1303,7 @@ Do not generate bubble options in this response.`
         }}>
 
           {/* ── LEFT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 110px)', overflow: 'hidden' }}>
 
             {/* 1. Section title row — always visible */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 12px 0', flexShrink: 0 }}>
@@ -1365,7 +1365,7 @@ Do not generate bubble options in this response.`
                 /* ── EDIT MODE ── */
                 avatarEditingField !== null ? (
                   /* Field editing */
-                  <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                  <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <button
                         onClick={() => { setAvatarEditingField(null); setAvatarSelectedBubbles([]); setCurrentBubbles([]) }}
@@ -1402,7 +1402,7 @@ Do not generate bubble options in this response.`
                   </div>
                 ) : (
                   /* Chips grid */
-                  <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                  <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                       {Object.entries(FIELD_LABELS).map(([field, label]) => (
                         <div
@@ -1433,7 +1433,7 @@ Do not generate bubble options in this response.`
 
               ) : avatarFunnelStep === 'review' ? (
                 /* ── REVIEW STEP ── */
-                <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
                   <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                     {Object.entries(FIELD_LABELS).map(([field, label]) =>
                       avatarData[field] ? (
@@ -1492,7 +1492,7 @@ Do not generate bubble options in this response.`
 
               ) : (
                 /* ── AVATAR FUNNEL STEPS ── */
-                <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45%', marginBottom: 8 }}>
+                <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
                   {/* Step indicator */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
@@ -1529,10 +1529,10 @@ Do not generate bubble options in this response.`
             ) : activeSection !== null ? (
 
               /* ── NON-AVATAR SECTION CONTROLS ── */
-              <>
+              <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
                 {/* Angle buttons with subcategories */}
                 {sectionAngles.length > 0 && (
-                  <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                  <div style={{ marginBottom: 8 }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: expandedCategories.length > 0 ? 6 : 0 }}>
                       {sectionAngles.map(angle => (
                         <button
@@ -1577,7 +1577,7 @@ Do not generate bubble options in this response.`
                 )}
 
                 {/* Option bubbles */}
-                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
                   {currentBubbles.map((bubble, idx) => (
                     <div key={idx}>
                       {editingBubble === idx ? (
@@ -1616,7 +1616,7 @@ Do not generate bubble options in this response.`
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
 
             ) : null}
 
