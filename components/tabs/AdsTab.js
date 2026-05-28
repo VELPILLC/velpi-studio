@@ -1230,7 +1230,7 @@ Do not generate bubble options in this response.`
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `${imageFormat === '1:1' ? 'square format photo' : imageFormat === '4:5' ? 'vertical 4:5 portrait photo' : 'cinematic vertical 9:16 portrait photo'}, ${concept}, no text, no logos, photorealistic, documentary style`,
+          prompt: `${imageFormat === '1:1' ? 'square format photo' : imageFormat === '4:5' ? 'vertical 4:5 portrait photo' : imageFormat === '16/9' ? 'horizontal 16:9 landscape photo' : 'cinematic vertical 9:16 portrait photo'}, ${concept}, no text, no logos, photorealistic, documentary style`,
         }),
       })
       const data = await res.json()
@@ -1915,7 +1915,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
             {/* 2. Chat messages area — always visible */}
             <div ref={chatScrollRef} style={{
-              flex: 1, overflowY: 'auto', minHeight: 80,
+              ...(activeSection === 'image' && sectionValues.image !== null
+                ? { flexShrink: 0, maxHeight: 130 }
+                : { flex: 1, minHeight: 80 }),
+              overflowY: 'auto',
               display: 'flex', flexDirection: 'column', gap: 10,
               padding: 12, background: '#060d1f', borderRadius: 10, border: '1px solid #152840',
               marginBottom: 10,
@@ -2116,7 +2119,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             ) : (activeSection === 'image' && sectionValues.image !== null) ? (
 
               /* ── IMAGE IN LEFT COLUMN (image section active + confirmed) ── */
-              <div style={{ flexShrink: 0, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
                 {/* 1. SIZE SELECTION — first thing the user sees */}
                 <div>
@@ -2128,6 +2131,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       { id: '9/16', label: '9:16', desc: 'Story' },
                       { id: '1:1', label: '1:1', desc: 'Square' },
                       { id: '4:5', label: '4:5', desc: 'Portrait' },
+                      { id: '16/9', label: '16:9', desc: 'Landscape' },
                     ].map(f => (
                       <button
                         key={f.id}
@@ -2161,13 +2165,13 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>PICK A SIZE ABOVE</div>
                     </div>
                   ) : isGeneratingImage ? (
-                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', background: '#060d1f', border: '1px solid rgba(41,144,250,0.25)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 12 }}>
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : imageFormat === '16/9' ? '16/9' : '9/16', background: '#060d1f', border: '1px solid rgba(41,144,250,0.25)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 12 }}>
                       <span className="img-pulse" style={{ fontSize: '2rem', lineHeight: 1 }}>⚡</span>
                       <div style={{ fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center' }}>GENERATING IMAGE</div>
                       <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', maxWidth: 120, lineHeight: 1.7 }}>This takes about 20 seconds.<br />You can keep working.</div>
                     </div>
                   ) : imageError ? (
-                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', background: '#060d1f', border: '1px solid rgba(255,68,85,0.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 }}>
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : imageFormat === '16/9' ? '16/9' : '9/16', background: '#060d1f', border: '1px solid rgba(255,68,85,0.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 }}>
                       <div style={{ fontSize: '1.4rem', lineHeight: 1 }}>⚠</div>
                       <div style={{ fontSize: '0.6rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>GENERATION FAILED</div>
                       <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.6, maxWidth: 140 }}>{imageError}</div>
@@ -2177,12 +2181,12 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       >Try Again</button>
                     </div>
                   ) : imageB64 ? (
-                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', overflow: 'hidden', borderRadius: 8 }}>
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : imageFormat === '16/9' ? '16/9' : '9/16', overflow: 'hidden', borderRadius: 8 }}>
                       <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   ) : (
                     /* Size selected, no image yet — show shaped placeholder + generate button */
-                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', background: '#060d1f', border: '2px dashed rgba(41,144,250,0.35)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : imageFormat === '16/9' ? '16/9' : '9/16', background: '#060d1f', border: '2px dashed rgba(41,144,250,0.35)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
                       <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>READY TO GENERATE</div>
                       <button
                         onClick={() => { setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
