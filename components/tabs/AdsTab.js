@@ -217,6 +217,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [selectedAvatar, setSelectedAvatar] = useState(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  // Freeform entry + restart
+  const [adEntryMode, setAdEntryMode] = useState('entry') // 'entry' | 'working'
+  const [freeformIdeaText, setFreeformIdeaText] = useState('')
+  const [storedIdeaText, setStoredIdeaText] = useState('')
+  const [isParsingIdea, setIsParsingIdea] = useState(false)
+  const [resetModal, setResetModal] = useState(null)
+  const [isBuildingSummary, setIsBuildingSummary] = useState(false)
+  const [copied, setCopied] = useState(false)
+
   // NEW: Multi-select + back + edit + dropdown + delete
   const [avatarSelectedBubbles, setAvatarSelectedBubbles] = useState([])
   const [avatarFunnelHistory, setAvatarFunnelHistory] = useState([])
@@ -265,6 +274,9 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setImageError(null)
     setCurrentDraftId(null)
     setUnsavedPrompt(null)
+    setAdEntryMode('entry')
+    setFreeformIdeaText('')
+    setStoredIdeaText('')
     initAvatarFunnel()
   }, [selectedProfile?.id])
 
@@ -370,6 +382,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
 
   function shouldHideMessage(msg) {
     if (msg.role === 'user' && AUTO_PROMPT_TEXTS.has(msg.content)) return true
+    if (msg.role === 'user' && msg.content.startsWith('[IDEA_CONTEXT]')) return true
     if (msg.role === 'assistant') {
       try {
         const p = JSON.parse(msg.content.replace(/```json|```/g, '').trim())
@@ -934,19 +947,29 @@ Do not generate bubble options in this response.`
     if (!prompt) return
     const openingMsg = SECTION_OPENING_MESSAGES[section]
 
+    // Build messages — prepend stored idea context if available so AI generates more relevant options
+    const apiMessages = []
+    if (storedIdeaText) {
+      apiMessages.push({ role: 'user', content: `[IDEA_CONTEXT] ${storedIdeaText}` })
+    }
+    apiMessages.push({ role: 'user', content: prompt })
+
     setIsLoading(true)
     setIsChatLoading(true)
     try {
-      const raw = await callAPI(section, [{ role: 'user', content: prompt }], svs, av, angles)
+      const raw = await callAPI(section, apiMessages, svs, av, angles)
       const parsed = parseResponse(raw)
-      setSectionChats(prev => ({
-        ...prev,
-        [section]: [
-          ...(openingMsg ? [{ role: 'assistant', content: openingMsg }] : []),
-          { role: 'user', content: prompt },
-          { role: 'assistant', content: raw },
-        ],
-      }))
+
+      // Build stored chat — include hidden idea context so refine/ask calls also have it
+      const chatHistory = []
+      if (storedIdeaText) {
+        chatHistory.push({ role: 'user', content: `[IDEA_CONTEXT] ${storedIdeaText}` })
+      }
+      if (openingMsg) chatHistory.push({ role: 'assistant', content: openingMsg })
+      chatHistory.push({ role: 'user', content: prompt })
+      chatHistory.push({ role: 'assistant', content: raw })
+
+      setSectionChats(prev => ({ ...prev, [section]: chatHistory }))
       if (parsed && parsed.options) {
         setCurrentBubbles(parsed.options)
         setSelectedBubbles([])
@@ -1159,6 +1182,7 @@ Do not generate bubble options in this response.`
     setDallePrompt(ad.image_concept || ad.imageConcept || '')
     // If loading a draft, track its ID so saves update the same record
     setCurrentDraftId(ad.status === 'draft' ? (ad.id || null) : null)
+    setAdEntryMode('working')
     // Land on the first section that has no confirmed value yet (skip avatar — always set from draft)
     const firstEmpty = SECTIONS.slice(1).find(s => svs[s] === null) || 'hook'
     setActiveSection(firstEmpty)
@@ -1180,6 +1204,7 @@ Do not generate bubble options in this response.`
     setCurrentBubbles([])
     setSelectedBubbles([])
     setImageB64(ad.imageB64 || ad.image_b64 || null)
+    setAdEntryMode('working')
     setActiveSection('hook')
     openSection('hook', svs, selectedAvatar, [])
   }
@@ -1265,6 +1290,153 @@ Do not generate bubble options in this response.`
       return
     }
     setUnsavedPrompt(callbacks)
+  }
+
+  // ─── Freeform entry + restart ─────────────────────────────────────────────────
+
+  async function handleIdeaSubmit() {
+    const text = freeformIdeaText.trim()
+    if (!text || isParsingIdea) return
+    setIsParsingIdea(true)
+    setStoredIdeaText(text)
+
+    // Reset avatar funnel to clean state before potentially overriding with extracted data
+    initAvatarFunnel()
+
+    const extractSystem = `Extract ad creation context from this user description. Return JSON only, no markdown:
+{
+  "platform": "Meta" | "TikTok" | "YouTube" | "Google" | "LinkedIn" | null,
+  "target_industry": "industry of their target customer e.g. Homeowners, Business owners, or null",
+  "target_role": "role/type of their target customer or null",
+  "target_age_range": "age range like '35 to 45' or null",
+  "target_wants": "what the target customer wants most or null",
+  "target_fears": "what the target customer fears or null",
+  "hook_angle": "main emotional angle e.g. Fear, Pain, Benefit, Social Proof — or null",
+  "cta_type": "e.g. Call Now, Book a Call, Fill Form or null"
+}`
+
+    try {
+      const raw = await callAPI('avatar', [{ role: 'user', content: text }], EMPTY_VALUES_OBJ(), null, [], extractSystem)
+      let parsed = null
+      try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()) } catch (_) {}
+
+      if (parsed) {
+        // Platform
+        const validPlatforms = ['Meta', 'TikTok', 'YouTube', 'Google', 'LinkedIn']
+        if (parsed.platform && validPlatforms.includes(parsed.platform)) {
+          setSelectedPlatform(parsed.platform)
+        }
+
+        // Avatar data
+        const newAvatarData = { ...EMPTY_AVATAR_DATA() }
+        if (parsed.target_industry) newAvatarData.industry = parsed.target_industry
+        if (parsed.target_role) newAvatarData.role = parsed.target_role
+        if (parsed.target_age_range) newAvatarData.ageRange = parsed.target_age_range
+        if (parsed.target_wants) newAvatarData.wants = parsed.target_wants
+        if (parsed.target_fears) newAvatarData.fears = parsed.target_fears
+
+        const anyExtracted = Object.values(newAvatarData).some(v => v !== null)
+        if (anyExtracted) {
+          setAvatarData(newAvatarData)
+          setAvatarFunnelHistory([])
+          setAvatarSelectedBubbles([])
+
+          // Jump to first missing step
+          const firstMissing = AVATAR_FUNNEL_STEPS.find(step => step !== 'review' && !newAvatarData[step])
+          const startStep = firstMissing || 'review'
+          setAvatarFunnelStep(startStep)
+
+          const openingContent = startStep === 'review'
+            ? 'I pulled your target audience from your description. Review and name your avatar below, then we\'ll build the ad.'
+            : `Got some info from your description. ${AVATAR_STEP_MESSAGES[startStep]}`
+
+          setSectionChats(prev => ({ ...prev, avatar: [{ role: 'assistant', content: openingContent }] }))
+
+          if (startStep === 'review') {
+            setCurrentBubbles([])
+          } else if (DYNAMIC_AVATAR_STEPS.has(startStep)) {
+            generateDynamicAvatarBubbles(startStep, newAvatarData)
+          } else {
+            const staticBubbles = {
+              industry: INDUSTRY_BUBBLES,
+              role: isTrade(newAvatarData.industry) ? ROLE_BUBBLES_TRADES : ROLE_BUBBLES_DEFAULT,
+              businessSize: BUSINESS_SIZE_BUBBLES,
+              ageRange: AGE_RANGE_BUBBLES,
+              mediaTrust: MEDIA_TRUST_BUBBLES,
+            }
+            setCurrentBubbles(staticBubbles[startStep] || [])
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Idea extraction error:', err)
+    }
+
+    setAdEntryMode('working')
+    setIsParsingIdea(false)
+  }
+
+  async function handleRestart() {
+    const hasWork = SECTIONS.some(s => sectionValues[s] !== null)
+
+    if (!hasWork && !storedIdeaText) {
+      doFullReset()
+      return
+    }
+
+    setIsBuildingSummary(true)
+
+    const contextParts = []
+    if (storedIdeaText) contextParts.push(`Original idea: ${storedIdeaText.slice(0, 300)}`)
+    if (selectedAvatar?.name) contextParts.push(`Avatar: ${selectedAvatar.name}`)
+    if (sectionValues.hook) contextParts.push(`Hook: ${sectionValues.hook}`)
+    if (sectionValues.image) contextParts.push(`Image: ${sectionValues.image}`)
+    if (sectionValues.headline) contextParts.push(`Headline: ${sectionValues.headline}`)
+    if (sectionValues.primary_text) contextParts.push(`Copy: ${sectionValues.primary_text.slice(0, 120)}`)
+    if (sectionValues.cta) contextParts.push(`CTA: ${sectionValues.cta}`)
+
+    const summarySystem = `Based on this ad creation progress, write 2–3 very concise sentences capturing the core ad idea — the target audience, the main angle, and the direction taken. Be specific and concrete, not generic. Plain text only, no JSON, no markdown, no bullets.`
+
+    let summary = contextParts.join(' | ')
+    try {
+      const raw = await callAPI(
+        'avatar',
+        [{ role: 'user', content: contextParts.join('\n') }],
+        sectionValues,
+        selectedAvatar,
+        [],
+        summarySystem,
+      )
+      if (raw.trim()) summary = raw.trim()
+    } catch (_) {}
+
+    setResetModal({ summary })
+    setIsBuildingSummary(false)
+  }
+
+  function doFullReset() {
+    setResetModal(null)
+    setCopied(false)
+    setAdEntryMode('entry')
+    setFreeformIdeaText('')
+    setStoredIdeaText('')
+    setSectionChats(EMPTY_SECTION_OBJ())
+    setSectionValues(EMPTY_VALUES_OBJ())
+    setActiveSection('avatar')
+    setCurrentBubbles([])
+    setSelectedBubbles([])
+    setSelectedAngles([])
+    setSelectedSubcategories([])
+    setExpandedCategory(null)
+    setExtraSubcategories({})
+    setTypeOwn('')
+    setImageB64(null)
+    setImageError(null)
+    setCurrentDraftId(null)
+    setUnsavedPrompt(null)
+    setSelectedAvatar(null)
+    setSelectedPlatform(null)
+    initAvatarFunnel()
   }
 
   // ─── Section reset ────────────────────────────────────────────────────────────
@@ -1477,6 +1649,74 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     )
   }
 
+  // Freeform entry screen
+  if (adEntryMode === 'entry') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 160px)', padding: '2rem 1.5rem' }}>
+        <div style={{ width: '100%', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* AI opening bubble */}
+          <div style={{ alignSelf: 'flex-start', background: '#0a1628', border: '1px solid rgba(41,144,250,0.3)', borderRadius: 12, padding: '16px 20px', maxWidth: '92%' }}>
+            <div style={{ color: '#ffffff', fontSize: '0.95rem', fontFamily: 'var(--font-inter)', lineHeight: 1.75 }}>
+              What's the idea behind this ad?
+              <br /><br />
+              Tell me your offer, who you're targeting, the angle you want to hit, or your full vision. Write as much or as little as you want — I'll pull out what I need and ask about the rest as we build.
+            </div>
+          </div>
+
+          {isParsingIdea ? (
+            <div style={{ textAlign: 'center', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', letterSpacing: '0.1em', padding: '36px 0' }}>
+              Analysing your idea...
+            </div>
+          ) : (
+            <>
+              <textarea
+                value={freeformIdeaText}
+                onChange={e => setFreeformIdeaText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleIdeaSubmit() }}
+                placeholder="e.g. HVAC company in Phoenix targeting homeowners. Same-day AC repair, family-owned 12 years. Lead with the fear of breaking down in summer heat. Bold cinematic image — sweating family. CTA: Call Now. Meta ad."
+                rows={5}
+                style={{
+                  width: '100%', background: '#060d1f', border: '1px solid #2990fa',
+                  color: '#ffffff', padding: '14px 16px', borderRadius: 10,
+                  fontSize: '0.95rem', fontFamily: 'var(--font-inter)', lineHeight: 1.6,
+                  resize: 'none', boxSizing: 'border-box',
+                }}
+              />
+              <button
+                onClick={handleIdeaSubmit}
+                disabled={!freeformIdeaText.trim()}
+                style={{
+                  background: freeformIdeaText.trim() ? '#2990fa' : '#0a1628',
+                  border: '1px solid #2990fa', borderRadius: 8, padding: '14px 0',
+                  color: freeformIdeaText.trim() ? '#ffffff' : '#4a6a8a',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem',
+                  cursor: freeformIdeaText.trim() ? 'pointer' : 'not-allowed',
+                  width: '100%', letterSpacing: '0.06em',
+                }}
+              >
+                CONTINUE →
+              </button>
+              <button
+                onClick={() => setAdEntryMode('working')}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: 'rgba(255,255,255,0.35)',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem',
+                  cursor: 'pointer', letterSpacing: '0.06em',
+                  textDecoration: 'underline', textAlign: 'center', padding: '4px 0',
+                }}
+              >
+                Skip to Assisted Mode →
+              </button>
+            </>
+          )}
+
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 110px)', overflow: 'hidden' }}>
@@ -1538,6 +1778,19 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             }}
           >
             New Avatar
+          </button>
+          <button
+            onClick={handleRestart}
+            disabled={isBuildingSummary}
+            style={{
+              border: '1px solid rgba(255,255,255,0.18)', background: 'transparent',
+              color: 'rgba(255,255,255,0.4)', padding: '6px 14px', borderRadius: 6,
+              cursor: isBuildingSummary ? 'wait' : 'pointer',
+              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0,
+              whiteSpace: 'nowrap', letterSpacing: '0.04em',
+            }}
+          >
+            {isBuildingSummary ? '...' : '↺ Restart'}
           </button>
         </div>
 
@@ -2385,6 +2638,87 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               style={{
                 background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8,
                 padding: '12px 0', color: 'rgba(255,255,255,0.6)',
+                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── RESET MODAL ── */}
+      {resetModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 5000,
+            background: 'rgba(2,8,16,0.95)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: '#0a1628', border: '1px solid #2990fa',
+              borderRadius: 12, padding: 28, width: '100%', maxWidth: 460,
+              display: 'flex', flexDirection: 'column', gap: 14,
+            }}
+          >
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', letterSpacing: '0.05em' }}>
+              YOUR IDEA SO FAR
+            </div>
+
+            {/* Summary card with inline copy button */}
+            <div style={{ background: '#060d1f', border: '1px solid rgba(41,144,250,0.2)', borderRadius: 8, padding: '14px 16px', position: 'relative' }}>
+              <div style={{
+                color: 'rgba(255,255,255,0.82)', fontSize: '0.88rem', lineHeight: 1.65,
+                fontFamily: 'var(--font-inter)', paddingRight: 68,
+              }}>
+                {resetModal.summary}
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(resetModal.summary)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2500)
+                }}
+                style={{
+                  position: 'absolute', top: 10, right: 10,
+                  background: copied ? 'rgba(0,229,200,0.15)' : 'transparent',
+                  border: `1px solid ${copied ? '#00e5c8' : 'rgba(41,144,250,0.45)'}`,
+                  borderRadius: 6, padding: '5px 12px',
+                  color: copied ? '#00e5c8' : '#2990fa',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem',
+                  cursor: 'pointer', letterSpacing: '0.04em', whiteSpace: 'nowrap',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {copied ? '✓ Copied' : 'Copy'}
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.57rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', letterSpacing: '0.04em', lineHeight: 1.6 }}>
+              Copy this and paste it into the next session to pick up where you left off
+            </div>
+
+            <button
+              onClick={doFullReset}
+              style={{
+                background: '#2990fa', border: 'none', borderRadius: 8,
+                padding: '13px 0', color: '#ffffff',
+                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
+              }}
+            >
+              Start Fresh
+            </button>
+
+            <button
+              onClick={() => { setResetModal(null); setCopied(false) }}
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 8, padding: '11px 0', color: 'rgba(255,255,255,0.55)',
                 fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
                 cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
               }}
