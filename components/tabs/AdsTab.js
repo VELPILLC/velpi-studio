@@ -1117,15 +1117,17 @@ Do not generate bubble options in this response.`
     }
 
     if (chat.length > 0) {
-      const lastAi = [...chat].reverse().find(m => m.role === 'assistant')
-      if (lastAi) {
-        const parsed = parseResponse(lastAi.content)
+      // Search all assistant messages from most recent to oldest for parseable options
+      const aiMessages = [...chat].reverse().filter(m => m.role === 'assistant')
+      for (const msg of aiMessages) {
+        const parsed = parseResponse(msg.content)
         if (parsed && parsed.options) {
           setCurrentBubbles(parsed.options)
           return
         }
       }
-      setCurrentBubbles([])
+      // No parseable options found anywhere in chat history — re-open the section to regenerate
+      openSection(section, sectionValues, selectedAvatar, [])
       return
     }
 
