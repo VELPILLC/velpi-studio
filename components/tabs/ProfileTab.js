@@ -836,8 +836,21 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {selectedProfile ? (
             <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 10, padding: 18 }}>
-              <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>
-                ACTIVE PROFILE
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                  ACTIVE PROFILE
+                </div>
+                <button
+                  onClick={() => handleEditProfile(selectedProfile)}
+                  style={{
+                    background: 'transparent', border: '1px solid rgba(41,144,250,0.4)',
+                    borderRadius: 5, padding: '3px 10px', color: '#2990fa',
+                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem',
+                    cursor: 'pointer', letterSpacing: '0.04em',
+                  }}
+                >
+                  EDIT
+                </button>
               </div>
               <div style={{ fontSize: '1rem', fontFamily: 'var(--font-bebas-neue)', color: '#ffffff', letterSpacing: '0.05em', marginBottom: 10 }}>
                 {selectedProfile.name}

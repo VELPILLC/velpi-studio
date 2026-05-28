@@ -28,8 +28,8 @@ const SECTION_PROMPTS = {
   hook: 'Generate 3 hook options based on what we know so far.',
   image: 'Generate 3 image concept descriptions for this ad. Each concept must describe a specific, cinematic scene — who or what is in the image, what is happening, the mood, lighting, and setting. Make it vivid and detailed enough to generate a striking photo. No text or logos in any concept.',
   headline: 'Generate 3 headline options. Max 40 characters each.',
-  primary_text: 'Generate 3 primary text options. This is the main body copy that appears ABOVE the image in a Meta ad. Tell the story, agitate the problem, present the solution. First 125 characters are critical — they show before See More is clicked. Write longer copy that builds desire and earns the click.',
-  description: 'Generate 3 description options. This is the short line that appears BELOW the headline, under the image in a Meta ad. Max 30 characters. One tight punchy line — urgency, social proof, or a reinforcing benefit.',
+  primary_text: 'Generate 3 primary text options. This is the short punchy line that appears BELOW the headline, under the image in a Meta ad. Max 30 characters. One tight line — urgency, social proof, or a reinforcing benefit.',
+  description: 'Generate 3 description options. This is the main body copy that appears ABOVE the image in a Meta ad. Tell the story, agitate the problem, present the solution. First 125 characters are critical — they show before See More is clicked. Write longer copy that builds desire and earns the click.',
   cta: 'Generate 3 CTA options based on the ad type.',
 }
 
@@ -37,8 +37,8 @@ const SECTION_OPENING_MESSAGES = {
   hook: 'Here are 3 hook angles built from your avatar. Pick what resonates.',
   image: '3 image concepts built from your hook and avatar. Pick one — it generates the actual image.',
   headline: '3 headlines built from your hook and avatar.',
-  primary_text: '3 primary text options. This is the body copy above the image — longer copy that tells the story and builds desire. First 125 characters carry the most weight.',
-  description: '3 description options. Short line below the headline, under the image. Max 30 characters. Tight and punchy.',
+  primary_text: '3 primary text options. Short line below the headline, under the image. Max 30 characters. Tight and punchy.',
+  description: '3 description options. This is the body copy above the image — longer copy that tells the story and builds desire. First 125 characters carry the most weight.',
   cta: '3 calls to action matched to your offer.',
 }
 
@@ -46,8 +46,8 @@ const SECTION_ANGLES = {
   hook: ['Pain', 'Curiosity', 'Contrarian', 'Benefit', 'Social Proof', 'Fear', 'Authority', 'Story'],
   image: ['Cinematic', 'Editorial', 'Raw/Real', 'Bold Text', 'Lifestyle', 'Before/After'],
   headline: ['Direct', 'Question', 'Bold Claim', 'Call Out', 'Curiosity', 'Number Based'],
-  primary_text: ['Story', 'Problem/Solution', 'Value Stack', 'Testimonial', 'Direct Offer', 'Educational'],
-  description: ['Urgency', 'Social Proof', 'Benefit', 'Simple CTA'],
+  primary_text: ['Urgency', 'Social Proof', 'Benefit', 'Simple CTA'],
+  description: ['Story', 'Problem/Solution', 'Value Stack', 'Testimonial', 'Direct Offer', 'Educational'],
   cta: ['Book a Call', 'Fill Form', 'DM Us', 'Call Now', 'Click Link', 'Comment Below'],
   avatar: [],
 }
@@ -80,18 +80,18 @@ const SECTION_SUBCATEGORIES = {
     'Number Based': ['List format','Percentage','Time frame','Dollar amount','Quantity'],
   },
   primary_text: {
+    'Urgency': ['Limited time','Deadline','Spots filling','Act now','Last chance'],
+    'Social Proof': ['Number of people','Reviews','Results','Trusted by','Join others'],
+    'Benefit': ['Main outcome','Key result','What changes','Primary win','Core promise'],
+    'Simple CTA': ['Click to learn','Book now','Get started','See how','Find out'],
+  },
+  description: {
     'Story': ['Personal origin','Customer transformation','Day in the life','Before the solution','Turning point moment'],
     'Problem/Solution': ['Agitate the pain','Name the enemy','Present the fix','Simple steps','Clear path forward'],
     'Value Stack': ['List everything included','Show the value','Compare to alternatives','What they get','Overdeliver frame'],
     'Testimonial': ['Direct quote','Results focused','Specific numbers','Emotional moment','Before and after quote'],
     'Direct Offer': ['Clear price or terms','Specific guarantee','Limited availability','Exact next step','No fluff offer'],
     'Educational': ['Teach something valuable','Insider knowledge','Common mistake','Better way','Eye opening fact'],
-  },
-  description: {
-    'Urgency': ['Limited time','Deadline','Spots filling','Act now','Last chance'],
-    'Social Proof': ['Number of people','Reviews','Results','Trusted by','Join others'],
-    'Benefit': ['Main outcome','Key result','What changes','Primary win','Core promise'],
-    'Simple CTA': ['Click to learn','Book now','Get started','See how','Find out'],
   },
   cta: {
     'Book a Call': ['Free strategy call','15 minute intro','No obligation chat','Quick discovery call','Schedule now'],
@@ -409,8 +409,34 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   // ─── Avatar funnel ────────────────────────────────────────────────────────────
 
   function initAvatarFunnel() {
-    setAvatarFunnelStep('industry')
-    setAvatarData(EMPTY_AVATAR_DATA())
+    // Pre-fill from selected profile if available — skip steps we already know
+    const preData = EMPTY_AVATAR_DATA()
+    let startStep = 'industry'
+    let openingContent = AVATAR_STEP_MESSAGES.industry
+    let startBubbles = INDUSTRY_BUBBLES
+
+    if (selectedProfile?.who_they_serve) {
+      const wts = selectedProfile.who_they_serve
+      const wtsLow = wts.toLowerCase()
+      preData.role = wts
+
+      // Infer industry from who they serve so we can skip both steps
+      if (wtsLow.includes('homeowner') || wtsLow.includes('residential')) {
+        preData.industry = 'Homeowners / Residential'
+      } else if (wtsLow.includes('business owner') || wtsLow.includes('entrepreneur')) {
+        preData.industry = 'Business Owners'
+      } else if (wtsLow.includes('contractor') || wtsLow.includes('trade')) {
+        preData.industry = 'Construction & Trades'
+      }
+
+      // Whether we inferred industry or not, role is set — skip to businessSize
+      startStep = 'businessSize'
+      startBubbles = BUSINESS_SIZE_BUBBLES
+      openingContent = `Based on your profile you serve: ${wts}.\n\n${AVATAR_STEP_MESSAGES.businessSize}`
+    }
+
+    setAvatarFunnelStep(startStep)
+    setAvatarData(preData)
     setAvatarNameInput('')
     setAvatarSelectedBubbles([])
     setAvatarFunnelHistory([])
@@ -419,9 +445,9 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setAvatarEditingId(null)
     setSectionChats(prev => ({
       ...prev,
-      avatar: [{ role: 'assistant', content: AVATAR_STEP_MESSAGES.industry }],
+      avatar: [{ role: 'assistant', content: openingContent }],
     }))
-    setCurrentBubbles(INDUSTRY_BUBBLES)
+    setCurrentBubbles(startBubbles)
   }
 
   function startNewAvatarFunnel() {
@@ -934,6 +960,67 @@ Do not generate bubble options in this response.`
       }
     } catch (err) {
       console.error('Ask Jarvis error:', err)
+    }
+    setIsLoading(false)
+    setIsChatLoading(false)
+  }
+
+  // ─── Unified send-to-Jarvis (replaces both REFINE and ASK for all sections) ──
+
+  async function handleSendToJarvis() {
+    if (isLoading || !activeSection || activeSection === 'avatar') return
+
+    const text = typeOwn.trim()
+
+    const activeAngles = [
+      ...selectedAngles.filter(a => !selectedSubcategories.some(s =>
+        (SECTION_SUBCATEGORIES[activeSection]?.[a] || []).includes(s) ||
+        (extraSubcategories[a] || []).includes(s)
+      )),
+      ...selectedSubcategories,
+    ]
+
+    let message
+    if (text && selectedBubbles.length > 0) {
+      message = `${text} — apply this to the selected option${selectedBubbles.length > 1 ? 's' : ''}: ${selectedBubbles.map(b => `"${b}"`).join(' and ')}`
+    } else if (text) {
+      message = text
+    } else if (selectedBubbles.length === 2) {
+      message = `The user selected these two options: "${selectedBubbles[0]}" and "${selectedBubbles[1]}". Generate exactly 3 refined options:\n1. Refined version of option 1\n2. Refined version of option 2\n3. A blend of both options combined`
+    } else if (selectedBubbles.length === 1) {
+      message = `Refine. I like the direction of: "${selectedBubbles[0]}". Give me 3 tighter variations.`
+    } else if (activeAngles.length > 0) {
+      message = `Generate 3 new options using these angle filters: [${activeAngles.join(', ')}]. Stay within these directions.`
+    } else {
+      message = 'Generate 3 fresh options. Use all confirmed context.'
+    }
+
+    const userMsg = { role: 'user', content: message }
+    const updatedChat = [...sectionChats[activeSection], userMsg]
+    setSectionChats(prev => ({ ...prev, [activeSection]: updatedChat }))
+    setTypeOwn('')
+    setIsLoading(true)
+    setIsChatLoading(true)
+
+    try {
+      const raw = await callAPI(
+        activeSection,
+        updatedChat.map(m => ({ role: m.role, content: m.content })),
+        sectionValues,
+        selectedAvatar,
+        activeAngles,
+      )
+      const parsed = parseResponse(raw)
+      setSectionChats(prev => ({
+        ...prev,
+        [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
+      }))
+      if (parsed?.options) {
+        setCurrentBubbles(parsed.options)
+        setSelectedBubbles([])
+      }
+    } catch (err) {
+      console.error('Send to Jarvis error:', err)
     }
     setIsLoading(false)
     setIsChatLoading(false)
@@ -2212,15 +2299,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     value={typeOwn}
                     onChange={e => setTypeOwn(e.target.value)}
                     onKeyDown={e => {
-                      if (activeSection === 'avatar') {
-                        if (e.key === 'Enter') e.preventDefault()
-                      } else {
-                        if (e.key === 'Enter') {
-                          if (isQuestion(typeOwn.trim())) {
-                            handleAskJarvisNonAvatar(typeOwn.trim())
-                          } else {
-                            handleAddTypeOwn()
-                          }
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (activeSection !== 'avatar' && activeSection !== null) {
+                          handleSendToJarvis()
                         }
                       }
                     }}
@@ -2240,14 +2322,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       ADD
                     </button>
                   )}
-                  {typeOwn.trim() && (
-                    <button
-                      onClick={activeSection === 'avatar' ? handleAvatarAsk : () => handleAskJarvisNonAvatar(typeOwn.trim())}
-                      style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                    >
-                      ASK
-                    </button>
-                  )}
                   {activeSection === 'avatar' && (avatarSelectedBubbles.length > 0 || typeOwn.trim()) && (
                     <button
                       onClick={handleAvatarAdvance}
@@ -2258,11 +2332,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   )}
                   {activeSection !== 'avatar' && (
                     <button
-                      onClick={handleRefine}
+                      onClick={handleSendToJarvis}
                       disabled={isLoading}
                       style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: isLoading ? 'not-allowed' : 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box', opacity: isLoading ? 0.5 : 1 }}
                     >
-                      REFINE
+                      →
                     </button>
                   )}
                   {activeSection !== 'avatar' && canSubmit && (

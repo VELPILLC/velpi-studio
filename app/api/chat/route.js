@@ -37,17 +37,18 @@ Example of RIGHT: 'Here are 3 hooks that speak directly to Jeff
 
 META AD ANATOMY — always follow this structure:
 HOOK = the first line or visual that stops the scroll
-PRIMARY TEXT = longer copy above the image, tells the story,
+DESCRIPTION = longer body copy above the image, tells the story,
   agitates the problem, presents the solution.
   First 125 characters are most important — shown before See More.
+  Write longer copy that builds desire and earns the click.
 HEADLINE = bold text below the image, max 40 characters,
   reinforces the offer
-DESCRIPTION = short line below the headline, max 30 characters,
-  urgency or social proof
+PRIMARY TEXT = short punchy line below the headline, under the image.
+  Max 30 characters. Urgency, social proof, or a reinforcing benefit.
 CTA BUTTON = the clickable button (Book Now, Learn More etc)
 
-PRIMARY TEXT is NOT a short line. It is the main body copy.
-DESCRIPTION is NOT the body copy. It is a single short punchy line
+DESCRIPTION is NOT a short line. It is the main body copy above the image.
+PRIMARY TEXT is NOT the body copy. It is a single short punchy line
 under the headline, below the image.
 Never confuse these two. They are completely different placements
 with completely different jobs.
@@ -294,9 +295,11 @@ For Meta (Facebook and Instagram):
   Optimize for vertical 9:16 and square 1:1.
 - Assume cold traffic. The viewer has never heard of this brand.
   Do not assume any awareness. Write accordingly.
-- Primary text front-loads the message.
+- Description (body copy) front-loads the message above the image.
   The first 125 characters must carry the full point.
-  Most people never tap See More.
+  Most people never tap See More. Write long, story-driven copy.
+- Primary text is the short punchy line below the headline.
+  Max 30 characters. Urgency or social proof only.
 - CTAs must match Meta lead gen formats: book a call, fill a form,
   DM, or click link. No vague or generic CTAs.
 - Simple language. Third grade reading level. No jargon. No fluff.
