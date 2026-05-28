@@ -104,17 +104,10 @@ export default function LibraryTab({ onEdit }) {
     } catch (_) {}
   }
 
-  // Separate drafts from completed ads
-  const drafts = ads.filter(ad => ad.status === 'draft')
-  const completedAds = ads.filter(ad => ad.status !== 'draft')
-
-  // Group completed by adType
-  const grouped = completedAds.reduce((acc, ad) => {
-    const key = ad.adType || 'Uncategorized'
-    if (!acc[key]) acc[key] = []
-    acc[key].push(ad)
-    return acc
-  }, {})
+  // A completed ad has all DRAFT_FIELDS populated; otherwise it is a draft
+  const isAdComplete = (ad) => DRAFT_FIELDS.every(({ key }) => !!ad[key])
+  const drafts = ads.filter(ad => !isAdComplete(ad))
+  const completedAds = ads.filter(ad => isAdComplete(ad))
 
   // Derived: which ad/version to display in modal
   const displayAd =
@@ -298,136 +291,118 @@ export default function LibraryTab({ onEdit }) {
       {/* ── COMPLETED ADS ── */}
       {completedAds.length > 0 && (
         <div>
-          {drafts.length > 0 && (
-            <div
+          <div
+            style={{
+              fontSize: '0.6rem',
+              fontFamily: 'var(--font-ibm-plex-mono)',
+              color: '#2990fa',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            COMPLETED
+            <span
               style={{
-                fontSize: '0.6rem',
-                fontFamily: 'var(--font-ibm-plex-mono)',
+                background: '#2990fa22',
+                border: '1px solid #2990fa',
+                borderRadius: 10,
+                padding: '1px 7px',
+                fontSize: '0.52rem',
                 color: '#2990fa',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                marginBottom: 20,
               }}
             >
-              COMPLETED
-            </div>
-          )}
-          {Object.entries(grouped).map(([type, groupAds]) => (
-            <div key={type} style={{ marginBottom: 32 }}>
+              {completedAds.length}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {completedAds.map(ad => (
               <div
+                key={ad.id}
+                onClick={() => {
+                  setSelectedAd(ad)
+                  setSelectedVersionIdx(null)
+                }}
                 style={{
-                  fontSize: '0.6rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  color: drafts.length > 0 ? 'rgba(41,144,250,0.6)' : '#2990fa',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  marginBottom: 16,
+                  width: 180,
+                  background: '#0a1628',
+                  border: '1px solid #2990fa',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  position: 'relative',
                 }}
               >
-                {type}
-              </div>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                {groupAds.map(ad => (
-                  <div
-                    key={ad.id}
-                    onClick={() => {
-                      setSelectedAd(ad)
-                      setSelectedVersionIdx(null)
-                    }}
-                    style={{
-                      width: 180,
-                      background: '#0a1628',
-                      border: '1px solid #2990fa',
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      position: 'relative',
-                    }}
-                  >
-                    {/* 9:16 thumbnail */}
+                {/* 9:16 thumbnail */}
+                <div
+                  style={{
+                    width: '100%',
+                    aspectRatio: '9 / 16',
+                    background: '#060d1f',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {ad.imageB64 ? (
+                    <img
+                      src={`data:image/png;base64,${ad.imageB64}`}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
                     <div
                       style={{
-                        width: '100%',
-                        aspectRatio: '9 / 16',
-                        background: '#060d1f',
-                        position: 'relative',
-                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        color: 'rgba(255,255,255,0.2)',
+                        fontSize: '0.65rem',
+                        fontFamily: 'var(--font-ibm-plex-mono)',
                       }}
                     >
-                      {ad.imageB64 ? (
-                        <img
-                          src={`data:image/png;base64,${ad.imageB64}`}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            height: '100%',
-                            color: 'rgba(255,255,255,0.2)',
-                            fontSize: '0.65rem',
-                            fontFamily: 'var(--font-ibm-plex-mono)',
-                          }}
-                        >
-                          No image
-                        </div>
-                      )}
-                      {/* Status badge */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 6, right: 6,
-                          background: 'rgba(0,0,0,0.7)',
-                          borderRadius: 4,
-                          padding: '2px 6px',
-                          fontSize: '0.55rem',
-                          fontFamily: 'var(--font-ibm-plex-mono)',
-                          color: STATUS_COLORS[ad.status] || STATUS_COLORS.unrated,
-                        }}
-                      >
-                        {(ad.status === 'unrated' || ad.status === 'complete') ? '—' : ad.status}
-                      </div>
-                      {/* Version count badge */}
-                      {ad.versions && ad.versions.length > 0 && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: 6, left: 6,
-                            background: '#2990fa',
-                            borderRadius: 4,
-                            padding: '2px 6px',
-                            fontSize: '0.55rem',
-                            fontFamily: 'var(--font-ibm-plex-mono)',
-                            color: '#ffffff',
-                          }}
-                        >
-                          V{ad.versions.length + 1}
-                        </div>
-                      )}
+                      No image
                     </div>
-                    {/* Headline */}
+                  )}
+                  {/* Version count badge */}
+                  {ad.versions && ad.versions.length > 0 && (
                     <div
                       style={{
-                        padding: '8px 10px',
-                        fontSize: '0.72rem',
+                        position: 'absolute',
+                        top: 6, left: 6,
+                        background: '#2990fa',
+                        borderRadius: 4,
+                        padding: '2px 6px',
+                        fontSize: '0.55rem',
+                        fontFamily: 'var(--font-ibm-plex-mono)',
                         color: '#ffffff',
-                        fontFamily: 'var(--font-inter)',
-                        lineHeight: 1.4,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
                       }}
                     >
-                      {ad.headline || 'No headline'}
+                      V{ad.versions.length + 1}
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+                {/* Headline */}
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    fontSize: '0.72rem',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-inter)',
+                    lineHeight: 1.4,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {ad.headline || 'No headline'}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 

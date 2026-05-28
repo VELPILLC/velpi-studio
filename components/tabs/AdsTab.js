@@ -947,6 +947,7 @@ Do not generate bubble options in this response.`
     const openingMsg = SECTION_OPENING_MESSAGES[section]
 
     setIsLoading(true)
+    setIsChatLoading(true)
     try {
       const raw = await callAPI(section, [{ role: 'user', content: prompt }], svs, av, angles)
       const parsed = parseResponse(raw)
@@ -966,6 +967,7 @@ Do not generate bubble options in this response.`
       console.error('openSection error:', err)
     }
     setIsLoading(false)
+    setIsChatLoading(false)
   }
 
   function gotoSection(section) {
@@ -1159,10 +1161,12 @@ Do not generate bubble options in this response.`
     setSelectedBubbles([])
     setImageB64(ad.image_b64 || ad.imageB64 || null)
     setDallePrompt(ad.image_concept || ad.imageConcept || '')
-    setActiveSection('hook')
     // If loading a draft, track its ID so saves update the same record
     setCurrentDraftId(ad.status === 'draft' ? (ad.id || null) : null)
-    openSection('hook', svs, selectedAvatar, [])
+    // Land on the first section that has no confirmed value yet (skip avatar — always set from draft)
+    const firstEmpty = SECTIONS.slice(1).find(s => svs[s] === null) || 'hook'
+    setActiveSection(firstEmpty)
+    openSection(firstEmpty, svs, selectedAvatar, [])
   }
 
   function loadForRefine(ad) {
@@ -2029,7 +2033,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           </div>
 
           {/* ── RIGHT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
             {/* Scrollable panels area */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
 
