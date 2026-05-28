@@ -1264,6 +1264,7 @@ Do not generate bubble options in this response.`
     setSelectedBubbles([])
     setImageB64(ad.image_b64 || ad.imageB64 || null)
     setImageError(null)
+    setImageFormat((ad.image_b64 || ad.imageB64) ? '9/16' : null)
     setDallePrompt(ad.image_concept || ad.imageConcept || '')
     // If loading a draft, track its ID so saves update the same record
     setCurrentDraftId(ad.status === 'draft' ? (ad.id || null) : null)
@@ -1289,6 +1290,7 @@ Do not generate bubble options in this response.`
     setCurrentBubbles([])
     setSelectedBubbles([])
     setImageB64(ad.imageB64 || ad.image_b64 || null)
+    setImageFormat((ad.imageB64 || ad.image_b64) ? '9/16' : null)
     setAdEntryMode('working')
     setActiveSection('hook')
     openSection('hook', svs, selectedAvatar, [])
@@ -2129,7 +2131,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     ].map(f => (
                       <button
                         key={f.id}
-                        onClick={() => { setImageFormat(f.id); setImageB64(null); setImageError(null) }}
+                        onClick={() => { setImageFormat(f.id); setImageError(null) }}
                         style={{
                           flex: 1,
                           background: imageFormat === f.id ? '#2990fa' : '#0a1628',
