@@ -193,7 +193,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [dallePrompt, setDallePrompt] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isChatLoading, setIsChatLoading] = useState(false)
-  const [imageFormat, setImageFormat] = useState('9/16')
+  const [imageFormat, setImageFormat] = useState(null)
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [selectedSubcategories, setSelectedSubcategories] = useState([])
   const [extraSubcategories, setExtraSubcategories] = useState({})
@@ -1204,9 +1204,7 @@ Do not generate bubble options in this response.`
     if (section === 'image') {
       setDallePrompt(value)
       setImageError(null)
-      // Auto-start image generation in background so user can continue working
-      setIsGeneratingImage(true)
-      generateImage(value).finally(() => setIsGeneratingImage(false))
+      // Do NOT auto-generate — user must select a size first
     }
 
     const idx = SECTIONS.indexOf(section)
@@ -1232,7 +1230,7 @@ Do not generate bubble options in this response.`
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `cinematic 9:16 vertical photo, ${concept}, no text, no logos, photorealistic, documentary style`,
+          prompt: `${imageFormat === '1:1' ? 'square format photo' : imageFormat === '4:5' ? 'vertical 4:5 portrait photo' : 'cinematic vertical 9:16 portrait photo'}, ${concept}, no text, no logos, photorealistic, documentary style`,
         }),
       })
       const data = await res.json()
@@ -1519,6 +1517,7 @@ Do not generate bubble options in this response.`
     setTypeOwn('')
     setImageB64(null)
     setImageError(null)
+    setImageFormat(null)
     setCurrentDraftId(null)
     setUnsavedPrompt(null)
     setSelectedAvatar(null)
@@ -1537,7 +1536,7 @@ Do not generate bubble options in this response.`
 
     setSectionChats(prev => ({ ...prev, [section]: [] }))
     setSectionValues(prev => ({ ...prev, [section]: null }))
-    if (section === 'image') setImageB64(null)
+    if (section === 'image') { setImageB64(null); setImageFormat(null) }
     if (section === activeSection) {
       setCurrentBubbles([])
       setSelectedBubbles([])
@@ -2115,16 +2114,58 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             ) : (activeSection === 'image' && sectionValues.image !== null) ? (
 
               /* ── IMAGE IN LEFT COLUMN (image section active + confirmed) ── */
-              <div style={{ flexShrink: 0, marginBottom: 8 }}>
-                <div style={{ maxWidth: 190, margin: '0 auto' }}>
-                  {isGeneratingImage ? (
-                    <div style={{ aspectRatio: '9/16', background: '#060d1f', border: '1px solid rgba(41,144,250,0.25)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 12 }}>
+              <div style={{ flexShrink: 0, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                {/* 1. SIZE SELECTION — first thing the user sees */}
+                <div>
+                  <div style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', marginBottom: 6, textAlign: 'center' }}>
+                    {imageFormat ? 'SIZE SELECTED' : 'SELECT A SIZE TO BEGIN'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    {[
+                      { id: '9/16', label: '9:16', desc: 'Story' },
+                      { id: '1:1', label: '1:1', desc: 'Square' },
+                      { id: '4:5', label: '4:5', desc: 'Portrait' },
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => { setImageFormat(f.id); setImageB64(null); setImageError(null) }}
+                        style={{
+                          flex: 1,
+                          background: imageFormat === f.id ? '#2990fa' : '#0a1628',
+                          border: `2px solid ${imageFormat === f.id ? '#2990fa' : '#152840'}`,
+                          borderRadius: 8,
+                          padding: '10px 4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <span style={{ fontSize: '0.78rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', fontWeight: 600, letterSpacing: '0.04em' }}>{f.label}</span>
+                        <span style={{ fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', color: imageFormat === f.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', letterSpacing: '0.06em' }}>{f.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. IMAGE AREA — placeholder until generated */}
+                <div style={{ maxWidth: 190, margin: '0 auto', width: '100%' }}>
+                  {!imageFormat ? (
+                    /* No size selected yet — prompt the user */
+                    <div style={{ aspectRatio: '1/1', background: '#060d1f', border: '2px dashed rgba(41,144,250,0.2)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16 }}>
+                      <div style={{ fontSize: '1.6rem', lineHeight: 1, opacity: 0.3 }}>📐</div>
+                      <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>PICK A SIZE ABOVE</div>
+                    </div>
+                  ) : isGeneratingImage ? (
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', background: '#060d1f', border: '1px solid rgba(41,144,250,0.25)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 12 }}>
                       <span className="img-pulse" style={{ fontSize: '2rem', lineHeight: 1 }}>⚡</span>
                       <div style={{ fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center' }}>GENERATING IMAGE</div>
                       <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', maxWidth: 120, lineHeight: 1.7 }}>This takes about 20 seconds.<br />You can keep working.</div>
                     </div>
                   ) : imageError ? (
-                    <div style={{ aspectRatio: '9/16', background: '#060d1f', border: '1px solid rgba(255,68,85,0.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 }}>
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', background: '#060d1f', border: '1px solid rgba(255,68,85,0.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 }}>
                       <div style={{ fontSize: '1.4rem', lineHeight: 1 }}>⚠</div>
                       <div style={{ fontSize: '0.6rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>GENERATION FAILED</div>
                       <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.6, maxWidth: 140 }}>{imageError}</div>
@@ -2138,31 +2179,54 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   ) : (
-                    <div style={{ aspectRatio: '9/16', background: '#060d1f', border: '1px dashed rgba(41,144,250,0.3)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
-                      <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>NO IMAGE YET</div>
+                    /* Size selected, no image yet — show shaped placeholder + generate button */
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', background: '#060d1f', border: '2px dashed rgba(41,144,250,0.35)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+                      <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>READY TO GENERATE</div>
                       <button
-                        disabled={isGeneratingImage}
                         onClick={() => { setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
-                        style={{ background: '#00e5c8', border: 'none', borderRadius: 8, padding: '8px 18px', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+                        style={{ background: '#2990fa', border: 'none', borderRadius: 8, padding: '10px 20px', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', cursor: 'pointer', letterSpacing: '0.06em' }}
                       >⚡ Generate Image</button>
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                    {['9/16', '1:1', '4:5'].map(f => (
+
+                  {/* New Image button — shown when image exists */}
+                  {imageB64 && !isGeneratingImage && imageFormat && (
+                    <div style={{ textAlign: 'center', marginTop: 8 }}>
                       <button
-                        key={f}
-                        onClick={() => setImageFormat(f)}
-                        style={{ background: imageFormat === f ? '#2990fa' : 'transparent', border: '1px solid #2990fa', borderRadius: 4, padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
-                      >{f}</button>
-                    ))}
-                    {imageB64 && !isGeneratingImage && (
-                      <button
-                        onClick={() => { setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
-                        style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 4, padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
-                      >New Image</button>
-                    )}
-                  </div>
+                        onClick={() => { setImageB64(null); setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
+                        style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: '6px 16px', fontSize: '0.65rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', letterSpacing: '0.06em' }}
+                      >↺ New Image</button>
+                    </div>
+                  )}
                 </div>
+
+                {/* 3. INPUT ROW — reprompt below the image */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={typeOwn}
+                    onChange={e => setTypeOwn(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSendToJarvis() } }}
+                    placeholder="Describe image or ask a question..."
+                    style={{
+                      flex: 1, background: '#060d1f', border: '1px solid #2990fa',
+                      color: '#ffffff', padding: '8px 14px', borderRadius: 8,
+                      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
+                      height: 36, boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    onClick={handleSendToJarvis}
+                    disabled={isLoading}
+                    style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: isLoading ? 'not-allowed' : 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box', opacity: isLoading ? 0.5 : 1 }}
+                  >→</button>
+                  {canSubmit && (
+                    <button
+                      onClick={handleSubmit}
+                      style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                    >SUBMIT</button>
+                  )}
+                </div>
+
               </div>
 
             ) : activeSection !== null ? (
@@ -2346,7 +2410,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     fontSize: '0.9rem', fontFamily: 'var(--font-inter)', opacity: 0.5, boxSizing: 'border-box', cursor: 'default',
                   }}
                 />
-              ) : (activeSection === 'avatar' && (avatarFunnelStep === 'review' || avatarEditMode)) ? null : (
+              ) : (activeSection === 'avatar' && (avatarFunnelStep === 'review' || avatarEditMode)) ? null
+              : (activeSection === 'image' && sectionValues.image !== null) ? null : (
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
                     value={typeOwn}
