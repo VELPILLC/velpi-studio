@@ -145,6 +145,7 @@ export default function Studio() {
               }
             }}
             onTabChangeCancelled={() => setPendingTabChange(null)}
+            onSaved={() => setActiveTab('library')}
           />
         )}
         {activeTab === 'library' && <LibraryTab onEdit={handleEditFromLibrary} />}

@@ -178,7 +178,7 @@ const EMPTY_AVATAR_DATA = () => ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled }) {
+export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled, onSaved }) {
   // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
@@ -1210,8 +1210,7 @@ Do not generate bubble options in this response.`
       })
       if (res.ok) {
         setCurrentDraftId(null)
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 2000)
+        onSaved?.()
       }
     } catch (err) {
       console.error('saveToLibrary error:', err)
