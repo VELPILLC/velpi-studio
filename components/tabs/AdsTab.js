@@ -252,6 +252,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setSelectedSubcategories([])
     setExpandedCategory(null)
     setExtraSubcategories({})
+    setTypeOwn('')
   }, [activeSection])
 
   useEffect(() => {
@@ -1112,6 +1113,30 @@ Do not generate bubble options in this response.`
     const chat = sectionChats[section]
 
     if (val !== null) {
+      if (section === 'image') {
+        // Look for parseable refine options after the last "Image confirmed." message
+        let confirmIdx = -1
+        for (let i = chat.length - 1; i >= 0; i--) {
+          if (chat[i].role === 'assistant' && chat[i].content === 'Image confirmed.') {
+            confirmIdx = i
+            break
+          }
+        }
+        if (confirmIdx >= 0) {
+          for (let i = chat.length - 1; i > confirmIdx; i--) {
+            if (chat[i].role === 'assistant') {
+              const parsed = parseResponse(chat[i].content)
+              if (parsed && parsed.options) {
+                setCurrentBubbles(parsed.options)
+                return
+              }
+            }
+          }
+        }
+        // No post-confirmation refine options — add concept as user message and get Jarvis refine options
+        openImageRefineChat(val)
+        return
+      }
       setCurrentBubbles([])
       return
     }
@@ -1132,6 +1157,33 @@ Do not generate bubble options in this response.`
     }
 
     openSection(section, sectionValues, selectedAvatar, [])
+  }
+
+  async function openImageRefineChat(concept) {
+    const userMsg = { role: 'user', content: concept }
+    setSectionChats(prev => ({
+      ...prev,
+      image: [...prev.image, userMsg],
+    }))
+    setIsLoading(true)
+    setIsChatLoading(true)
+    try {
+      const prompt = `The user has confirmed this image concept: "${concept}". Generate 3 refined variations of this concept — same core direction, different visual approaches or moods. Return JSON only: {"options":["option1","option2","option3"]}`
+      const raw = await callAPI('image', [{ role: 'user', content: prompt }], sectionValues, selectedAvatar, [])
+      const parsed = parseResponse(raw)
+      setSectionChats(prev => ({
+        ...prev,
+        image: [...prev.image, { role: 'assistant', content: raw }],
+      }))
+      if (parsed && parsed.options) {
+        setCurrentBubbles(parsed.options)
+        setSelectedBubbles([])
+      }
+    } catch (err) {
+      console.error('openImageRefineChat error:', err)
+    }
+    setIsLoading(false)
+    setIsChatLoading(false)
   }
 
   async function handleRefine() {
