@@ -2112,6 +2112,59 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 </div>
               )
 
+            ) : (activeSection === 'image' && sectionValues.image !== null) ? (
+
+              /* ── IMAGE IN LEFT COLUMN (image section active + confirmed) ── */
+              <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                <div style={{ maxWidth: 190, margin: '0 auto' }}>
+                  {isGeneratingImage ? (
+                    <div style={{ aspectRatio: '9/16', background: '#060d1f', border: '1px solid rgba(41,144,250,0.25)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 12 }}>
+                      <span className="img-pulse" style={{ fontSize: '2rem', lineHeight: 1 }}>⚡</span>
+                      <div style={{ fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center' }}>GENERATING IMAGE</div>
+                      <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', maxWidth: 120, lineHeight: 1.7 }}>This takes about 20 seconds.<br />You can keep working.</div>
+                    </div>
+                  ) : imageError ? (
+                    <div style={{ aspectRatio: '9/16', background: '#060d1f', border: '1px solid rgba(255,68,85,0.4)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 }}>
+                      <div style={{ fontSize: '1.4rem', lineHeight: 1 }}>⚠</div>
+                      <div style={{ fontSize: '0.6rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>GENERATION FAILED</div>
+                      <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.6, maxWidth: 140 }}>{imageError}</div>
+                      <button
+                        onClick={() => { setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
+                        style={{ background: 'transparent', border: '1px solid #ff4455', borderRadius: 8, padding: '8px 16px', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+                      >Try Again</button>
+                    </div>
+                  ) : imageB64 ? (
+                    <div style={{ aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16', overflow: 'hidden', borderRadius: 8 }}>
+                      <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  ) : (
+                    <div style={{ aspectRatio: '9/16', background: '#060d1f', border: '1px dashed rgba(41,144,250,0.3)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+                      <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>NO IMAGE YET</div>
+                      <button
+                        disabled={isGeneratingImage}
+                        onClick={() => { setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
+                        style={{ background: '#00e5c8', border: 'none', borderRadius: 8, padding: '8px 18px', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+                      >⚡ Generate Image</button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {['9/16', '1:1', '4:5'].map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setImageFormat(f)}
+                        style={{ background: imageFormat === f ? '#2990fa' : 'transparent', border: '1px solid #2990fa', borderRadius: 4, padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
+                      >{f}</button>
+                    ))}
+                    {imageB64 && !isGeneratingImage && (
+                      <button
+                        onClick={() => { setImageError(null); setIsGeneratingImage(true); generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false)) }}
+                        style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 4, padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
+                      >New Image</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
             ) : activeSection !== null ? (
 
               /* ── NON-AVATAR SECTION CONTROLS ── */
@@ -2466,134 +2519,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   )}
 
-                  {/* Image section — full UI when active and concept confirmed */}
-                  {section === 'image' && isActive && hasValue && (
-                    <div style={{ marginTop: 8 }}>
-                      {isGeneratingImage ? (
-                        /* ── Loading state ── */
-                        <div style={{
-                          width: '100%', aspectRatio: '9/16',
-                          background: '#060d1f',
-                          border: '1px solid rgba(41,144,250,0.25)',
-                          borderRadius: 6,
-                          display: 'flex', flexDirection: 'column',
-                          alignItems: 'center', justifyContent: 'center',
-                          gap: 14,
-                        }}>
-                          <span className="img-pulse" style={{ fontSize: '2rem', lineHeight: 1 }}>⚡</span>
-                          <div style={{ fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center' }}>
-                            GENERATING IMAGE
-                          </div>
-                          <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', maxWidth: 140, lineHeight: 1.7 }}>
-                            This takes about 20 seconds.<br />You can keep working.
-                          </div>
-                        </div>
-                      ) : imageError ? (
-                        /* ── Error state ── */
-                        <div style={{
-                          width: '100%', aspectRatio: '9/16',
-                          background: '#060d1f',
-                          border: '1px solid rgba(255,68,85,0.4)',
-                          borderRadius: 6,
-                          display: 'flex', flexDirection: 'column',
-                          alignItems: 'center', justifyContent: 'center',
-                          gap: 14, padding: 20,
-                        }}>
-                          <div style={{ fontSize: '1.4rem', lineHeight: 1 }}>⚠</div>
-                          <div style={{ fontSize: '0.6rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>
-                            GENERATION FAILED
-                          </div>
-                          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.7, maxWidth: 150 }}>
-                            {imageError}
-                          </div>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleGenerateImageClick() }}
-                            style={{
-                              background: 'transparent', border: '1px solid #ff4455', borderRadius: 8,
-                              padding: '8px 20px', color: '#ff4455',
-                              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem',
-                              cursor: 'pointer', letterSpacing: '0.06em',
-                            }}
-                          >
-                            Try Again
-                          </button>
-                        </div>
-                      ) : imageB64 ? (
-                        /* ── Image ready ── */
-                        <>
-                          <div style={{
-                            width: '100%',
-                            aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16',
-                            overflow: 'hidden', borderRadius: 6,
-                          }}>
-                            <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                          <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                            {['9/16', '1:1', '4:5'].map(f => (
-                              <button
-                                key={f}
-                                onClick={e => { e.stopPropagation(); setImageFormat(f) }}
-                                style={{
-                                  background: imageFormat === f ? '#2990fa' : 'transparent',
-                                  border: '1px solid #2990fa', borderRadius: 4,
-                                  padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff',
-                                  fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
-                                }}
-                              >
-                                {f}
-                              </button>
-                            ))}
-                            <button
-                              disabled={isGeneratingImage}
-                              onClick={e => {
-                                e.stopPropagation()
-                                if (isGeneratingImage) return
-                                setImageError(null)
-                                setIsGeneratingImage(true)
-                                generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false))
-                              }}
-                              style={{
-                                background: 'transparent', border: '1px solid #2990fa', borderRadius: 4,
-                                padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa',
-                                fontFamily: 'var(--font-ibm-plex-mono)', cursor: isGeneratingImage ? 'not-allowed' : 'pointer',
-                                opacity: isGeneratingImage ? 0.4 : 1,
-                              }}
-                            >
-                              New Image
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        /* ── No image yet — placeholder ── */
-                        <div style={{
-                          width: '100%', aspectRatio: '9/16',
-                          background: '#060d1f',
-                          border: '1px dashed rgba(41,144,250,0.3)',
-                          borderRadius: 6,
-                          display: 'flex', flexDirection: 'column',
-                          alignItems: 'center', justifyContent: 'center',
-                          gap: 14,
-                        }}>
-                          <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>
-                            NO IMAGE YET
-                          </div>
-                          <button
-                            disabled={isGeneratingImage}
-                            onClick={e => { e.stopPropagation(); handleGenerateImageClick() }}
-                            style={{
-                              background: isGeneratingImage ? 'rgba(0,229,200,0.3)' : '#00e5c8',
-                              border: 'none', borderRadius: 8,
-                              padding: '10px 22px', color: '#ffffff',
-                              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
-                              cursor: isGeneratingImage ? 'not-allowed' : 'pointer',
-                              letterSpacing: '0.06em',
-                              pointerEvents: isGeneratingImage ? 'none' : 'auto',
-                            }}
-                          >
-                            ⚡ Generate Image
-                          </button>
-                        </div>
-                      )}
+                  {/* Compact thumbnail in right column when image section is NOT active */}
+                  {section === 'image' && !isActive && imageB64 && hasValue && (
+                    <div style={{ marginTop: 6, width: 58, aspectRatio: '9/16', overflow: 'hidden', borderRadius: 4, opacity: 0.9 }}>
+                      <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   )}
                 </div>
