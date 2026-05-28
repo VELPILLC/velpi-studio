@@ -3,12 +3,11 @@ import { useState, useEffect, useRef } from 'react'
 
 // ─── Section constants ────────────────────────────────────────────────────────
 
-const SECTIONS = ['avatar', 'hook', 'visual_format', 'image', 'headline', 'primary_text', 'description', 'cta']
+const SECTIONS = ['avatar', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
 
 const SECTION_PREREQUISITES = {
   hook: 'avatar',
-  visual_format: 'hook',
-  image: 'visual_format',
+  image: 'hook',
   headline: 'image',
   primary_text: 'headline',
   description: 'primary_text',
@@ -17,7 +16,6 @@ const SECTION_PREREQUISITES = {
 
 const SECTION_LABELS = {
   avatar: 'AVATAR',
-  visual_format: 'VISUAL FORMAT',
   hook: 'HOOK',
   image: 'IMAGE',
   headline: 'HEADLINE',
@@ -27,9 +25,8 @@ const SECTION_LABELS = {
 }
 
 const SECTION_PROMPTS = {
-  visual_format: 'Generate 3 visual format style options for this ad.\nVisual format means the overall style and format of the image or creative.\nExamples: Newspaper front page style, Raw documentary photo, News chyron breaking news format, Screenshot of a conversation, Behind the scenes candid, Bold text on solid background.\nDo NOT suggest what the image should contain or what text should appear.\nOnly suggest the visual style and format.\nBase suggestions on the avatar context.',
   hook: 'Generate 3 hook options based on what we know so far.',
-  image: 'Generate 3 image concept descriptions for the visual.',
+  image: 'Generate 3 image concept descriptions for this ad. Each concept must describe a specific, cinematic scene — who or what is in the image, what is happening, the mood, lighting, and setting. Make it vivid and detailed enough to generate a striking photo. No text or logos in any concept.',
   headline: 'Generate 3 headline options. Max 40 characters each.',
   primary_text: 'Generate 3 primary text options. This is the main body copy that appears ABOVE the image in a Meta ad. Tell the story, agitate the problem, present the solution. First 125 characters are critical — they show before See More is clicked. Write longer copy that builds desire and earns the click.',
   description: 'Generate 3 description options. This is the short line that appears BELOW the headline, under the image in a Meta ad. Max 30 characters. One tight punchy line — urgency, social proof, or a reinforcing benefit.',
@@ -38,8 +35,7 @@ const SECTION_PROMPTS = {
 
 const SECTION_OPENING_MESSAGES = {
   hook: 'Here are 3 hook angles built from your avatar. Pick what resonates.',
-  visual_format: 'Based on your hook and avatar I put together 3 visual directions. Each one describes exactly what the image looks and feels like. Pick the one that fits your ad.',
-  image: '3 image concepts based on your hook and visual format.',
+  image: '3 image concepts built from your hook and avatar. Pick one — it generates the actual image.',
   headline: '3 headlines built from your hook and avatar.',
   primary_text: '3 primary text options. This is the body copy above the image — longer copy that tells the story and builds desire. First 125 characters carry the most weight.',
   description: '3 description options. Short line below the headline, under the image. Max 30 characters. Tight and punchy.',
@@ -47,7 +43,6 @@ const SECTION_OPENING_MESSAGES = {
 }
 
 const SECTION_ANGLES = {
-  visual_format: ['Real and unpolished', 'Clean and bold', 'Familiar and trusted', 'Before and after', 'Dramatic moment', 'Simple and direct', 'Authoritative', 'Emotional and human'],
   hook: ['Pain', 'Curiosity', 'Contrarian', 'Benefit', 'Social Proof', 'Fear', 'Authority', 'Story'],
   image: ['Cinematic', 'Editorial', 'Raw/Real', 'Bold Text', 'Lifestyle', 'Before/After'],
   headline: ['Direct', 'Question', 'Bold Claim', 'Call Out', 'Curiosity', 'Number Based'],
@@ -58,15 +53,6 @@ const SECTION_ANGLES = {
 }
 
 const SECTION_SUBCATEGORIES = {
-  visual_format: {
-    'Newspaper': ['Tabloid style','Broadsheet style','Trade publication','Local news front page','Financial paper'],
-    'Raw Photo': ['iPhone candid','Behind the scenes','On the job site','Real customer moment','Unposed portrait'],
-    'News Chyron': ['Breaking news banner','Live update ticker','News alert style','Broadcast lower third'],
-    'Screenshot': ['Text conversation','Google review','Social media post','Email screenshot','DM screenshot'],
-    'Documentary': ['Talking head interview','B-roll footage style','Street documentary','Fly on the wall'],
-    'Text Only': ['Bold single statement','Manifesto style','List format','Question and answer'],
-    'Report Cover': ['Industry report','Case study cover','White paper style','Research findings'],
-  },
   hook: {
     'Pain': ['Financial pain','Time pain','Stress pain','Fear of loss','Embarrassment'],
     'Curiosity': ['Open loop','Surprising fact','Counterintuitive','Hidden secret','What most people miss'],
@@ -175,12 +161,12 @@ const FIELD_LABELS = {
 // ─── Shared constants ─────────────────────────────────────────────────────────
 
 const EMPTY_SECTION_OBJ = () => ({
-  avatar: [], visual_format: [], hook: [], image: [],
+  avatar: [], hook: [], image: [],
   headline: [], primary_text: [], description: [], cta: [],
 })
 
 const EMPTY_VALUES_OBJ = () => ({
-  avatar: null, visual_format: null, hook: null, image: null,
+  avatar: null, hook: null, image: null,
   headline: null, primary_text: null, description: null, cta: null,
 })
 
@@ -1147,7 +1133,6 @@ Do not generate bubble options in this response.`
   function loadFullAdFromLibrary(ad) {
     const svs = {
       avatar: ad.angle || ad.avatar_name || null,
-      visual_format: null,
       hook: ad.hook || null,
       image: ad.image_concept || ad.imageConcept || null,
       headline: ad.headline || null,
@@ -1172,7 +1157,6 @@ Do not generate bubble options in this response.`
   function loadForRefine(ad) {
     const svs = {
       avatar: ad.angle || ad.avatar || null,
-      visual_format: ad.visualFormat || ad.visual_format || null,
       hook: null,
       image: ad.imageConcept || ad.image_concept || null,
       headline: ad.headline || null,
@@ -2133,55 +2117,120 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   )}
 
-                  {/* Image generating indicator — shows regardless of active state */}
-                  {section === 'image' && isGeneratingImage && (
+                  {/* Image section — non-active status pill */}
+                  {section === 'image' && !isActive && isGeneratingImage && (
                     <div style={{
-                      marginTop: 6,
-                      fontSize: '0.58rem',
+                      marginTop: 4,
+                      fontSize: '0.55rem',
                       color: '#2990fa',
                       fontFamily: 'var(--font-ibm-plex-mono)',
                       letterSpacing: '0.04em',
                     }}>
-                      ⚡ Generating image...
+                      ⚡ Generating image in background...
                     </div>
                   )}
 
-                  {/* Image preview — only when active and not generating */}
-                  {isActive && section === 'image' && imageB64 && hasValue && !isGeneratingImage && (
+                  {/* Image section — full UI when active and concept confirmed */}
+                  {section === 'image' && isActive && hasValue && (
                     <div style={{ marginTop: 8 }}>
-                      <div style={{
-                        width: '100%',
-                        aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16',
-                        overflow: 'hidden', borderRadius: 4,
-                      }}>
-                        <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                        {['9/16', '1:1', '4:5'].map(f => (
+                      {isGeneratingImage ? (
+                        /* Loading placeholder */
+                        <div style={{
+                          width: '100%', aspectRatio: '9/16',
+                          background: '#060d1f',
+                          border: '1px solid rgba(41,144,250,0.25)',
+                          borderRadius: 6,
+                          display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center',
+                          gap: 14,
+                        }}>
+                          <span className="img-pulse" style={{ fontSize: '2rem', lineHeight: 1 }}>⚡</span>
+                          <div style={{
+                            fontSize: '0.6rem', color: '#2990fa',
+                            fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em',
+                            textAlign: 'center',
+                          }}>
+                            GENERATING IMAGE
+                          </div>
+                          <div style={{
+                            fontSize: '0.52rem', color: 'rgba(255,255,255,0.3)',
+                            fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center',
+                            maxWidth: 130, lineHeight: 1.7,
+                          }}>
+                            This takes 15–20 seconds.<br />You can keep working.
+                          </div>
+                        </div>
+                      ) : imageB64 ? (
+                        /* Image ready */
+                        <>
+                          <div style={{
+                            width: '100%',
+                            aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : '9/16',
+                            overflow: 'hidden', borderRadius: 6,
+                          }}>
+                            <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                            {['9/16', '1:1', '4:5'].map(f => (
+                              <button
+                                key={f}
+                                onClick={e => { e.stopPropagation(); setImageFormat(f) }}
+                                style={{
+                                  background: imageFormat === f ? '#2990fa' : 'transparent',
+                                  border: '1px solid #2990fa', borderRadius: 4,
+                                  padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff',
+                                  fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
+                                }}
+                              >
+                                {f}
+                              </button>
+                            ))}
+                            <button
+                              onClick={e => {
+                                e.stopPropagation()
+                                setIsGeneratingImage(true)
+                                generateImage(dallePrompt || sectionValues.image).finally(() => setIsGeneratingImage(false))
+                              }}
+                              style={{
+                                background: 'transparent', border: '1px solid #2990fa', borderRadius: 4,
+                                padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa',
+                                fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
+                              }}
+                            >
+                              New Image
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        /* No image yet — placeholder with generate button */
+                        <div style={{
+                          width: '100%', aspectRatio: '9/16',
+                          background: '#060d1f',
+                          border: '1px dashed rgba(41,144,250,0.3)',
+                          borderRadius: 6,
+                          display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center',
+                          gap: 14,
+                        }}>
+                          <div style={{
+                            fontSize: '0.52rem', color: 'rgba(255,255,255,0.2)',
+                            fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em',
+                          }}>
+                            NO IMAGE YET
+                          </div>
                           <button
-                            key={f}
-                            onClick={e => { e.stopPropagation(); setImageFormat(f) }}
+                            onClick={e => { e.stopPropagation(); handleGenerateImageClick() }}
                             style={{
-                              background: imageFormat === f ? '#2990fa' : 'transparent',
-                              border: '1px solid #2990fa', borderRadius: 4,
-                              padding: '2px 8px', fontSize: '0.6rem', color: '#ffffff',
-                              fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
+                              background: '#00e5c8', border: 'none', borderRadius: 8,
+                              padding: '10px 22px', color: '#ffffff',
+                              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
+                              cursor: 'pointer', letterSpacing: '0.06em',
                             }}
                           >
-                            {f}
+                            ⚡ Generate Image
                           </button>
-                        ))}
-                        <button
-                          onClick={e => { e.stopPropagation(); generateImage(dallePrompt || sectionValues.image) }}
-                          style={{
-                            background: 'transparent', border: '1px solid #2990fa', borderRadius: 4,
-                            padding: '2px 8px', fontSize: '0.6rem', color: '#2990fa',
-                            fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer',
-                          }}
-                        >
-                          New Image
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2192,21 +2241,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
             {/* Action buttons — fixed below scroll, always visible */}
             <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {sectionValues.image && !imageB64 && (
-                <button
-                  onClick={handleGenerateImageClick}
-                  disabled={isGeneratingImage}
-                  style={{
-                    background: isGeneratingImage ? 'rgba(0,229,200,0.4)' : '#00e5c8',
-                    border: '1px solid #00e5c8', borderRadius: 10, padding: 14,
-                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                    cursor: isGeneratingImage ? 'default' : 'pointer',
-                    letterSpacing: '0.08em', width: '100%',
-                  }}
-                >
-                  {isGeneratingImage ? 'Generating Image...' : '⚡ Generate Image'}
-                </button>
-              )}
               {allConfirmed && (
                 <button
                   onClick={saveToLibrary}

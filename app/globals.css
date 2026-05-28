@@ -60,6 +60,15 @@ button {
   animation: none !important;
 }
 
+/* Image generation loading pulse — class selector beats * specificity even with !important */
+@keyframes imgPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.img-pulse {
+  animation: imgPulse 1.4s ease-in-out infinite !important;
+}
+
 @media print {
   #app-header,
   #app-tabs,

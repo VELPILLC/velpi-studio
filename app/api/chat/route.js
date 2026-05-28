@@ -1,4 +1,4 @@
-const SECTIONS_ORDER = ['avatar', 'hook', 'visual_format', 'image', 'headline', 'primary_text', 'description', 'cta']
+const SECTIONS_ORDER = ['avatar', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
 
 const JARVIS_SYSTEM = `CRITICAL IDENTITY RULES — NEVER VIOLATE THESE:
 
