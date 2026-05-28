@@ -158,7 +158,7 @@ export default function LibraryTab({ onEdit }) {
       {ads.length === 0 && (
         <div
           style={{
-            color: 'rgba(255,255,255,0.3)',
+            color: '#ffffff',
             fontSize: '0.85rem',
             fontFamily: 'var(--font-ibm-plex-mono)',
             textAlign: 'center',
@@ -180,7 +180,7 @@ export default function LibraryTab({ onEdit }) {
               {selectedIds.length > 0 && (
                 <span style={{
                   fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)',
-                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.06em',
+                  color: '#ffffff', letterSpacing: '0.06em',
                 }}>
                   {selectedIds.length} selected
                 </span>
@@ -188,9 +188,9 @@ export default function LibraryTab({ onEdit }) {
               <button
                 onClick={exitSelectMode}
                 style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.5)',
                   borderRadius: 6, padding: '5px 14px',
-                  color: 'rgba(255,255,255,0.55)',
+                  color: '#ffffff',
                   fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem',
                   cursor: 'pointer', letterSpacing: '0.06em',
                 }}
@@ -372,7 +372,7 @@ export default function LibraryTab({ onEdit }) {
                       <div
                         style={{
                           fontSize: '0.52rem',
-                          color: 'rgba(255,255,255,0.35)',
+                          color: 'rgba(255,255,255,0.75)',
                           fontFamily: 'var(--font-ibm-plex-mono)',
                           marginTop: 3,
                         }}
@@ -465,7 +465,7 @@ export default function LibraryTab({ onEdit }) {
                           alignItems: 'center',
                           justifyContent: 'center',
                           height: '100%',
-                          color: 'rgba(255,255,255,0.2)',
+                          color: 'rgba(255,255,255,0.55)',
                           fontSize: '0.65rem',
                           fontFamily: 'var(--font-ibm-plex-mono)',
                         }}
@@ -550,7 +550,7 @@ export default function LibraryTab({ onEdit }) {
         >
           <span style={{
             fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.7rem',
-            color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em',
+            color: '#ffffff', letterSpacing: '0.04em',
           }}>
             {selectedIds.length} selected
           </span>
@@ -867,10 +867,10 @@ export default function LibraryTab({ onEdit }) {
                 style={{
                   flex: 1,
                   background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.2)',
+                  border: '1px solid rgba(255,255,255,0.4)',
                   borderRadius: 8,
                   padding: 8,
-                  color: 'rgba(255,255,255,0.6)',
+                  color: '#ffffff',
                   fontSize: '0.75rem',
                   fontFamily: 'var(--font-ibm-plex-mono)',
                   cursor: 'pointer',

@@ -54,7 +54,7 @@ export default function Studio() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#060d1f' }}>
+    <div style={{ minHeight: '100vh', background: '#0f1e35' }}>
       {/* HEADER */}
       <header
         id="app-header"
@@ -62,7 +62,7 @@ export default function Studio() {
           position: 'sticky',
           top: 0,
           height: 52,
-          background: '#060d1f',
+          background: '#0f1e35',
           borderBottom: '1px solid rgba(41,144,250,0.3)',
           display: 'flex',
           alignItems: 'center',
@@ -91,7 +91,7 @@ export default function Studio() {
         style={{
           position: 'sticky',
           top: 52,
-          background: '#060d1f',
+          background: '#0f1e35',
           borderBottom: '1px solid rgba(41,144,250,0.3)',
           display: 'flex',
           zIndex: 99,

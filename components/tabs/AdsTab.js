@@ -1703,7 +1703,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     return {
       border: `1px solid ${selected ? '#2990fa' : '#152840'}`,
       background: selected ? '#0a1f3f' : '#060d1f',
-      color: selected ? '#ffffff' : 'rgba(255,255,255,0.75)',
+      color: '#ffffff',
       padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
       fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
       lineHeight: 1.4, textAlign: 'left', width: '100%', boxSizing: 'border-box',
@@ -1788,8 +1788,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 onClick={() => setAdEntryMode('working')}
                 style={{
                   background: 'transparent', border: 'none',
-                  color: 'rgba(255,255,255,0.35)',
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem',
                   cursor: 'pointer', letterSpacing: '0.06em',
                   textDecoration: 'underline', textAlign: 'center', padding: '4px 0',
                 }}
@@ -1870,8 +1870,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             onClick={handleRestart}
             disabled={isBuildingSummary}
             style={{
-              border: '1px solid rgba(255,255,255,0.18)', background: 'transparent',
-              color: 'rgba(255,255,255,0.4)', padding: '6px 14px', borderRadius: 6,
+              border: '1px solid rgba(255,255,255,0.45)', background: 'transparent',
+              color: '#ffffff', padding: '6px 14px', borderRadius: 6,
               cursor: isBuildingSummary ? 'wait' : 'pointer',
               fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0,
               whiteSpace: 'nowrap', letterSpacing: '0.04em',
@@ -1900,7 +1900,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     ? <button onClick={() => gotoSection(SECTIONS[activeSectionIdx - 1])} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>←</button>
                     : null
               )}
-              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
+              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.5)', letterSpacing: '0.05em' }}>
                 {activeSection ? SECTION_LABELS[activeSection] : 'SELECT SECTION'}
               </div>
               {activeSection !== null && (
@@ -1920,7 +1920,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               marginBottom: 10,
             }}>
               {activeSection === null && (
-                <div style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-inter)', fontSize: '0.88rem', textAlign: 'center', paddingTop: 24 }}>
+                <div style={{ color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-inter)', fontSize: '0.88rem', textAlign: 'center', paddingTop: 24 }}>
                   Select a section to continue
                 </div>
               )}
@@ -2003,7 +2003,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                             {label}
                           </div>
                           <div style={{ fontSize: '0.78rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.4 }}>
-                            {avatarData[field] || <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
+                            {avatarData[field] || <span style={{ color: 'rgba(255,255,255,0.55)' }}>—</span>}
                           </div>
                         </div>
                       ))}
@@ -2440,7 +2440,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   {hasValue && (
                     <div style={{
                       fontSize: '0.82rem',
-                      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.85)',
                       fontFamily: 'var(--font-inter)',
                       lineHeight: 1.5,
                       marginTop: 4,
@@ -2484,7 +2484,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           <div style={{ fontSize: '0.6rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center' }}>
                             GENERATING IMAGE
                           </div>
-                          <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', maxWidth: 140, lineHeight: 1.7 }}>
+                          <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', maxWidth: 140, lineHeight: 1.7 }}>
                             This takes about 20 seconds.<br />You can keep working.
                           </div>
                         </div>
@@ -2503,7 +2503,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           <div style={{ fontSize: '0.6rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.08em', textAlign: 'center' }}>
                             GENERATION FAILED
                           </div>
-                          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.7, maxWidth: 150 }}>
+                          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.7, maxWidth: 150 }}>
                             {imageError}
                           </div>
                           <button
@@ -2574,7 +2574,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           alignItems: 'center', justifyContent: 'center',
                           gap: 14,
                         }}>
-                          <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>
+                          <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>
                             NO IMAGE YET
                           </div>
                           <button
@@ -2641,7 +2641,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ffffff', letterSpacing: '0.05em' }}>
               Unsaved Work
             </div>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 4 }}>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5, marginBottom: 4 }}>
               You have unsaved work. What do you want to do?
             </div>
 
@@ -2710,8 +2710,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 onCancel?.()
               }}
               style={{
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8,
-                padding: '12px 0', color: 'rgba(255,255,255,0.6)',
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8,
+                padding: '12px 0', color: '#ffffff',
                 fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
                 cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
               }}
@@ -2772,7 +2772,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               </button>
             </div>
 
-            <div style={{ fontSize: '0.57rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', letterSpacing: '0.04em', lineHeight: 1.6 }}>
+            <div style={{ fontSize: '0.57rem', color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', letterSpacing: '0.04em', lineHeight: 1.6 }}>
               Copy this and paste it into the next session to pick up where you left off
             </div>
 
@@ -2791,8 +2791,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             <button
               onClick={() => { setResetModal(null); setCopied(false) }}
               style={{
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: 8, padding: '11px 0', color: 'rgba(255,255,255,0.55)',
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.4)',
+                borderRadius: 8, padding: '11px 0', color: '#ffffff',
                 fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
                 cursor: 'pointer', letterSpacing: '0.06em', width: '100%', textAlign: 'center',
               }}

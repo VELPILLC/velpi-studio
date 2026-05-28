@@ -88,7 +88,7 @@ function bubbleStyle(selected) {
   return {
     border: `1px solid ${selected ? '#2990fa' : '#152840'}`,
     background: selected ? '#0a1f3f' : '#060d1f',
-    color: selected ? '#ffffff' : 'rgba(255,255,255,0.75)',
+    color: '#ffffff',
     padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
     fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
     lineHeight: 1.4, textAlign: 'left', width: '100%', boxSizing: 'border-box',
@@ -482,7 +482,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             onClick={() => setDropdownOpen(v => !v)}
             style={{
               background: '#060d1f', border: '1px solid #2990fa', borderRadius: 6,
-              color: selectedProfile ? '#ffffff' : 'rgba(255,255,255,0.4)',
+              color: selectedProfile ? '#ffffff' : 'rgba(255,255,255,0.75)',
               padding: '6px 14px', cursor: 'pointer',
               fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem',
               display: 'flex', alignItems: 'center', gap: 8, minWidth: 180,
@@ -502,7 +502,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
             }}>
               {profiles.length === 0 && (
-                <div style={{ padding: '12px 16px', color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                <div style={{ padding: '12px 16px', color: 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>
                   No profiles yet
                 </div>
               )}
@@ -755,7 +755,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           {label}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.4 }}>
-                          {profileData[field] || <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
+                          {profileData[field] || <span style={{ color: 'rgba(255,255,255,0.55)' }}>—</span>}
                         </div>
                       </div>
                     ))}
@@ -866,7 +866,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
                       {label}
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--font-inter)', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: '0.82rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.5 }}>
                       {value}
                     </div>
                   </div>
@@ -875,7 +875,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             </div>
           ) : (
             <div style={{ background: '#060d1f', border: '1px solid #152840', borderRadius: 10, padding: 18, textAlign: 'center' }}>
-              <div style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'var(--font-inter)', fontSize: '0.82rem' }}>
+              <div style={{ color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-inter)', fontSize: '0.82rem' }}>
                 No profile selected
               </div>
             </div>
