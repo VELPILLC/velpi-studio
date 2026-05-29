@@ -207,6 +207,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [currentImageIdx, setCurrentImageIdx] = useState(0)
   const [currentDraftId, setCurrentDraftId] = useState(null)
   const [unsavedPrompt, setUnsavedPrompt] = useState(null)
+  const [imageViewMode, setImageViewMode] = useState('single') // 'single' | 'multi'
+  const [imgMultiExpanded, setImgMultiExpanded] = useState({})
+  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false)
+  const [imgSelectMsg, setImgSelectMsg] = useState(null)
 
   const chatScrollRef = useRef(null)
 
@@ -281,6 +285,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setCurrentImageIdx(0)
     setCurrentDraftId(null)
     setUnsavedPrompt(null)
+    setImageViewMode('single')
+    setImgMultiExpanded({})
+    setPlatformDropdownOpen(false)
+    setImgSelectMsg(null)
     setAdEntryMode('entry')
     setFreeformIdeaText('')
     setStoredIdeaText('')
@@ -1275,15 +1283,21 @@ Do not generate bubble options in this response.`
     }
   }
 
-  async function generateImageVersion(concept, fmt, referenceB64s = []) {
-    const versionId = `v-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const newVersion = { id: versionId, b64: null, prompt: concept, format: fmt, isGenerating: true, error: null }
-    const newIdx = imageVersions.length
-    setImageVersions(prev => [...prev, newVersion])
-    setCurrentImageIdx(newIdx)
+  async function generateImageVersion(concept, fmt, referenceB64s = [], parentId = null) {
+    // Reuse pending placeholder slot if one exists, otherwise create a new version
+    const pendingVersion = imageVersions.find(v => v.isPending)
+    const versionId = pendingVersion?.id || `v-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const generatingVersion = { id: versionId, b64: null, prompt: concept, format: fmt, isGenerating: true, error: null, parentId, isPending: false }
+
+    if (pendingVersion) {
+      setImageVersions(prev => prev.map(v => v.isPending ? generatingVersion : v))
+    } else {
+      setImageVersions(prev => [...prev, generatingVersion])
+      setCurrentImageIdx(imageVersions.length)
+    }
 
     try {
-      const sizeMap = { '9/16': '1024x1536', '1:1': '1024x1024', '4:5': '1024x1536', '16/9': '1536x1024' }
+      const sizeMap = { '9/16': '1024x1792', '1:1': '1024x1024', '4:5': '1024x1280', '16/9': '1792x1024' }
       const formatDesc = fmt === '1:1' ? 'square format photo' : fmt === '4:5' ? 'vertical 4:5 portrait photo' : fmt === '16/9' ? 'horizontal 16:9 landscape photo' : 'cinematic vertical 9:16 portrait photo'
       const promptText = `${formatDesc}, ${concept}, no text, no logos, photorealistic, documentary style`
 
@@ -1292,7 +1306,7 @@ Do not generate bubble options in this response.`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          size: sizeMap[fmt] || '1024x1536',
+          size: sizeMap[fmt] || '1024x1792',
           ...(referenceB64s.length > 0 ? { referenceB64s } : {}),
         }),
       })
@@ -1304,40 +1318,76 @@ Do not generate bubble options in this response.`
       }
     } catch (err) {
       console.error('Image gen error:', err)
-      setImageVersions(prev => prev.map(v => v.id === versionId ? { ...v, isGenerating: false, error: 'Something went wrong. Check your connection and try again.' } : v))
+      setImageVersions(prev => prev.map(v => v.id === versionId ? { ...v, isGenerating: false, error: 'Something went wrong.' } : v))
     }
   }
 
-  function handleGenerateFromBubble() {
-    if (selectedBubbles.length !== 1 || isLoading) return
+  function handleSizeClick(fmt) {
+    setImageFormat(fmt)
+    setImageError(null)
+    if (imageVersions.length > 0) {
+      const pendingIdx = imageVersions.findIndex(v => v.isPending)
+      if (pendingIdx >= 0) {
+        // Update format of existing pending placeholder
+        setImageVersions(prev => prev.map((v, i) => i === pendingIdx ? { ...v, format: fmt } : v))
+        setCurrentImageIdx(pendingIdx)
+      } else {
+        // Add new pending placeholder at the end
+        setImageVersions(prev => [
+          ...prev,
+          { id: `pending-${Date.now()}`, b64: null, prompt: null, format: fmt, isGenerating: false, error: null, parentId: null, isPending: true },
+        ])
+        setCurrentImageIdx(imageVersions.length) // length before appending = new last index
+      }
+    }
+  }
+
+  function handleGenerateImageClick() {
+    if (!imageFormat && selectedBubbles.length !== 1) {
+      setImgSelectMsg('Select a size and a prompt first')
+      setTimeout(() => setImgSelectMsg(null), 2500)
+      return
+    }
+    if (!imageFormat) {
+      setImgSelectMsg('Select a size first')
+      setTimeout(() => setImgSelectMsg(null), 2500)
+      return
+    }
+    if (selectedBubbles.length !== 1) {
+      setImgSelectMsg('Select a prompt from the left first')
+      setTimeout(() => setImgSelectMsg(null), 2500)
+      return
+    }
     const concept = selectedBubbles[0]
-    const fmt = imageFormat || '9/16'
+    const fmt = imageFormat
     const refs = selectedImageIds.map(id => imageVersions.find(v => v.id === id)?.b64).filter(Boolean)
-    setSectionChats(prev => ({
-      ...prev,
-      image: [...prev.image, { role: 'user', content: concept }],
-    }))
+    const parentId = refs.length > 0 ? selectedImageIds[0] : null
+    setSectionChats(prev => ({ ...prev, image: [...prev.image, { role: 'user', content: concept }] }))
     setDallePrompt(concept)
-    generateImageVersion(concept, fmt, refs)
+    generateImageVersion(concept, fmt, refs, parentId)
   }
 
   function handleImageVersionClick(version) {
     if (!version.b64) return
-    setSelectedImageIds(prev => {
-      if (prev.includes(version.id)) return prev.filter(id => id !== version.id)
-      if (prev.length >= 2) return [prev[1], version.id]
-      return [...prev, version.id]
-    })
-    if (version.prompt) setTypeOwn(version.prompt)
+    if (selectedImageIds.includes(version.id)) {
+      setSelectedImageIds(prev => prev.filter(id => id !== version.id))
+      return
+    }
+    if (selectedImageIds.length >= 2) {
+      setImgSelectMsg('Unselect one to choose another')
+      setTimeout(() => setImgSelectMsg(null), 2500)
+      return
+    }
+    setSelectedImageIds(prev => [...prev, version.id])
   }
 
-  function handleImageSubmit() {
-    if (selectedImageIds.length !== 1) return
-    const version = imageVersions.find(v => v.id === selectedImageIds[0])
+  function handleImageSubmit(versionOverride = null) {
+    const version = versionOverride || (selectedImageIds.length === 1 ? imageVersions.find(v => v.id === selectedImageIds[0]) : null)
     if (!version?.b64) return
 
     setImageB64(version.b64)
     setDallePrompt(version.prompt || '')
+    setSelectedImageIds([version.id])
 
     const concept = version.prompt || sectionValues.image || dallePrompt || 'Generated image'
     const newSvs = { ...sectionValues, image: concept }
@@ -1384,7 +1434,7 @@ Do not generate bubble options in this response.`
     setDallePrompt(loadedConcept)
     if (loadedB64) {
       const vId = `loaded-${Date.now()}`
-      setImageVersions([{ id: vId, b64: loadedB64, prompt: loadedConcept, format: '9/16', isGenerating: false, error: null }])
+      setImageVersions([{ id: vId, b64: loadedB64, prompt: loadedConcept, format: '9/16', isGenerating: false, error: null, parentId: null, isPending: false }])
       setSelectedImageIds([vId])
       setCurrentImageIdx(0)
     } else {
@@ -1422,7 +1472,7 @@ Do not generate bubble options in this response.`
     setDallePrompt(refineConcept)
     if (refineB64) {
       const vId = `loaded-${Date.now()}`
-      setImageVersions([{ id: vId, b64: refineB64, prompt: refineConcept, format: '9/16', isGenerating: false, error: null }])
+      setImageVersions([{ id: vId, b64: refineB64, prompt: refineConcept, format: '9/16', isGenerating: false, error: null, parentId: null, isPending: false }])
       setSelectedImageIds([vId])
       setCurrentImageIdx(0)
     } else {
@@ -1664,6 +1714,10 @@ Do not generate bubble options in this response.`
     setCurrentImageIdx(0)
     setCurrentDraftId(null)
     setUnsavedPrompt(null)
+    setImageViewMode('single')
+    setImgMultiExpanded({})
+    setPlatformDropdownOpen(false)
+    setImgSelectMsg(null)
     setSelectedAvatar(null)
     setSelectedPlatform(null)
     initAvatarFunnel()
@@ -1686,6 +1740,8 @@ Do not generate bubble options in this response.`
       setImageVersions([])
       setSelectedImageIds([])
       setCurrentImageIdx(0)
+      setImageViewMode('single')
+      setImgMultiExpanded({})
     }
     if (section === activeSection) {
       setCurrentBubbles([])
@@ -1809,11 +1865,15 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     const val = typeOwn.trim()
     setTypeOwn('')
     setCurrentBubbles(prev => prev.includes(val) ? prev : [...prev, val])
-    setSelectedBubbles(prev => {
-      if (prev.includes(val)) return prev
-      if (prev.length < 2) return [...prev, val]
-      return [prev[1], val]
-    })
+    if (activeSection === 'image') {
+      setSelectedBubbles([val]) // single-select for image
+    } else {
+      setSelectedBubbles(prev => {
+        if (prev.includes(val)) return prev
+        if (prev.length < 2) return [...prev, val]
+        return [prev[1], val]
+      })
+    }
   }
 
   function handleEditSave(idx) {
@@ -1827,6 +1887,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
   }
 
   function handleBubbleClick(bubble) {
+    if (activeSection === 'image') {
+      // Single-select only for image section
+      setSelectedBubbles(prev => prev.includes(bubble) ? [] : [bubble])
+      return
+    }
     setSelectedBubbles(prev => {
       if (prev.includes(bubble)) return prev.filter(b => b !== bubble)
       if (prev.length < 2) return [...prev, bubble]
@@ -2033,8 +2098,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         {/* ── MAIN GRID ── */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: activeSection === 'image' ? '280px 1fr 260px' : '1fr 1fr',
-          gap: activeSection === 'image' ? 16 : 32,
+          gridTemplateColumns: activeSection === 'image' ? '1fr 1fr 200px' : '1fr 1fr',
+          gap: activeSection === 'image' ? 12 : 32,
           flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 8px',
           alignItems: 'start',
         }}>
@@ -2492,14 +2557,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       →
                     </button>
                   )}
-                  {activeSection === 'image' && canSubmit && (
-                    <button
-                      onClick={handleGenerateFromBubble}
-                      style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
-                    >
-                      GENERATE
-                    </button>
-                  )}
                   {activeSection !== 'avatar' && activeSection !== 'image' && canSubmit && (
                     <button
                       onClick={handleSubmit}
@@ -2518,191 +2575,356 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           {activeSection === 'image' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
 
-              {/* Size buttons */}
-              <div style={{ flexShrink: 0, display: 'flex', gap: 6, marginBottom: 12 }}>
-                {[
-                  { id: '9/16', label: '9:16', desc: 'Story' },
-                  { id: '1:1', label: '1:1', desc: 'Square' },
-                  { id: '4:5', label: '4:5', desc: 'Portrait' },
-                  { id: '16/9', label: '16:9', desc: 'Wide' },
-                ].map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => {
-                      setImageFormat(f.id)
-                      setImageError(null)
-                      if (selectedImageIds.length === 1) {
-                        const selVer = imageVersions.find(v => v.id === selectedImageIds[0])
-                        if (selVer?.b64) {
-                          const concept = selVer.prompt || dallePrompt || sectionValues.image || ''
-                          generateImageVersion(concept, f.id, [selVer.b64])
-                        }
-                      }
-                    }}
-                    style={{
-                      flex: 1,
-                      background: imageFormat === f.id ? '#2990fa' : '#0a1628',
-                      border: `2px solid ${imageFormat === f.id ? '#2990fa' : '#152840'}`,
-                      borderRadius: 8, padding: '8px 4px', cursor: 'pointer',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                    }}
-                  >
-                    <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', fontWeight: 600 }}>{f.label}</span>
-                    <span style={{ fontSize: '0.46rem', fontFamily: 'var(--font-ibm-plex-mono)', color: imageFormat === f.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.45)' }}>{f.desc}</span>
-                  </button>
-                ))}
+              {/* Top row: size buttons + view toggle */}
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+                  {[
+                    { id: '9/16', label: '9:16', desc: 'Story' },
+                    { id: '1:1', label: '1:1', desc: 'Square' },
+                    { id: '4:5', label: '4:5', desc: 'Portrait' },
+                    { id: '16/9', label: '16:9', desc: 'Wide' },
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => handleSizeClick(f.id)}
+                      style={{
+                        flex: 1,
+                        background: imageFormat === f.id ? '#2990fa' : '#0a1628',
+                        border: `2px solid ${imageFormat === f.id ? '#2990fa' : '#152840'}`,
+                        borderRadius: 8, padding: '7px 4px', cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                      }}
+                    >
+                      <span style={{ fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', fontWeight: 600 }}>{f.label}</span>
+                      <span style={{ fontSize: '0.44rem', fontFamily: 'var(--font-ibm-plex-mono)', color: imageFormat === f.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)' }}>{f.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                  {['single', 'multi'].map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setImageViewMode(mode)}
+                      style={{
+                        background: imageViewMode === mode ? '#2990fa' : '#0a1628',
+                        border: `1px solid ${imageViewMode === mode ? '#2990fa' : '#152840'}`,
+                        borderRadius: 6, padding: '5px 9px', cursor: 'pointer',
+                        fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)',
+                        color: '#ffffff', letterSpacing: '0.06em', textTransform: 'uppercase',
+                      }}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Image workspace */}
-              {imageVersions.length === 0 ? (
-                /* Empty placeholder */
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
-                  <div style={{
-                    aspectRatio: imageFormat === '1:1' ? '1/1' : imageFormat === '4:5' ? '4/5' : imageFormat === '16/9' ? '16/9' : '9/16',
-                    maxHeight: 'calc(100vh - 320px)', maxWidth: '100%',
-                    background: '#060d1f', border: '2px dashed rgba(41,144,250,0.12)',
-                    borderRadius: 10, display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24,
-                    minWidth: 80,
-                  }}>
-                    <div style={{ fontSize: '2.2rem', opacity: 0.15 }}>⚡</div>
-                    <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.8 }}>
-                      SELECT A CONCEPT<br />AND CLICK GENERATE
-                    </div>
-                  </div>
+              {/* Toast message */}
+              {imgSelectMsg && (
+                <div style={{ flexShrink: 0, textAlign: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: '0.6rem', color: '#e5c07b', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>
+                    {imgSelectMsg}
+                  </span>
                 </div>
-              ) : (
-                /* Image versions viewer */
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 8 }}>
+              )}
 
-                  {/* Navigation row + image */}
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 0 }}>
+              {imageViewMode === 'single' ? (
+                /* ── SINGLE VIEW ── */
+                (() => {
+                  const allFrames = imageVersions
+                  const totalFrames = allFrames.length
+                  const hasFrames = totalFrames > 0
+                  const clampedIdx = hasFrames ? Math.min(currentImageIdx, totalFrames - 1) : 0
+                  const currentFrame = hasFrames ? allFrames[clampedIdx] : null
+                  const isReady = !!currentFrame?.b64
+                  const isGenerating = !!currentFrame?.isGenerating
+                  const isError = !!currentFrame?.error
+                  const isPendingOrEmpty = !hasFrames || (currentFrame && !isReady && !isGenerating && !isError)
+                  const canGenerate = !!imageFormat && selectedBubbles.length === 1
+                  const frameFormat = currentFrame?.format || imageFormat
+                  const frameRatio = frameFormat === '1:1' ? '1/1' : frameFormat === '4:5' ? '4/5' : frameFormat === '16/9' ? '16/9' : frameFormat === '9/16' ? '9/16' : null
 
-                    {/* Left arrow */}
-                    <button
-                      onClick={() => setCurrentImageIdx(prev => Math.max(0, prev - 1))}
-                      disabled={currentImageIdx === 0}
-                      style={{
-                        background: 'transparent', border: '1px solid #152840',
-                        color: currentImageIdx === 0 ? 'rgba(255,255,255,0.15)' : '#ffffff',
-                        borderRadius: 6, padding: '8px 10px',
-                        cursor: currentImageIdx === 0 ? 'default' : 'pointer',
-                        fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', flexShrink: 0,
-                      }}
-                    >←</button>
-
-                    {/* Image frame */}
-                    {(() => {
-                      const version = imageVersions[Math.min(currentImageIdx, imageVersions.length - 1)]
-                      if (!version) return null
-                      const fmt = version.format || imageFormat || '9/16'
-                      const frameRatio = fmt === '1:1' ? '1/1' : fmt === '4:5' ? '4/5' : fmt === '16/9' ? '16/9' : '9/16'
-                      const isSelected = selectedImageIds.includes(version.id)
-                      return (
-                        <div
-                          onClick={() => version.b64 && handleImageVersionClick(version)}
+                  return (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 6 }}>
+                      {/* Nav + frame */}
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 0 }}>
+                        {/* Left arrow */}
+                        <button
+                          onClick={() => setCurrentImageIdx(prev => Math.max(0, prev - 1))}
                           style={{
-                            aspectRatio: frameRatio,
-                            maxHeight: 'calc(100vh - 380px)',
-                            maxWidth: '100%',
-                            overflow: 'hidden', borderRadius: 8, flexShrink: 0,
-                            border: isSelected ? '2px solid #2990fa' : '1px solid rgba(41,144,250,0.2)',
+                            background: 'transparent', border: '1px solid #152840',
+                            color: (!hasFrames || clampedIdx === 0) ? 'rgba(255,255,255,0.12)' : '#ffffff',
+                            borderRadius: 6, padding: '8px 10px',
+                            cursor: (!hasFrames || clampedIdx === 0) ? 'default' : 'pointer',
+                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', flexShrink: 0,
+                          }}
+                        >←</button>
+
+                        {/* Frame */}
+                        <div
+                          onClick={() => isReady && handleImageVersionClick(currentFrame)}
+                          style={{
+                            ...(frameRatio
+                              ? { aspectRatio: frameRatio, maxHeight: 'calc(100vh - 390px)' }
+                              : { width: 180, height: 240 }),
+                            maxWidth: '100%', minWidth: 80,
+                            overflow: 'hidden', borderRadius: 10, flexShrink: 0,
+                            border: (isReady && selectedImageIds.includes(currentFrame?.id))
+                              ? '2px solid #2990fa'
+                              : '1px solid rgba(41,144,250,0.18)',
                             background: '#060d1f',
-                            cursor: version.b64 ? 'pointer' : 'default',
+                            cursor: isReady ? 'pointer' : 'default',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             position: 'relative',
                           }}
                         >
-                          {version.b64 ? (
-                            <img
-                              src={`data:image/png;base64,${version.b64}`}
-                              alt=""
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          ) : version.isGenerating ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 24, minHeight: 100 }}>
+                          {isReady ? (
+                            <>
+                              <img src={`data:image/png;base64,${currentFrame.b64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {selectedImageIds.includes(currentFrame.id) && (
+                                <div style={{ position: 'absolute', top: 6, right: 6, background: '#2990fa', borderRadius: 4, padding: '2px 6px', fontSize: '0.46rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#fff' }}>✓</div>
+                              )}
+                            </>
+                          ) : isGenerating ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 24 }}>
                               <span className="img-pulse" style={{ fontSize: '2rem', lineHeight: 1 }}>⚡</span>
                               <div style={{ fontSize: '0.55rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em' }}>GENERATING</div>
-                              <div style={{ fontSize: '0.46rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', lineHeight: 1.7 }}>~20 seconds</div>
+                              <div style={{ fontSize: '0.46rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-ibm-plex-mono)' }}>~20 seconds</div>
                             </div>
-                          ) : version.error ? (
+                          ) : isError ? (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 20 }}>
                               <div style={{ fontSize: '1.2rem' }}>⚠</div>
                               <div style={{ fontSize: '0.52rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center' }}>FAILED</div>
                               <button
                                 onClick={e => {
                                   e.stopPropagation()
-                                  const concept = version.prompt || dallePrompt || sectionValues.image || ''
-                                  generateImageVersion(concept, version.format || imageFormat || '9/16')
+                                  generateImageVersion(currentFrame.prompt || dallePrompt || sectionValues.image || '', currentFrame.format || imageFormat || '9/16', [], currentFrame.parentId)
                                 }}
                                 style={{ background: 'transparent', border: '1px solid #ff4455', borderRadius: 6, padding: '4px 10px', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', cursor: 'pointer' }}
                               >Retry</button>
                             </div>
-                          ) : null}
-                          {isSelected && version.b64 && (
-                            <div style={{ position: 'absolute', top: 6, right: 6, background: '#2990fa', borderRadius: 4, padding: '2px 6px', fontSize: '0.46rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', letterSpacing: '0.06em' }}>
-                              ✓
+                          ) : (
+                            /* Placeholder — empty or pending */
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: 24 }}>
+                              <div style={{ fontSize: '2rem', opacity: 0.08 }}>⚡</div>
+                              <button
+                                onClick={e => { e.stopPropagation(); handleGenerateImageClick() }}
+                                style={{
+                                  background: canGenerate ? '#2990fa' : '#0d1e2e',
+                                  border: `1px solid ${canGenerate ? '#2990fa' : '#1d3558'}`,
+                                  color: canGenerate ? '#ffffff' : '#2a4a6a',
+                                  padding: '9px 18px', borderRadius: 8,
+                                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
+                                  cursor: 'pointer', letterSpacing: '0.08em',
+                                }}
+                              >
+                                GENERATE IMAGE
+                              </button>
+                              {!frameRatio && (
+                                <div style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.18)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.9 }}>
+                                  SELECT A SIZE ABOVE
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )
-                    })()}
 
-                    {/* Right arrow */}
-                    <button
-                      onClick={() => setCurrentImageIdx(prev => Math.min(imageVersions.length - 1, prev + 1))}
-                      disabled={currentImageIdx >= imageVersions.length - 1}
-                      style={{
-                        background: 'transparent', border: '1px solid #152840',
-                        color: currentImageIdx >= imageVersions.length - 1 ? 'rgba(255,255,255,0.15)' : '#ffffff',
-                        borderRadius: 6, padding: '8px 10px',
-                        cursor: currentImageIdx >= imageVersions.length - 1 ? 'default' : 'pointer',
-                        fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', flexShrink: 0,
-                      }}
-                    >→</button>
-                  </div>
-
-                  {/* Counter + prompt */}
-                  <div style={{ flexShrink: 0, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-ibm-plex-mono)', marginBottom: 3 }}>
-                      {Math.min(currentImageIdx + 1, imageVersions.length)} / {imageVersions.length}
-                    </div>
-                    {imageVersions[Math.min(currentImageIdx, imageVersions.length - 1)]?.prompt && (
-                      <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-ibm-plex-mono)', lineHeight: 1.5, maxWidth: 260, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {imageVersions[Math.min(currentImageIdx, imageVersions.length - 1)].prompt}
+                        {/* Right arrow */}
+                        <button
+                          onClick={() => setCurrentImageIdx(prev => Math.min(totalFrames - 1, prev + 1))}
+                          style={{
+                            background: 'transparent', border: '1px solid #152840',
+                            color: (!hasFrames || clampedIdx >= totalFrames - 1) ? 'rgba(255,255,255,0.12)' : '#ffffff',
+                            borderRadius: 6, padding: '8px 10px',
+                            cursor: (!hasFrames || clampedIdx >= totalFrames - 1) ? 'default' : 'pointer',
+                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', flexShrink: 0,
+                          }}
+                        >→</button>
                       </div>
-                    )}
-                  </div>
 
-                  {/* SUBMIT button — one image selected with b64 */}
-                  {selectedImageIds.length === 1 && imageVersions.find(v => v.id === selectedImageIds[0])?.b64 && (
-                    <div style={{ flexShrink: 0, textAlign: 'center' }}>
-                      <button
-                        onClick={handleImageSubmit}
-                        style={{
-                          background: '#2990fa', border: 'none', color: '#ffffff',
-                          borderRadius: 8, padding: '10px 28px',
-                          fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem',
-                          cursor: 'pointer', letterSpacing: '0.06em',
-                        }}
-                      >
-                        SUBMIT IMAGE →
-                      </button>
+                      {/* Counter + prompt */}
+                      {hasFrames && (
+                        <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', marginBottom: 2 }}>
+                            {clampedIdx + 1} / {totalFrames}
+                          </div>
+                          {currentFrame?.prompt && (
+                            <div style={{ fontSize: '0.46rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', maxWidth: 240, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {currentFrame.prompt}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* SUBMIT IMAGE button */}
+                      {isReady && (
+                        <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleImageSubmit(currentFrame)}
+                            style={{
+                              background: '#2990fa', border: 'none', color: '#ffffff',
+                              borderRadius: 8, padding: '9px 24px',
+                              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
+                              cursor: 'pointer', letterSpacing: '0.06em',
+                            }}
+                          >
+                            SUBMIT IMAGE →
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Reference select hint */}
+                      {selectedImageIds.length > 0 && (
+                        <div style={{ flexShrink: 0, textAlign: 'center', fontSize: '0.44rem', color: 'rgba(41,144,250,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em' }}>
+                          {selectedImageIds.length === 2 ? '2 refs selected — GENERATE IMAGE to blend' : '1 ref selected — GENERATE IMAGE to use as reference'}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  )
+                })()
 
-                  {/* Selection hint */}
-                  {selectedImageIds.length > 0 && (
-                    <div style={{ flexShrink: 0, fontSize: '0.46rem', color: 'rgba(41,144,250,0.7)', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center', letterSpacing: '0.06em', lineHeight: 1.6 }}>
-                      {selectedImageIds.length === 2
-                        ? '2 SELECTED — GENERATE to blend'
-                        : selectedImageIds.length === 1 && imageVersions.find(v => v.id === selectedImageIds[0])?.b64
-                          ? 'SUBMIT to confirm • GENERATE to use as reference'
-                          : ''}
+              ) : (
+                /* ── MULTI VIEW ── */
+                (() => {
+                  const topLevel = imageVersions.filter(v => !v.parentId && !v.isPending)
+                  const canGenerate = !!imageFormat && selectedBubbles.length === 1
+                  return (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 8 }}>
+
+                      {/* GENERATE button */}
+                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          onClick={handleGenerateImageClick}
+                          style={{
+                            background: canGenerate ? '#2990fa' : '#0d1e2e',
+                            border: `1px solid ${canGenerate ? '#2990fa' : '#1d3558'}`,
+                            color: canGenerate ? '#ffffff' : '#2a4a6a',
+                            padding: '7px 16px', borderRadius: 8,
+                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem',
+                            cursor: 'pointer', letterSpacing: '0.08em', flexShrink: 0,
+                          }}
+                        >
+                          GENERATE IMAGE
+                        </button>
+                        {selectedImageIds.length > 0 && (
+                          <span style={{ fontSize: '0.5rem', color: 'rgba(41,144,250,0.7)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
+                            {selectedImageIds.length} ref{selectedImageIds.length > 1 ? 's' : ''} selected
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Image grid with parent/child folders */}
+                      <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
+                        {topLevel.length === 0 && (
+                          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.58rem', fontFamily: 'var(--font-ibm-plex-mono)', paddingTop: 32 }}>
+                            No images yet — generate one
+                          </div>
+                        )}
+                        {topLevel.map(parent => {
+                          const children = imageVersions.filter(v => v.parentId === parent.id && !v.isPending)
+                          const isExpanded = !!imgMultiExpanded[parent.id]
+                          const pRatio = parent.format === '1:1' ? '1/1' : parent.format === '4:5' ? '4/5' : parent.format === '16/9' ? '16/9' : '9/16'
+                          const pSelRef = selectedImageIds.includes(parent.id)
+                          return (
+                            <div key={parent.id} style={{ marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                {/* Parent thumbnail */}
+                                <div
+                                  onClick={() => handleImageVersionClick(parent)}
+                                  style={{
+                                    width: 68, aspectRatio: pRatio, flexShrink: 0,
+                                    borderRadius: 6, overflow: 'hidden',
+                                    border: pSelRef ? '2px solid #2990fa' : '1px solid rgba(41,144,250,0.2)',
+                                    background: '#060d1f', cursor: parent.b64 ? 'pointer' : 'default',
+                                    position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  {parent.b64 ? (
+                                    <>
+                                      <img src={`data:image/png;base64,${parent.b64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      {pSelRef && <div style={{ position: 'absolute', top: 2, right: 2, background: '#2990fa', borderRadius: 3, padding: '1px 4px', fontSize: '0.44rem', color: '#fff' }}>✓</div>}
+                                    </>
+                                  ) : parent.isGenerating ? (
+                                    <span className="img-pulse" style={{ fontSize: '1.2rem', opacity: 0.5 }}>⚡</span>
+                                  ) : parent.error ? (
+                                    <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>⚠</span>
+                                  ) : null}
+                                </div>
+                                {/* Info */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', marginBottom: 2 }}>
+                                    {parent.format || '9/16'}
+                                  </div>
+                                  {parent.prompt && (
+                                    <div style={{ fontSize: '0.54rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-inter)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
+                                      {parent.prompt}
+                                    </div>
+                                  )}
+                                  {children.length > 0 && (
+                                    <button
+                                      onClick={() => setImgMultiExpanded(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))}
+                                      style={{ background: 'transparent', border: 'none', color: '#2990fa', fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', padding: '3px 0', marginTop: 2 }}
+                                    >
+                                      {children.length} variation{children.length > 1 ? 's' : ''} {isExpanded ? '▲' : '▼'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Children row */}
+                              {isExpanded && children.length > 0 && (
+                                <div style={{ marginLeft: 20, marginTop: 6, display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4 }}>
+                                  {children.map(child => {
+                                    const cRatio = child.format === '1:1' ? '1/1' : child.format === '4:5' ? '4/5' : child.format === '16/9' ? '16/9' : '9/16'
+                                    const cSelRef = selectedImageIds.includes(child.id)
+                                    return (
+                                      <div
+                                        key={child.id}
+                                        onClick={() => handleImageVersionClick(child)}
+                                        style={{
+                                          width: 50, aspectRatio: cRatio, flexShrink: 0,
+                                          borderRadius: 5, overflow: 'hidden',
+                                          border: cSelRef ? '2px solid #2990fa' : '1px solid rgba(41,144,250,0.15)',
+                                          background: '#060d1f', cursor: child.b64 ? 'pointer' : 'default',
+                                          position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        }}
+                                      >
+                                        {child.b64 ? (
+                                          <>
+                                            <img src={`data:image/png;base64,${child.b64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            {cSelRef && <div style={{ position: 'absolute', top: 2, right: 2, background: '#2990fa', borderRadius: 3, padding: '1px 4px', fontSize: '0.44rem', color: '#fff' }}>✓</div>}
+                                          </>
+                                        ) : child.isGenerating ? (
+                                          <span className="img-pulse" style={{ fontSize: '1rem', opacity: 0.5 }}>⚡</span>
+                                        ) : null}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* SUBMIT IMAGE */}
+                      {selectedImageIds.length === 1 && imageVersions.find(v => v.id === selectedImageIds[0])?.b64 && (
+                        <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleImageSubmit()}
+                            style={{
+                              background: '#2990fa', border: 'none', color: '#ffffff',
+                              borderRadius: 8, padding: '9px 24px',
+                              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
+                              cursor: 'pointer', letterSpacing: '0.06em',
+                            }}
+                          >
+                            SUBMIT IMAGE →
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                </div>
+                  )
+                })()
               )}
 
             </div>
@@ -2713,39 +2935,49 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             {/* Scrollable panels area */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
 
-            {/* ── PLATFORM SELECTOR ── */}
-            <div style={{ background: '#0a1628', border: '1px solid #152840', borderRadius: 10, padding: '12px 14px', marginBottom: 2 }}>
-              <div style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
-                PLATFORM
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[
-                  { id: 'Meta', locked: false },
-                  { id: 'TikTok', locked: true },
-                  { id: 'YouTube', locked: true },
-                  { id: 'Google', locked: true },
-                  { id: 'LinkedIn', locked: true },
-                ].map(({ id, locked }) => (
-                  <button
-                    key={id}
-                    onClick={locked ? undefined : () => setSelectedPlatform(prev => prev === id ? null : id)}
-                    disabled={locked}
-                    style={{
-                      border: `1px solid ${selectedPlatform === id ? '#2990fa' : locked ? '#0d1e2e' : '#152840'}`,
-                      background: selectedPlatform === id ? '#2990fa' : '#060d1f',
-                      color: selectedPlatform === id ? '#ffffff' : locked ? '#1d3a58' : '#ffffff',
-                      padding: '6px 14px', borderRadius: 6,
-                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.65rem',
-                      cursor: locked ? 'default' : 'pointer',
-                      letterSpacing: '0.04em',
-                      display: 'flex', alignItems: 'center', gap: 5,
-                    }}
-                  >
-                    {id}
-                    {locked && <span style={{ fontSize: '0.48rem', color: '#1d3a58', letterSpacing: '0.06em' }}>SOON</span>}
-                  </button>
-                ))}
-              </div>
+            {/* ── PLATFORM DROPDOWN ── */}
+            <div style={{ position: 'relative', marginBottom: 2 }}>
+              <button
+                onClick={() => setPlatformDropdownOpen(prev => !prev)}
+                style={{
+                  width: '100%', background: '#0a1628', border: '1px solid #152840',
+                  borderRadius: 8, padding: '7px 12px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  PLATFORM
+                </span>
+                <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {selectedPlatform || 'Select'} <span style={{ opacity: 0.45, fontSize: '0.5rem' }}>▾</span>
+                </span>
+              </button>
+              {platformDropdownOpen && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#0a1628', border: '1px solid #2990fa', borderRadius: 8, overflow: 'hidden', marginTop: 2 }}>
+                  {[
+                    { id: 'Meta', locked: false },
+                    { id: 'TikTok', locked: true },
+                    { id: 'YouTube', locked: true },
+                    { id: 'Google', locked: true },
+                    { id: 'LinkedIn', locked: true },
+                  ].map(({ id, locked }) => (
+                    <div
+                      key={id}
+                      onClick={locked ? undefined : () => { setSelectedPlatform(prev => prev === id ? null : id); setPlatformDropdownOpen(false) }}
+                      style={{
+                        padding: '8px 12px', cursor: locked ? 'default' : 'pointer',
+                        color: locked ? '#1d3a58' : '#ffffff',
+                        fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)',
+                        background: selectedPlatform === id ? 'rgba(41,144,250,0.1)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>{id}</span>
+                      {locked && <span style={{ fontSize: '0.48rem', color: '#1d3a58' }}>SOON</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {SECTIONS.map(section => {
