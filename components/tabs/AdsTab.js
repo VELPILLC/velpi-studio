@@ -110,6 +110,9 @@ const ANGLE_COLORS = [
   '#4ec9b0', '#f0a500',
 ]
 
+// Column resize steps (fr units) for the image section
+const COL_SIZES = [0.55, 0.75, 1.0, 1.35, 1.75]
+
 const AUTO_PROMPT_TEXTS = new Set(Object.values(SECTION_PROMPTS))
 
 // ─── Avatar funnel constants ──────────────────────────────────────────────────
@@ -211,6 +214,8 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [imgMultiExpanded, setImgMultiExpanded] = useState({})
   const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false)
   const [imgSelectMsg, setImgSelectMsg] = useState(null)
+  const [leftColIdx, setLeftColIdx] = useState(2)   // 0–4 index into COL_SIZES
+  const [centerColIdx, setCenterColIdx] = useState(2)
 
   const chatScrollRef = useRef(null)
 
@@ -1322,6 +1327,37 @@ Do not generate bubble options in this response.`
     }
   }
 
+  // Regenerate a new image using selected image(s) as reference + typed prompt
+  function handleRegenWithImage() {
+    if (!typeOwn.trim() || !imageFormat) return
+    const concept = typeOwn.trim()
+    const refs = selectedImageIds.map(id => imageVersions.find(v => v.id === id)?.b64).filter(Boolean)
+    const parentId = refs.length > 0 ? selectedImageIds[0] : null
+    setSectionChats(prev => ({ ...prev, image: [...prev.image, { role: 'user', content: concept }] }))
+    setTypeOwn('')
+    setDallePrompt(concept)
+    setImageViewMode('single')
+    generateImageVersion(concept, imageFormat, refs, parentId)
+  }
+
+  // Create a fresh blank slot for a new image (keeps existing versions intact)
+  function handleNewImage() {
+    setSelectedImageIds([])
+    setImageViewMode('single')
+    const hasPending = imageVersions.some(v => v.isPending)
+    if (!hasPending && imageVersions.length > 0) {
+      setCurrentImageIdx(imageVersions.length)
+      setImageVersions(prev => [
+        ...prev,
+        { id: `pending-${Date.now()}`, b64: null, prompt: null, format: imageFormat || null, isGenerating: false, error: null, parentId: null, isPending: true },
+      ])
+    } else if (hasPending) {
+      const idx = imageVersions.findIndex(v => v.isPending)
+      if (idx >= 0) setCurrentImageIdx(idx)
+    }
+    // if no versions yet: empty placeholder is already visible
+  }
+
   function handleSizeClick(fmt) {
     setImageFormat(fmt)
     setImageError(null)
@@ -2098,7 +2134,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         {/* ── MAIN GRID ── */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: activeSection === 'image' ? '1fr 1fr 200px' : '1fr 1fr',
+          gridTemplateColumns: activeSection === 'image'
+            ? `${COL_SIZES[leftColIdx]}fr ${COL_SIZES[centerColIdx]}fr 200px`
+            : '1fr 1fr',
           gap: activeSection === 'image' ? 12 : 32,
           flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 8px',
           alignItems: 'start',
@@ -2125,6 +2163,21 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   : (activeSectionIdx >= 0 && activeSectionIdx < SECTIONS.length - 1)
                     ? <button onClick={() => gotoSection(SECTIONS[activeSectionIdx + 1])} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>→</button>
                     : null
+              )}
+              {/* Column resize controls — image section only */}
+              {activeSection === 'image' && (
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 3, alignItems: 'center' }}>
+                  <button
+                    onClick={() => setLeftColIdx(prev => Math.max(0, prev - 1))}
+                    disabled={leftColIdx === 0}
+                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === 0 ? 'default' : 'pointer' }}
+                  >−</button>
+                  <button
+                    onClick={() => setLeftColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))}
+                    disabled={leftColIdx === COL_SIZES.length - 1}
+                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}
+                  >+</button>
+                </div>
               )}
             </div>
 
@@ -2557,6 +2610,16 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       →
                     </button>
                   )}
+                  {/* Regen with selected image as reference */}
+                  {activeSection === 'image' && typeOwn.trim() && selectedImageIds.length > 0 && imageFormat && (
+                    <button
+                      onClick={handleRegenWithImage}
+                      disabled={isLoading}
+                      style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '8px 10px', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: isLoading ? 'not-allowed' : 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box', opacity: isLoading ? 0.5 : 1, whiteSpace: 'nowrap', letterSpacing: '0.04em' }}
+                    >
+                      REGEN →
+                    </button>
+                  )}
                   {activeSection !== 'avatar' && activeSection !== 'image' && canSubmit && (
                     <button
                       onClick={handleSubmit}
@@ -2575,8 +2638,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           {activeSection === 'image' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
 
-              {/* Top row: size buttons + view toggle */}
-              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              {/* Row 1: size buttons + center col resize */}
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <div style={{ display: 'flex', gap: 4, flex: 1 }}>
                   {[
                     { id: '9/16', label: '9:16', desc: 'Story' },
@@ -2600,7 +2663,34 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </button>
                   ))}
                 </div>
-                <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                {/* Center col resize */}
+                <div style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
+                  <button
+                    onClick={() => setCenterColIdx(prev => Math.max(0, prev - 1))}
+                    disabled={centerColIdx === 0}
+                    style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === 0 ? 'default' : 'pointer' }}
+                  >−</button>
+                  <button
+                    onClick={() => setCenterColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))}
+                    disabled={centerColIdx === COL_SIZES.length - 1}
+                    style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Row 2: new image + view toggle */}
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <button
+                  onClick={handleNewImage}
+                  style={{
+                    background: 'transparent', border: '1px solid #152840', color: 'rgba(255,255,255,0.6)',
+                    borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+                    fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em',
+                  }}
+                >
+                  + NEW IMAGE
+                </button>
+                <div style={{ display: 'flex', gap: 3 }}>
                   {['single', 'multi'].map(mode => (
                     <button
                       key={mode}
