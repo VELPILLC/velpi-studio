@@ -5,8 +5,8 @@ export async function POST(request) {
 
     const { prompt, size = '1024x1536', referenceB64s } = await request.json()
 
-    const VALID_SIZES = ['1024x1024', '1024x1536', '1536x1024', '1024x1792', '1024x1280', '1792x1024']
-    const resolvedSize = VALID_SIZES.includes(size) ? size : '1024x1792'
+    const VALID_SIZES = ['1024x1024', '1024x1536', '1536x1024']
+    const resolvedSize = VALID_SIZES.includes(size) ? size : '1024x1536'
 
     let response
 

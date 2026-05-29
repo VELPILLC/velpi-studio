@@ -1297,7 +1297,7 @@ Do not generate bubble options in this response.`
     }
 
     try {
-      const sizeMap = { '9/16': '1024x1792', '1:1': '1024x1024', '4:5': '1024x1280', '16/9': '1792x1024' }
+      const sizeMap = { '9/16': '1024x1536', '1:1': '1024x1024', '4:5': '1024x1536', '16/9': '1536x1024' }
       const formatDesc = fmt === '1:1' ? 'square format photo' : fmt === '4:5' ? 'vertical 4:5 portrait photo' : fmt === '16/9' ? 'horizontal 16:9 landscape photo' : 'cinematic vertical 9:16 portrait photo'
       const promptText = `${formatDesc}, ${concept}, no text, no logos, photorealistic, documentary style`
 
@@ -1306,7 +1306,7 @@ Do not generate bubble options in this response.`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          size: sizeMap[fmt] || '1024x1792',
+          size: sizeMap[fmt] || '1024x1536',
           ...(referenceB64s.length > 0 ? { referenceB64s } : {}),
         }),
       })
