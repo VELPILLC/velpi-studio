@@ -119,7 +119,7 @@ export default function Studio() {
       </div>
 
       {/* TAB CONTENT */}
-      <div style={{ padding: '1.5rem', maxWidth: 1200, margin: '0 auto' }}>
+      <div style={{ padding: '1.5rem 0.75rem' }}>
         {activeTab === 'profile' && (
           <ProfileTab
             selectedProfile={selectedProfile}

@@ -2035,7 +2035,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           display: 'grid',
           gridTemplateColumns: activeSection === 'image' ? '280px 1fr 260px' : '1fr 1fr',
           gap: activeSection === 'image' ? 16 : 32,
-          flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 24px',
+          flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 8px',
           alignItems: 'start',
         }}>
 
@@ -2791,8 +2791,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   )}
 
-                  {/* Confirmed value — full text when active, one-line truncated when not */}
-                  {hasValue && (
+                  {/* Confirmed value — full text when active (except image), one-line truncated when not */}
+                  {hasValue && !(section === 'image' && isActive) && (
                     <div style={{
                       fontSize: '0.82rem',
                       color: isActive ? '#ffffff' : 'rgba(255,255,255,0.85)',
@@ -2821,8 +2821,19 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   )}
 
-                  {/* Image thumbnail — shown when image is confirmed (submitted) */}
-                  {section === 'image' && imageB64 && hasValue && (
+                  {/* Image thumbnail — when active: thumbnail or placeholder; when not active: thumbnail only if confirmed */}
+                  {section === 'image' && isActive && (
+                    imageB64 ? (
+                      <div style={{ marginTop: 6, width: 52, aspectRatio: '9/16', overflow: 'hidden', borderRadius: 4, opacity: 0.9 }}>
+                        <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 6, width: 52, aspectRatio: '9/16', borderRadius: 4, background: '#060d1f', border: '1px dashed rgba(41,144,250,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '1rem', opacity: 0.12 }}>⚡</span>
+                      </div>
+                    )
+                  )}
+                  {section === 'image' && !isActive && imageB64 && hasValue && (
                     <div style={{ marginTop: 6, width: 52, aspectRatio: '9/16', overflow: 'hidden', borderRadius: 4, opacity: 0.9 }}>
                       <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
