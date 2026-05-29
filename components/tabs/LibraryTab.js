@@ -44,6 +44,58 @@ function formatDate(dateStr) {
   } catch (_) { return '' }
 }
 
+function downloadAdPdf(ad) {
+  if (typeof window === 'undefined' || !window.jspdf) return
+  const { jsPDF } = window.jspdf
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const margin = 18
+  let y = margin
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(41, 144, 250)
+  doc.text('VELPI STUDIO', margin, y)
+  y += 10
+
+  if (ad.imageB64) {
+    try {
+      const imgW = 55
+      const imgH = Math.round(imgW * (16 / 9))
+      const imgX = (pageW - imgW) / 2
+      doc.addImage(`data:image/png;base64,${ad.imageB64}`, 'PNG', imgX, y, imgW, imgH)
+      y += imgH + 8
+    } catch (_) {}
+  }
+
+  const fields = [
+    { label: 'HOOK', value: ad.hook },
+    { label: 'HEADLINE', value: ad.headline },
+    { label: 'PRIMARY TEXT', value: ad.primaryText },
+    { label: 'DESCRIPTION', value: ad.description },
+    { label: 'CTA', value: ad.cta },
+  ]
+
+  for (const { label, value } of fields) {
+    if (!value) continue
+    if (y > 268) { doc.addPage(); y = margin }
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(41, 144, 250)
+    doc.text(label, margin, y)
+    y += 5
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(20, 20, 20)
+    const lines = doc.splitTextToSize(value, pageW - margin * 2)
+    doc.text(lines, margin, y)
+    y += lines.length * 5.5 + 6
+  }
+
+  const filename = (ad.hook || 'velpi-ad').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+  doc.save(`${filename}.pdf`)
+}
+
 export default function LibraryTab({ onEdit }) {
   const [ads, setAds] = useState([])
   const [selectedAd, setSelectedAd] = useState(null)
@@ -703,17 +755,16 @@ export default function LibraryTab({ onEdit }) {
               padding: 24,
             }}
           >
-            <div
-              style={{
-                fontSize: '0.6rem',
-                fontFamily: 'var(--font-ibm-plex-mono)',
-                color: '#2990fa',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                marginBottom: 16,
-              }}
-            >
-              AD DETAILS
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                AD DETAILS
+              </div>
+              <button
+                onClick={() => downloadAdPdf(displayAd)}
+                style={{ background: 'transparent', border: '1px solid rgba(41,144,250,0.4)', borderRadius: 6, padding: '5px 12px', color: '#2990fa', fontSize: '0.62rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', letterSpacing: '0.04em' }}
+              >
+                ⬇ PDF
+              </button>
             </div>
 
             {/* Version tabs */}
@@ -762,23 +813,27 @@ export default function LibraryTab({ onEdit }) {
               </div>
             )}
 
-            {/* Image thumbnail */}
+            {/* Image thumbnail with download icon */}
             {displayAd?.imageB64 && (
-              <div
-                style={{
-                  width: '100%',
-                  maxWidth: 180,
-                  aspectRatio: '9 / 16',
-                  margin: '0 auto 16px',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                }}
-              >
-                <img
-                  src={`data:image/png;base64,${displayAd.imageB64}`}
-                  alt=""
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+              <div style={{ position: 'relative', width: '100%', maxWidth: 180, margin: '0 auto 16px' }}>
+                <div style={{ aspectRatio: '9 / 16', borderRadius: 8, overflow: 'hidden' }}>
+                  <img
+                    src={`data:image/png;base64,${displayAd.imageB64}`}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    const name = (displayAd.hook || 'velpi-image').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+                    const a = document.createElement('a')
+                    a.href = `data:image/png;base64,${displayAd.imageB64}`
+                    a.download = `${name}.png`
+                    a.click()
+                  }}
+                  title="Download image"
+                  style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', color: '#ffffff', borderRadius: 5, padding: '4px 7px', cursor: 'pointer', fontSize: '0.85rem' }}
+                >⬇</button>
               </div>
             )}
 
@@ -823,58 +878,30 @@ export default function LibraryTab({ onEdit }) {
             {/* Edit button */}
             <div style={{ marginBottom: 8 }}>
               <button
-                onClick={() => {
-                  onEdit?.(selectedAd)
-                  setSelectedAd(null)
-                }}
-                style={{
-                  width: '100%',
-                  background: '#2990fa',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: 10,
-                  color: '#ffffff',
-                  fontSize: '0.75rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: 'pointer',
-                  letterSpacing: '0.06em',
-                }}
+                onClick={() => { onEdit?.(selectedAd); setSelectedAd(null) }}
+                style={{ width: '100%', background: '#2990fa', border: 'none', borderRadius: 8, padding: 10, color: '#ffffff', fontSize: '0.75rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', letterSpacing: '0.06em' }}
               >
                 Edit
               </button>
             </div>
 
-            {/* Delete + Close */}
+            {/* Delete + Download PDF + Close */}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => setDeleteConfirm(selectedAd.id)}
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: '1px solid rgba(255,68,85,0.5)',
-                  borderRadius: 8,
-                  padding: 8,
-                  color: '#ff4455',
-                  fontSize: '0.75rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: 'pointer',
-                }}
+                style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,68,85,0.5)', borderRadius: 8, padding: 8, color: '#ff4455', fontSize: '0.75rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
               >
                 Delete
               </button>
               <button
+                onClick={() => downloadAdPdf(displayAd)}
+                style={{ flex: 1, background: 'transparent', border: '1px solid rgba(41,144,250,0.5)', borderRadius: 8, padding: 8, color: '#2990fa', fontSize: '0.75rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
+              >
+                ⬇ PDF
+              </button>
+              <button
                 onClick={() => setSelectedAd(null)}
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.4)',
-                  borderRadius: 8,
-                  padding: 8,
-                  color: '#ffffff',
-                  fontSize: '0.75rem',
-                  fontFamily: 'var(--font-ibm-plex-mono)',
-                  cursor: 'pointer',
-                }}
+                style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: 8, color: '#ffffff', fontSize: '0.75rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}
               >
                 Close
               </button>

@@ -113,6 +113,9 @@ const ANGLE_COLORS = [
 // Column resize steps (fr units) for the image section
 const COL_SIZES = [0.55, 0.75, 1.0, 1.35, 1.75]
 
+// Chat text scaling steps
+const FONT_SCALES = [0.75, 0.88, 1.0, 1.15, 1.3]
+
 const AUTO_PROMPT_TEXTS = new Set(Object.values(SECTION_PROMPTS))
 
 // ─── Avatar funnel constants ──────────────────────────────────────────────────
@@ -181,7 +184,7 @@ const EMPTY_AVATAR_DATA = () => ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled, onSaved }) {
+export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled, onSaved, pendingAvatarAction, onAvatarActionConsumed, onAvatarChange }) {
   // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
@@ -216,6 +219,9 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [imgSelectMsg, setImgSelectMsg] = useState(null)
   const [leftColIdx, setLeftColIdx] = useState(2)   // 0–4 index into COL_SIZES
   const [centerColIdx, setCenterColIdx] = useState(2)
+  const [bubbleHistory, setBubbleHistory] = useState([])
+  const [chatFontScale, setChatFontScale] = useState(2) // index into FONT_SCALES
+  const [avatarRestartModal, setAvatarRestartModal] = useState(false)
 
   const chatScrollRef = useRef(null)
 
@@ -244,9 +250,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [avatarEditMode, setAvatarEditMode] = useState(false)
   const [avatarEditingField, setAvatarEditingField] = useState(null)
   const [avatarEditingId, setAvatarEditingId] = useState(null)
-  const [avatarDropdown, setAvatarDropdown] = useState(null)
-  const [avatarDeleteConfirm, setAvatarDeleteConfirm] = useState(null)
-  const [avatarMenuPos, setAvatarMenuPos] = useState({ top: 0, left: 0 })
+  // avatarDropdown/avatarDeleteConfirm/avatarMenuPos removed — handled in Studio.js tab bar
 
   // ─── useEffects ───────────────────────────────────────────────────────────────
 
@@ -262,7 +266,40 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setExpandedCategory(null)
     setExtraSubcategories({})
     setTypeOwn('')
+    setBubbleHistory([])
   }, [activeSection])
+
+  // Sync avatar data to Studio.js tab bar
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { onAvatarChange?.(avatars, selectedAvatar) }, [avatars, selectedAvatar])
+
+  // Handle avatar actions dispatched from Studio.js tab bar
+  useEffect(() => {
+    if (!pendingAvatarAction) return
+    switch (pendingAvatarAction.type) {
+      case 'select':
+        handleAvatarSelect(pendingAvatarAction.avatar)
+        break
+      case 'new':
+        startNewAvatarFunnel()
+        break
+      case 'edit':
+        handleEditAvatarFromBar(pendingAvatarAction.avatar)
+        break
+      case 'avatarDeleted':
+        loadAvatars()
+        if (selectedAvatar?.id === pendingAvatarAction.avatarId) {
+          setSelectedAvatar(null)
+          setSectionValues(prev => ({ ...prev, avatar: null }))
+          setActiveSection('avatar')
+          initAvatarFunnel()
+        }
+        break
+      default: break
+    }
+    onAvatarActionConsumed?.()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAvatarAction])
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -1036,6 +1073,7 @@ Do not generate bubble options in this response.`
         [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
       }))
       if (parsed?.options) {
+        pushBubbleHistory()
         setCurrentBubbles(parsed.options)
         setSelectedBubbles([])
       }
@@ -1078,6 +1116,7 @@ Do not generate bubble options in this response.`
 
       setSectionChats(prev => ({ ...prev, [section]: chatHistory }))
       if (parsed && parsed.options) {
+        pushBubbleHistory()
         setCurrentBubbles(parsed.options)
         setSelectedBubbles([])
       }
@@ -1189,6 +1228,7 @@ Do not generate bubble options in this response.`
         image: [...prev.image, { role: 'assistant', content: raw }],
       }))
       if (parsed && parsed.options) {
+        pushBubbleHistory()
         setCurrentBubbles(parsed.options)
         setSelectedBubbles([])
       }
@@ -1243,6 +1283,7 @@ Do not generate bubble options in this response.`
         [activeSection]: [...prev[activeSection], { role: 'assistant', content: raw }],
       }))
       if (parsed && parsed.options) {
+        pushBubbleHistory()
         setCurrentBubbles(parsed.options)
         setSelectedBubbles([])
       }
@@ -1935,6 +1976,49 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     })
   }
 
+  // Undo last bubble generation
+  function handleUndoBubbles() {
+    if (bubbleHistory.length === 0) return
+    const prev = bubbleHistory[bubbleHistory.length - 1]
+    setBubbleHistory(h => h.slice(0, -1))
+    setCurrentBubbles(prev)
+    setSelectedBubbles([])
+  }
+
+  // Helper to push current bubbles to history before replacing them
+  function pushBubbleHistory() {
+    if (activeSection && activeSection !== 'avatar' && currentBubbles.length > 0) {
+      setBubbleHistory(h => [...h.slice(-4), [...currentBubbles]])
+    }
+  }
+
+  // Avatar restart: save current data then start a fresh funnel
+  async function avatarRestartSaveAndNew() {
+    const name = avatarNameInput.trim()
+    if (!name) { setAvatarRestartModal(false); initAvatarFunnel(); setActiveSection('avatar'); return }
+    try {
+      const body = {
+        name,
+        age_range: avatarData.ageRange || '',
+        niche: [avatarData.industry, avatarData.role].filter(Boolean).join(' - '),
+        what_they_want: avatarData.wants || '',
+        what_they_fear: avatarData.fears || '',
+        what_they_trust: avatarData.mediaTrust || '',
+        primary_emotion: [avatarData.fears, avatarData.frustrations].filter(Boolean).join(' / '),
+      }
+      if (avatarEditingId) {
+        await fetch('/api/avatars', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: avatarEditingId, ...body }) })
+      } else {
+        await fetch('/api/avatars', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      }
+      await loadAvatars()
+    } catch (err) { console.error('avatarRestartSaveAndNew error:', err) }
+    setAvatarRestartModal(false)
+    setAvatarEditingId(null)
+    initAvatarFunnel()
+    setActiveSection('avatar')
+  }
+
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
   const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
@@ -2058,128 +2142,59 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     <>
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 110px)', overflow: 'hidden' }}>
 
-        {/* ── AVATAR BAR ── */}
-        <div style={{
-          flexShrink: 0, background: '#0a1628', borderBottom: '1px solid #2990fa',
-          padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
-        }}>
-          <div style={{ fontSize: '0.48rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
-            AVATAR
-          </div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flex: 1, alignItems: 'center' }}>
-            {avatars.length === 0 && (
-              <div style={{ fontSize: '0.6rem', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', whiteSpace: 'nowrap' }}>
-                No avatars yet
-              </div>
-            )}
-            {avatars.map(av => (
-              <div key={av.id} style={{ flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <div
-                    onClick={() => handleAvatarSelect(av)}
-                    style={{
-                      background: selectedAvatar?.id === av.id ? '#2990fa' : '#060d1f',
-                      border: '1px solid #2990fa', borderRadius: 6,
-                      padding: '6px 14px', cursor: 'pointer', color: '#ffffff',
-                      fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem',
-                      whiteSpace: 'nowrap', userSelect: 'none',
-                    }}
-                  >
-                    {av.name}
-                  </div>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      const rect = e.currentTarget.getBoundingClientRect()
-                      setAvatarMenuPos({ top: rect.bottom, left: rect.left })
-                      setAvatarDropdown(prev => prev === av.id ? null : av.id)
-                    }}
-                    style={{
-                      background: 'transparent', border: 'none',
-                      color: '#2990fa', fontSize: '1rem',
-                      cursor: 'pointer', padding: '2px 6px',
-                    }}
-                  >
-                    ⋯
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={startNewAvatarFunnel}
-            style={{
-              border: '1px solid #2990fa', background: 'transparent', color: '#2990fa',
-              padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
-              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0, whiteSpace: 'nowrap',
-            }}
-          >
-            New Avatar
-          </button>
-          <button
-            onClick={handleRestart}
-            disabled={isBuildingSummary}
-            style={{
-              border: '1px solid rgba(255,255,255,0.45)', background: 'transparent',
-              color: '#ffffff', padding: '6px 14px', borderRadius: 6,
-              cursor: isBuildingSummary ? 'wait' : 'pointer',
-              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0,
-              whiteSpace: 'nowrap', letterSpacing: '0.04em',
-            }}
-          >
-            {isBuildingSummary ? '...' : '↺ Restart'}
-          </button>
-        </div>
-
         {/* ── MAIN GRID ── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: activeSection === 'image'
             ? `${COL_SIZES[leftColIdx]}fr ${COL_SIZES[centerColIdx]}fr 200px`
-            : '1fr 1fr',
-          gap: activeSection === 'image' ? 12 : 32,
+            : '1fr 200px',
+          gap: activeSection === 'image' ? 12 : 20,
           flex: 1, minHeight: 0, overflow: 'hidden', padding: '20px 8px',
           alignItems: 'start',
         }}>
 
           {/* ── LEFT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
 
-            {/* 1. Section title row — always visible */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 12px 0', flexShrink: 0 }}>
-              {activeSection !== null && (
-                (activeSection === 'avatar' && avatarFunnelHistory.length > 0)
-                  ? <button onClick={goBackAvatarStep} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>←</button>
-                  : activeSectionIdx > 0
-                    ? <button onClick={() => gotoSection(SECTIONS[activeSectionIdx - 1])} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>←</button>
-                    : null
-              )}
-              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.5)', letterSpacing: '0.05em' }}>
+            {/* 1. Section title row — label only, no nav arrows */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 6px 0', flexShrink: 0 }}>
+              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.0rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.5)', letterSpacing: '0.08em' }}>
                 {activeSection ? SECTION_LABELS[activeSection] : 'SELECT SECTION'}
               </div>
-              {activeSection !== null && (
-                (activeSection === 'avatar' && avatarFunnelStep !== 'review' && !avatarEditMode)
-                  ? <button onClick={handleAvatarAdvance} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>→</button>
-                  : (activeSectionIdx >= 0 && activeSectionIdx < SECTIONS.length - 1)
-                    ? <button onClick={() => gotoSection(SECTIONS[activeSectionIdx + 1])} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem' }}>→</button>
-                    : null
-              )}
-              {/* Column resize controls — image section only */}
+              {/* Column resize — image section only */}
               {activeSection === 'image' && (
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 3, alignItems: 'center' }}>
-                  <button
-                    onClick={() => setLeftColIdx(prev => Math.max(0, prev - 1))}
-                    disabled={leftColIdx === 0}
-                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === 0 ? 'default' : 'pointer' }}
-                  >−</button>
-                  <button
-                    onClick={() => setLeftColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))}
-                    disabled={leftColIdx === COL_SIZES.length - 1}
-                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}
-                  >+</button>
+                  <button onClick={() => setLeftColIdx(prev => Math.max(0, prev - 1))} disabled={leftColIdx === 0}
+                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === 0 ? 'default' : 'pointer' }}>−</button>
+                  <button onClick={() => setLeftColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))} disabled={leftColIdx === COL_SIZES.length - 1}
+                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}>+</button>
                 </div>
               )}
             </div>
+
+            {/* 1b. Undo + text-size controls */}
+            {activeSection && activeSection !== 'avatar' && (
+              <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                <button
+                  onClick={handleUndoBubbles}
+                  disabled={bubbleHistory.length === 0}
+                  title="Undo last options"
+                  style={{ background: 'transparent', border: '1px solid #152840', color: bubbleHistory.length === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)', borderRadius: 5, padding: '2px 8px', fontSize: '0.75rem', cursor: bubbleHistory.length === 0 ? 'default' : 'pointer', fontFamily: 'var(--font-ibm-plex-mono)' }}
+                >↩</button>
+                <button
+                  onClick={() => setChatFontScale(prev => Math.max(0, prev - 1))}
+                  disabled={chatFontScale === 0}
+                  title="Smaller text"
+                  style={{ background: 'transparent', border: '1px solid #152840', color: chatFontScale === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)', borderRadius: 5, padding: '2px 7px', fontSize: '0.68rem', cursor: chatFontScale === 0 ? 'default' : 'pointer', fontFamily: 'var(--font-ibm-plex-mono)' }}
+                >A−</button>
+                <button
+                  onClick={() => setChatFontScale(prev => Math.min(FONT_SCALES.length - 1, prev + 1))}
+                  disabled={chatFontScale === FONT_SCALES.length - 1}
+                  title="Larger text"
+                  style={{ background: 'transparent', border: '1px solid #152840', color: chatFontScale === FONT_SCALES.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)', borderRadius: 5, padding: '2px 7px', fontSize: '0.68rem', cursor: chatFontScale === FONT_SCALES.length - 1 ? 'default' : 'pointer', fontFamily: 'var(--font-ibm-plex-mono)' }}
+                >A+</button>
+              </div>
+            )}
 
             {/* 2. Chat messages area — always visible */}
             <div ref={chatScrollRef} style={{
@@ -2200,7 +2215,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     background: msg.role === 'user' ? '#2990fa' : '#0a1628',
                     border: msg.role === 'assistant' ? '1px solid rgba(41,144,250,0.3)' : 'none',
                     color: '#ffffff', padding: '10px 14px', borderRadius: 10,
-                    maxWidth: '80%', fontSize: '0.92rem', lineHeight: 1.5,
+                    maxWidth: '80%', fontSize: `${0.92 * FONT_SCALES[chatFontScale]}rem`, lineHeight: 1.5,
                     fontFamily: 'var(--font-inter)', whiteSpace: 'pre-wrap',
                   }}>
                     {msg.content}
@@ -2344,11 +2359,26 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   >
                     REDO SECTIONS
                   </button>
+                  <button
+                    onClick={() => setAvatarRestartModal(true)}
+                    style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '8px 0', color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', cursor: 'pointer', width: '100%', marginTop: 6 }}
+                  >
+                    ↺ Restart Avatar
+                  </button>
                 </div>
 
               ) : (
                 /* ── AVATAR FUNNEL STEPS ── */
                 <div style={{ flexShrink: 0, overflowY: 'auto', maxHeight: '45vh', marginBottom: 8 }}>
+                  {/* Restart button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                    <button
+                      onClick={() => setAvatarRestartModal(true)}
+                      style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', letterSpacing: '0.06em' }}
+                    >
+                      ↺ Restart
+                    </button>
+                  </div>
                   {/* Step indicator */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: '0.6rem', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)' }}>
@@ -2529,9 +2559,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           style={{
                             border: '1px solid #2990fa',
                             background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
-                            color: '#ffffff', padding: '14px 18px', borderRadius: 10, cursor: 'pointer',
+                            color: '#ffffff', padding: `${14 * FONT_SCALES[chatFontScale]}px ${18 * FONT_SCALES[chatFontScale]}px`, borderRadius: 10, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                            fontSize: '1rem', fontFamily: 'var(--font-inter)', lineHeight: 1.5, minHeight: 44,
+                            fontSize: `${1.0 * FONT_SCALES[chatFontScale]}rem`, fontFamily: 'var(--font-inter)', lineHeight: 1.5, minHeight: 44,
                           }}
                         >
                           <span>{bubble}</span>
@@ -2636,7 +2666,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
           {/* ── CENTER COLUMN — image workspace (only when image section active) ── */}
           {activeSection === 'image' && (
-            <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
 
               {/* Row 1: size buttons + center col resize */}
               <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -2846,9 +2876,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                         </div>
                       )}
 
-                      {/* SUBMIT IMAGE button */}
+                      {/* SUBMIT IMAGE + download */}
                       {isReady && (
-                        <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                           <button
                             onClick={() => handleImageSubmit(currentFrame)}
                             style={{
@@ -2860,6 +2890,17 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           >
                             SUBMIT IMAGE →
                           </button>
+                          <button
+                            onClick={() => {
+                              const name = (sectionValues.hook || 'velpi-image').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+                              const a = document.createElement('a')
+                              a.href = `data:image/png;base64,${currentFrame.b64}`
+                              a.download = `${name}.png`
+                              a.click()
+                            }}
+                            title="Download image"
+                            style={{ background: 'transparent', border: '1px solid #152840', color: 'rgba(255,255,255,0.5)', borderRadius: 6, padding: '7px 10px', cursor: 'pointer', fontSize: '0.9rem' }}
+                          >⬇</button>
                         </div>
                       )}
 
@@ -2940,10 +2981,13 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                                     <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>⚠</span>
                                   ) : null}
                                 </div>
-                                {/* Info */}
+                                {/* Info + download */}
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', marginBottom: 2 }}>
-                                    {parent.format || '9/16'}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                    <span style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa' }}>{parent.format || '9/16'}</span>
+                                    {parent.b64 && (
+                                      <button onClick={() => { const n=(sectionValues.hook||'velpi-image').replace(/[^a-z0-9]/gi,'-').toLowerCase(); const a=document.createElement('a'); a.href=`data:image/png;base64,${parent.b64}`; a.download=`${n}.png`; a.click() }} title="Download" style={{ background:'transparent', border:'none', color:'rgba(255,255,255,0.35)', cursor:'pointer', fontSize:'0.7rem', padding:0, lineHeight:1 }}>⬇</button>
+                                    )}
                                   </div>
                                   {parent.prompt && (
                                     <div style={{ fontSize: '0.54rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-inter)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textOverflow: 'ellipsis' }}>
@@ -3021,7 +3065,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           )}
 
           {/* ── RIGHT COLUMN ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
             {/* Scrollable panels area */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
 
@@ -3113,33 +3157,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   )}
 
-                  {/* Confirmed value — full text when active (except image), one-line truncated when not */}
-                  {hasValue && !(section === 'image' && isActive) && (
-                    <div style={{
-                      fontSize: '0.82rem',
-                      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.85)',
-                      fontFamily: 'var(--font-inter)',
-                      lineHeight: 1.5,
-                      marginTop: 4,
-                      ...(isActive ? {} : {
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }),
-                    }}>
-                      {sectionValues[section]}
-                    </div>
-                  )}
-
-                  {/* Image section — generating/error status (shown when not active) */}
+                  {/* Image background generation indicator */}
                   {section === 'image' && !isActive && imageVersions.some(v => v.isGenerating) && (
-                    <div style={{ marginTop: 4, fontSize: '0.55rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.04em' }}>
-                      ⚡ Generating image in background...
-                    </div>
-                  )}
-                  {section === 'image' && !isActive && imageVersions.some(v => v.error) && !imageVersions.some(v => v.isGenerating) && (
-                    <div style={{ marginTop: 4, fontSize: '0.55rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.04em' }}>
-                      ⚠ Generation failed — open IMAGE to retry
+                    <div style={{ marginTop: 3, fontSize: '0.5rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.04em' }}>
+                      ⚡ Generating...
                     </div>
                   )}
 
@@ -3167,19 +3188,32 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             </div>{/* end scrollable panels */}
 
             {/* Action buttons — fixed below scroll, always visible */}
-            <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {allConfirmed && (
                 <button
                   onClick={saveToLibrary}
                   style={{
-                    background: '#2990fa', border: 'none', borderRadius: 10, padding: 14,
-                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    background: '#2990fa', border: 'none', borderRadius: 10, padding: 12,
+                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.75rem',
                     cursor: 'pointer', width: '100%',
                   }}
                 >
                   {saveSuccess ? 'Saved!' : 'Save to Library'}
                 </button>
               )}
+              <button
+                onClick={handleRestart}
+                disabled={isBuildingSummary}
+                style={{
+                  border: '1px solid rgba(255,255,255,0.2)', background: 'transparent',
+                  color: 'rgba(255,255,255,0.45)', padding: '7px 0', borderRadius: 8,
+                  cursor: isBuildingSummary ? 'wait' : 'pointer',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem',
+                  letterSpacing: '0.04em', width: '100%',
+                }}
+              >
+                {isBuildingSummary ? '...' : '↺ Restart Session'}
+              </button>
             </div>
           </div>
         </div>
@@ -3367,94 +3401,50 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         </div>
       )}
 
-      {/* ── AVATAR THREE DOTS POPUP ── */}
-      {avatarDropdown && (
-        <>
-          <div
-            onClick={() => setAvatarDropdown(null)}
-            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-          />
-          <div style={{
-            position: 'fixed',
-            top: avatarMenuPos.top,
-            left: avatarMenuPos.left,
-            zIndex: 9999,
-            background: '#0a1628',
-            border: '1px solid #2990fa',
-            borderRadius: 8,
-            padding: 4,
-            minWidth: 120,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-          }}>
-            <div
-              onClick={() => { const av = avatars.find(a => a.id === avatarDropdown); if (av) handleEditAvatarFromBar(av) }}
-              style={{ padding: '8px 14px', color: '#ffffff', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-              onMouseEnter={e => e.currentTarget.style.background = '#152840'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      {/* ── AVATAR RESTART MODAL ── */}
+      {avatarRestartModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(2,8,16,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 28, width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em', marginBottom: 4 }}>
+              AVATAR RESTART
+            </div>
+            <button
+              onClick={avatarRestartSaveAndNew}
+              style={{ background: '#2990fa', border: 'none', borderRadius: 8, padding: '12px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.04em', width: '100%' }}
             >
-              ✎ Edit
-            </div>
-            <div
-              onClick={() => { const av = avatars.find(a => a.id === avatarDropdown); if (av) { setAvatarDropdown(null); setAvatarDeleteConfirm(av) } }}
-              style={{ padding: '8px 14px', color: '#ff4455', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-              onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              Save and start new avatar
+            </button>
+            <button
+              onClick={() => {
+                setAvatarRestartModal(false)
+                setAvatarEditingId(null)
+                setAvatarNameInput('')
+                setAvatarEditMode(false)
+                setAvatarFunnelStep('review')
+                setAvatarFunnelHistory([])
+                setAvatarSelectedBubbles([])
+                setCurrentBubbles([])
+              }}
+              style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 8, padding: '11px 0', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.04em', width: '100%' }}
             >
-              🗑 Delete
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── AVATAR DELETE CONFIRM ── */}
-      {avatarDeleteConfirm && (
-        <div
-          onClick={() => setAvatarDeleteConfirm(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 3000,
-            background: 'rgba(2,8,16,0.88)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 20,
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#0a1628', border: '1px solid #ff4455',
-              borderRadius: 12, padding: 28, width: '100%', maxWidth: 360,
-              display: 'flex', flexDirection: 'column', gap: 16,
-            }}
-          >
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
-              Delete Avatar
-            </div>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
-              Delete <strong>{avatarDeleteConfirm.name}</strong>? This cannot be undone.
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => { handleDeleteAvatar(avatarDeleteConfirm); setAvatarDeleteConfirm(null) }}
-                style={{
-                  flex: 1, background: '#ff4455', border: 'none', borderRadius: 8,
-                  padding: '11px 0', color: '#ffffff',
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                  cursor: 'pointer', letterSpacing: '0.06em',
-                }}
-              >
-                DELETE
-              </button>
-              <button
-                onClick={() => setAvatarDeleteConfirm(null)}
-                style={{
-                  flex: 1, background: 'transparent', border: '1px solid #2990fa',
-                  borderRadius: 8, padding: '11px 0', color: '#2990fa',
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
-                  cursor: 'pointer', letterSpacing: '0.06em',
-                }}
-              >
-                CANCEL
-              </button>
-            </div>
+              Duplicate this and restart fresh
+            </button>
+            <button
+              onClick={async () => {
+                setAvatarRestartModal(false)
+                if (avatarEditingId) await handleDeleteAvatar({ id: avatarEditingId, name: avatarNameInput })
+                else { initAvatarFunnel(); setActiveSection('avatar') }
+              }}
+              style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.5)', borderRadius: 8, padding: '11px 0', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.04em', width: '100%' }}
+            >
+              Delete this completely and start over
+            </button>
+            <button
+              onClick={() => setAvatarRestartModal(false)}
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '11px 0', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.04em', width: '100%' }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
