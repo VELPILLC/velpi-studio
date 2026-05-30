@@ -1306,7 +1306,11 @@ Do not generate bubble options in this response.`
     const generatingVersion = { id: versionId, b64: null, prompt: concept, format: fmt, isGenerating: true, error: null, parentId, isPending: false }
 
     if (pendingVersion) {
+      // Reuse the pending slot in place — move the carousel onto it so the
+      // loading frame is what the user is looking at while it generates.
+      const pendingIdx = imageVersions.findIndex(v => v.id === pendingVersion.id)
       setImageVersions(prev => prev.map(v => v.isPending ? generatingVersion : v))
+      if (pendingIdx >= 0) setCurrentImageIdx(pendingIdx)
     } else {
       setImageVersions(prev => [...prev, generatingVersion])
       setCurrentImageIdx(imageVersions.length)
@@ -1412,6 +1416,8 @@ Do not generate bubble options in this response.`
     const parentId = refs.length > 0 ? selectedImageIds[0] : null
     setSectionChats(prev => ({ ...prev, image: [...prev.image, { role: 'user', content: concept }] }))
     setDallePrompt(concept)
+    // Show the single carousel view so the loading frame is visible.
+    setImageViewMode('single')
     // If the prompt came from the typed input (no bubble selected), clear it.
     if (!selectedBubbles[0] && typeOwn.trim()) setTypeOwn('')
     generateImageVersion(concept, fmt, refs, parentId)
