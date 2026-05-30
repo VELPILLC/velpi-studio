@@ -107,6 +107,9 @@ export default function LibraryTab({ onEdit }) {
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
+  // ── Card context menu ──
+  const [cardMenu, setCardMenu] = useState(null) // { id, top, left }
+
   useEffect(() => {
     loadAds()
   }, [])
@@ -192,6 +195,17 @@ export default function LibraryTab({ onEdit }) {
     setSelectedIds([])
   }
 
+  function selectAll() {
+    setSelectedIds(ads.map(a => a.id))
+  }
+
+  function openCardMenu(e, ad) {
+    e.stopPropagation()
+    if (cardMenu?.id === ad.id) { setCardMenu(null); return }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setCardMenu({ id: ad.id, top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 164) })
+  }
+
   // A completed ad has all DRAFT_FIELDS populated; otherwise it is a draft
   const isAdComplete = (ad) => DRAFT_FIELDS.every(({ key }) => !!ad[key])
   const drafts = ads.filter(ad => !isAdComplete(ad))
@@ -226,42 +240,39 @@ export default function LibraryTab({ onEdit }) {
 
       {/* ── SELECT MODE CONTROL ── */}
       {ads.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           {selectMode ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <>
+              <span style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.55)', letterSpacing: '0.06em' }}>
+                {selectedIds.length} selected
+              </span>
+              <button
+                onClick={selectAll}
+                style={{ background: 'transparent', border: '1px solid #152840', borderRadius: 6, padding: '5px 12px', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+              >
+                Select All
+              </button>
               {selectedIds.length > 0 && (
-                <span style={{
-                  fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)',
-                  color: '#ffffff', letterSpacing: '0.06em',
-                }}>
-                  {selectedIds.length} selected
-                </span>
+                <button
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  style={{ background: '#ff4455', border: 'none', borderRadius: 6, padding: '5px 14px', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+                >
+                  🗑 Delete {selectedIds.length}
+                </button>
               )}
               <button
                 onClick={exitSelectMode}
-                style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.5)',
-                  borderRadius: 6, padding: '5px 14px',
-                  color: '#ffffff',
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem',
-                  cursor: 'pointer', letterSpacing: '0.06em',
-                }}
+                style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 12px', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', cursor: 'pointer', letterSpacing: '0.04em' }}
               >
                 Cancel
               </button>
-            </div>
+            </>
           ) : (
             <button
               onClick={() => setSelectMode(true)}
-              style={{
-                background: 'transparent', border: '1px solid #2990fa',
-                borderRadius: 6, padding: '5px 14px',
-                color: '#2990fa',
-                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem',
-                cursor: 'pointer', letterSpacing: '0.06em',
-              }}
+              style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.5)', borderRadius: 6, padding: '5px 14px', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', cursor: 'pointer', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              Select
+              🗑 Select to Delete
             </button>
           )}
         </div>
@@ -405,32 +416,23 @@ export default function LibraryTab({ onEdit }) {
                       DRAFT
                     </div>
                   </div>
-                  {/* Bottom info */}
-                  <div style={{ padding: '8px 10px' }}>
-                    <div
-                      style={{
-                        fontSize: '0.72rem',
-                        color: '#ffffff',
-                        fontFamily: 'var(--font-inter)',
-                        lineHeight: 1.4,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {ad.hook || ad.avatarName || 'Untitled draft'}
-                    </div>
-                    {ad.createdAt && (
-                      <div
-                        style={{
-                          fontSize: '0.52rem',
-                          color: 'rgba(255,255,255,0.75)',
-                          fontFamily: 'var(--font-ibm-plex-mono)',
-                          marginTop: 3,
-                        }}
-                      >
-                        {formatDate(ad.createdAt)}
+                  {/* Bottom info + ⋯ menu button */}
+                  <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.72rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {ad.hook || ad.avatarName || 'Untitled draft'}
                       </div>
+                      {ad.createdAt && (
+                        <div style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-ibm-plex-mono)', marginTop: 2 }}>
+                          {formatDate(ad.createdAt)}
+                        </div>
+                      )}
+                    </div>
+                    {!selectMode && (
+                      <button
+                        onClick={e => openCardMenu(e, ad)}
+                        style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: '1.1rem', cursor: 'pointer', padding: '0 2px', flexShrink: 0, lineHeight: 1 }}
+                      >⋯</button>
                     )}
                   </div>
                 </div>
@@ -566,20 +568,17 @@ export default function LibraryTab({ onEdit }) {
                       }} />
                     )}
                   </div>
-                  {/* Headline */}
-                  <div
-                    style={{
-                      padding: '8px 10px',
-                      fontSize: '0.72rem',
-                      color: '#ffffff',
-                      fontFamily: 'var(--font-inter)',
-                      lineHeight: 1.4,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {ad.headline || 'No headline'}
+                  {/* Headline + ⋯ */}
+                  <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ flex: 1, fontSize: '0.72rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {ad.headline || 'No headline'}
+                    </div>
+                    {!selectMode && (
+                      <button
+                        onClick={e => openCardMenu(e, ad)}
+                        style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: '1.1rem', cursor: 'pointer', padding: '0 2px', flexShrink: 0, lineHeight: 1 }}
+                      >⋯</button>
+                    )}
                   </div>
                 </div>
               )
@@ -909,6 +908,51 @@ export default function LibraryTab({ onEdit }) {
           </div>
         </div>
       )}
+
+      {/* ── CARD CONTEXT MENU ── */}
+      {cardMenu && (() => {
+        const menuAd = ads.find(a => a.id === cardMenu.id)
+        if (!menuAd) return null
+        const complete = isAdComplete(menuAd)
+        return (
+          <>
+            <div onClick={() => setCardMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+            <div style={{
+              position: 'fixed', top: cardMenu.top, left: cardMenu.left, zIndex: 1999,
+              background: '#0a1628', border: '1px solid #2990fa',
+              borderRadius: 10, overflow: 'hidden', minWidth: 156,
+              boxShadow: '0 8px 28px rgba(0,0,0,0.85)',
+            }}>
+              {complete && (
+                <div
+                  onClick={() => { setSelectedAd(menuAd); setSelectedVersionIdx(null); setCardMenu(null) }}
+                  style={{ padding: '10px 16px', fontSize: '0.8rem', color: '#ffffff', fontFamily: 'var(--font-inter)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #152840' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  👁 View
+                </div>
+              )}
+              <div
+                onClick={() => { onEdit?.(menuAd); setCardMenu(null) }}
+                style={{ padding: '10px 16px', fontSize: '0.8rem', color: '#ffffff', fontFamily: 'var(--font-inter)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #152840' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                ✎ Edit
+              </div>
+              <div
+                onClick={() => { setDeleteConfirm(menuAd.id); setCardMenu(null) }}
+                style={{ padding: '10px 16px', fontSize: '0.8rem', color: '#ff4455', fontFamily: 'var(--font-inter)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                🗑 Delete
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
