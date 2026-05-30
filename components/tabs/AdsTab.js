@@ -2124,15 +2124,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.0rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.5)', letterSpacing: '0.08em' }}>
                 {activeSection ? SECTION_LABELS[activeSection] : 'SELECT SECTION'}
               </div>
-              {/* Column resize — image section only */}
-              {activeSection === 'image' && (
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 3, alignItems: 'center' }}>
-                  <button onClick={() => setLeftColIdx(prev => Math.max(0, prev - 1))} disabled={leftColIdx === 0}
-                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === 0 ? 'default' : 'pointer' }}>−</button>
-                  <button onClick={() => setLeftColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))} disabled={leftColIdx === COL_SIZES.length - 1}
-                    style={{ background: 'transparent', border: '1px solid #152840', color: leftColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: leftColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}>+</button>
-                </div>
-              )}
             </div>
 
             {/* 1b. Undo + text-size controls — not in image section */}
@@ -2707,18 +2698,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                         {mode}
                       </button>
                     ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-                    <button
-                      onClick={() => setCenterColIdx(prev => Math.max(0, prev - 1))}
-                      disabled={centerColIdx === 0}
-                      style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === 0 ? 'default' : 'pointer' }}
-                    >−</button>
-                    <button
-                      onClick={() => setCenterColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))}
-                      disabled={centerColIdx === COL_SIZES.length - 1}
-                      style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}
-                    >+</button>
                   </div>
                 </div>
               </div>
