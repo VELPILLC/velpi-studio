@@ -1390,7 +1390,9 @@ Do not generate bubble options in this response.`
   }
 
   function handleGenerateImageClick() {
-    if (!imageFormat && selectedBubbles.length !== 1) {
+    // Prompt comes from the selected bubble, or whatever is typed in the input.
+    const concept = (selectedBubbles[0] || typeOwn.trim() || '').trim()
+    if (!imageFormat && !concept) {
       setImgSelectMsg('Select a size and a prompt first')
       setTimeout(() => setImgSelectMsg(null), 2500)
       return
@@ -1400,17 +1402,18 @@ Do not generate bubble options in this response.`
       setTimeout(() => setImgSelectMsg(null), 2500)
       return
     }
-    if (selectedBubbles.length !== 1) {
-      setImgSelectMsg('Select a prompt from the left first')
+    if (!concept) {
+      setImgSelectMsg('Select a prompt or type one first')
       setTimeout(() => setImgSelectMsg(null), 2500)
       return
     }
-    const concept = selectedBubbles[0]
     const fmt = imageFormat
     const refs = selectedImageIds.map(id => imageVersions.find(v => v.id === id)?.b64).filter(Boolean)
     const parentId = refs.length > 0 ? selectedImageIds[0] : null
     setSectionChats(prev => ({ ...prev, image: [...prev.image, { role: 'user', content: concept }] }))
     setDallePrompt(concept)
+    // If the prompt came from the typed input (no bubble selected), clear it.
+    if (!selectedBubbles[0] && typeOwn.trim()) setTypeOwn('')
     generateImageVersion(concept, fmt, refs, parentId)
   }
 
@@ -1988,8 +1991,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
   const sectionAngles = SECTION_ANGLES[activeSection] || []
   const canSubmit = selectedBubbles.length === 1 && !isLoading
+  // REFINE shows whenever there is at least one selected bubble OR typed text.
+  // Covers: 1 bubble, 2 bubbles, 1 bubble + text, or text alone — in every section.
   const canRefine = !isLoading && activeSection && activeSection !== 'avatar' &&
-    (selectedBubbles.length >= 2 || (selectedBubbles.length === 1 && !!typeOwn.trim()))
+    (selectedBubbles.length >= 1 || !!typeOwn.trim())
   const avatarStepIdx = AVATAR_FUNNEL_STEPS.indexOf(avatarFunnelStep)
   const activeStepForMax = avatarEditingField || avatarFunnelStep
   const avatarMaxSelect = activeStepForMax === 'mediaTrust' ? 4 : 2
@@ -2641,6 +2646,26 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       {canRefine ? 'REFINE' : '→'}
                     </button>
                   )}
+                  {/* GENERATE IMAGE — always visible in image section, greyed until a size is selected */}
+                  {activeSection === 'image' && (
+                    <button
+                      onClick={handleGenerateImageClick}
+                      disabled={!imageFormat}
+                      title={imageFormat ? 'Generate image' : 'Select a size first'}
+                      style={{
+                        background: imageFormat ? '#2990fa' : '#0d1e2e',
+                        border: `1px solid ${imageFormat ? '#2990fa' : '#1d3558'}`,
+                        color: imageFormat ? '#ffffff' : '#2a4a6a',
+                        borderRadius: 8, padding: '8px 12px',
+                        fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)',
+                        cursor: imageFormat ? 'pointer' : 'not-allowed',
+                        flexShrink: 0, height: 36, boxSizing: 'border-box',
+                        letterSpacing: '0.04em', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      GENERATE IMAGE
+                    </button>
+                  )}
                   {/* Regen with selected image as reference */}
                   {activeSection === 'image' && typeOwn.trim() && selectedImageIds.length > 0 && imageFormat && (
                     <button
@@ -2723,7 +2748,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   const isGenerating = !!currentFrame?.isGenerating
                   const isError = !!currentFrame?.error
                   const isPendingOrEmpty = !hasFrames || (currentFrame && !isReady && !isGenerating && !isError)
-                  const canGenerate = !!imageFormat && selectedBubbles.length === 1
                   const frameFormat = currentFrame?.format || imageFormat
                   const frameRatio = frameFormat === '1:1' ? '1/1' : frameFormat === '4:5' ? '4/5' : frameFormat === '16/9' ? '16/9' : frameFormat === '9/16' ? '9/16' : null
 
@@ -2814,22 +2838,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                             /* Placeholder */
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: 24 }}>
                               <div style={{ fontSize: '2rem', opacity: 0.08 }}>⚡</div>
-                              <button
-                                onClick={e => { e.stopPropagation(); handleGenerateImageClick() }}
-                                style={{
-                                  background: canGenerate ? '#2990fa' : '#0d1e2e',
-                                  border: `1px solid ${canGenerate ? '#2990fa' : '#1d3558'}`,
-                                  color: canGenerate ? '#ffffff' : '#2a4a6a',
-                                  padding: '9px 18px', borderRadius: 8,
-                                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
-                                  cursor: 'pointer', letterSpacing: '0.08em',
-                                }}
-                              >GENERATE IMAGE</button>
-                              {!frameRatio && (
-                                <div style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.18)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.9 }}>
-                                  SELECT A SIZE BELOW
-                                </div>
-                              )}
+                              <div style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.18)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.9 }}>
+                                {imageFormat ? 'CLICK GENERATE IMAGE ON THE LEFT' : 'SELECT A SIZE BELOW'}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -2929,25 +2940,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 /* ── MULTI VIEW ── */
                 (() => {
                   const topLevel = imageVersions.filter(v => !v.parentId && !v.isPending)
-                  const canGenerate = !!imageFormat && selectedBubbles.length === 1
                   return (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 8 }}>
 
-                      {/* GENERATE button */}
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button
-                          onClick={handleGenerateImageClick}
-                          style={{
-                            background: canGenerate ? '#2990fa' : '#0d1e2e',
-                            border: `1px solid ${canGenerate ? '#2990fa' : '#1d3558'}`,
-                            color: canGenerate ? '#ffffff' : '#2a4a6a',
-                            padding: '7px 16px', borderRadius: 8,
-                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem',
-                            cursor: 'pointer', letterSpacing: '0.08em', flexShrink: 0,
-                          }}
-                        >
-                          GENERATE IMAGE
-                        </button>
+                      {/* Reference indicator — GENERATE IMAGE lives in the left column */}
+                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, minHeight: 4 }}>
                         {selectedImageIds.length > 0 && (
                           <span style={{ fontSize: '0.5rem', color: 'rgba(41,144,250,0.7)', fontFamily: 'var(--font-ibm-plex-mono)' }}>
                             {selectedImageIds.length} ref{selectedImageIds.length > 1 ? 's' : ''} selected
