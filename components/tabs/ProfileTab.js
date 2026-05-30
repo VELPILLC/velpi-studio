@@ -589,7 +589,16 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             padding: 12, background: '#060d1f', borderRadius: 10, border: '1px solid #152840',
             marginBottom: 10,
           }}>
-            {chatMessages.map((msg, idx) => (
+            {chatMessages.map((msg, idx) => {
+              // Safety net: never render raw JSON in the chat.
+              let text = msg.content || ''
+              if (msg.role === 'assistant') {
+                const cleaned = text.replace(/```json|```/g, '').trim()
+                if (cleaned.startsWith('{') || cleaned.startsWith('[')) {
+                  text = '⚠ Something went wrong reading that. Please try again.'
+                }
+              }
+              return (
               <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div style={{
                   background: msg.role === 'user' ? '#2990fa' : '#0a1628',
@@ -598,10 +607,11 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   maxWidth: '85%', fontSize: '0.92rem', lineHeight: 1.6,
                   fontFamily: 'var(--font-inter)', whiteSpace: 'pre-wrap',
                 }}>
-                  {msg.content}
+                  {text}
                 </div>
               </div>
-            ))}
+              )
+            })}
             {isLoading && (
               <div style={{ color: '#2990fa', fontSize: '0.72rem', fontFamily: 'var(--font-ibm-plex-mono)', padding: '4px 0' }}>
                 {mode === 'freeform' ? 'Analysing your description...' : 'Generating...'}

@@ -411,12 +411,28 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     if (msg.role === 'user' && AUTO_PROMPT_TEXTS.has(msg.content)) return true
     if (msg.role === 'user' && msg.content.startsWith('[IDEA_CONTEXT]')) return true
     if (msg.role === 'assistant') {
-      try {
-        const p = JSON.parse(msg.content.replace(/```json|```/g, '').trim())
-        if (Array.isArray(p.options)) return true
-      } catch (_) {}
+      // Any assistant payload that yields an options array is bubble data — never show it.
+      // Uses the same lenient detection as parseResponse so JSON embedded in surrounding
+      // text is caught too (strict JSON.parse alone would let those leak into the chat).
+      if (parseResponse(msg.content)?.options) return true
     }
     return false
+  }
+
+  // Final safety net for chat rendering: never let raw JSON reach the screen.
+  // Returns the text to display, or null to skip the message entirely.
+  function chatDisplayText(msg) {
+    if (shouldHideMessage(msg)) return null
+    const content = msg?.content || ''
+    if (msg?.role === 'assistant') {
+      const cleaned = content.replace(/```json|```/g, '').trim()
+      // Looked like structured data but did not parse into options — show a clean
+      // message instead of dumping raw JSON on the user.
+      if (cleaned.startsWith('{') || cleaned.startsWith('[')) {
+        return '⚠ I had trouble formatting that response. Tap Refine to try again.'
+      }
+    }
+    return content
   }
 
   function isQuestion(text) {
@@ -1304,23 +1320,14 @@ Do not generate bubble options in this response.`
     const pendingVersion = imageVersions.find(v => v.isPending)
     const versionId = pendingVersion?.id || `v-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-    // Build the exact prompt + size up front so we can store & log what is sent.
     const sizeMap = { '9/16': '1024x1536', '1:1': '1024x1024', '4:5': '1024x1536', '16/9': '1536x1024' }
     const formatDesc = fmt === '1:1' ? 'square format photo' : fmt === '4:5' ? 'vertical 4:5 portrait photo' : fmt === '16/9' ? 'horizontal 16:9 landscape photo' : 'cinematic vertical 9:16 portrait photo'
     const isEdit = referenceB64s.length > 0
     const sizeValue = sizeMap[fmt] || '1024x1536'
-    const promptText = `${formatDesc}, ${concept}, no text, no logos, photorealistic, documentary style`
 
-    // VISIBILITY: log the exact prompt being sent (open browser console to inspect)
-    console.log('[image gen]', {
-      mode: isEdit ? 'EDIT (with reference image)' : 'GENERATE (fresh)',
-      size: sizeValue,
-      references: referenceB64s.length,
-      yourText: concept,
-      promptSent: promptText,
-    })
-
-    const generatingVersion = { id: versionId, b64: null, prompt: concept, sentPrompt: promptText, isEdit, format: fmt, isGenerating: true, error: null, parentId, isPending: false }
+    // Create the generating slot immediately so the loading spinner shows right away.
+    // sentPrompt is filled in once the final prompt is built (edits build it async).
+    const generatingVersion = { id: versionId, b64: null, prompt: concept, sentPrompt: null, isEdit, format: fmt, isGenerating: true, error: null, parentId, isPending: false }
 
     if (pendingVersion) {
       // Reuse the pending slot in place — move the carousel onto it so the
@@ -1334,6 +1341,32 @@ Do not generate bubble options in this response.`
     }
 
     try {
+      // Fresh generation uses the scene template. Edits build a precise combined
+      // prompt: preserve the original exactly, then the requested change only.
+      let promptText
+      if (isEdit) {
+        const refVersion = imageVersions.find(v => v.id === parentId)
+        const originalConcept = refVersion?.prompt || refVersion?.sentPrompt || dallePrompt || sectionValues.image || ''
+        promptText = await buildEditPrompt(originalConcept, concept)
+      } else {
+        promptText = `${formatDesc}, ${concept}, no text, no logos, photorealistic, documentary style`
+      }
+
+      // VISIBILITY: log the exact prompt being sent (open browser console to inspect)
+      console.log('[image gen]', {
+        mode: isEdit ? 'EDIT (with reference image)' : 'GENERATE (fresh)',
+        size: sizeValue,
+        references: referenceB64s.length,
+        yourText: concept,
+        promptSent: promptText,
+      })
+
+      // Reflect the real prompt in the slot. For edits, also store the richer
+      // combined prompt as the concept so a confirmed edit keeps full context.
+      setImageVersions(prev => prev.map(v => v.id === versionId
+        ? { ...v, sentPrompt: promptText, ...(isEdit ? { prompt: promptText } : {}) }
+        : v))
+
       const res = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1353,6 +1386,36 @@ Do not generate bubble options in this response.`
     } catch (err) {
       console.error('Image gen error:', err)
       setImageVersions(prev => prev.map(v => v.id === versionId ? { ...v, isGenerating: false, error: 'Something went wrong.' } : v))
+    }
+  }
+
+  // Build a precise EDIT prompt for the image edit endpoint: first describe everything
+  // in the original that must be preserved exactly, then the requested change using
+  // precise spatial language. Never sends the user's casual instruction on its own.
+  async function buildEditPrompt(originalConcept, instruction) {
+    const fallback = `Preserve everything in the original image exactly as it is${originalConcept ? ', including: ' + originalConcept : ''}. Change only this: ${instruction}. Do not move or alter any other element.`
+    try {
+      const system = `You write precise EDIT prompts for an AI image-editing model that receives the ORIGINAL image plus your text. It must change ONLY what is asked and keep everything else identical.
+You are given the ORIGINAL image description and the user's NEW change instruction.
+Output ONE edit prompt as PLAIN TEXT only. No JSON. No markdown. No preamble. No surrounding quotes.
+Follow this structure exactly:
+1. Start with "Preserve " and list every element from the original that must stay exactly the same — the subjects, any text content quoted word-for-word, the setting, the props, the lighting, the mood, the composition, and the style.
+2. Then write "Change only this: " and describe the requested change as precisely as possible. Locate it with spatial language — left of, right of, above, below, next to, on the same line as, the beginning of the line.
+3. End with the sentence "Do not move or alter any other element."
+Be concrete and specific. Preserve the exact wording of any text visible in the image. Plain text only.`
+      const userMsg = `ORIGINAL IMAGE: ${originalConcept || '(no description provided — preserve every element visible in the attached image)'}\nNEW INSTRUCTION: ${instruction}`
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: userMsg }], system }),
+      })
+      const data = await res.json()
+      const raw = (data.text || '').replace(/```json|```/g, '').trim()
+      // Guard: never let stray JSON become the image prompt — fall back if so.
+      if (raw && !raw.startsWith('{') && !raw.startsWith('[')) return raw
+      return fallback
+    } catch (_) {
+      return fallback
     }
   }
 
@@ -2188,7 +2251,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   Select a section to continue
                 </div>
               )}
-              {activeSection && (sectionChats[activeSection] || []).filter(m => !shouldHideMessage(m)).map((msg, idx) => (
+              {activeSection && (sectionChats[activeSection] || [])
+                .map((msg, idx) => ({ msg, idx, text: chatDisplayText(msg) }))
+                .filter(x => x.text !== null)
+                .map(({ msg, idx, text }) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <div style={{
                     background: msg.role === 'user' ? '#2990fa' : '#0a1628',
@@ -2197,7 +2263,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     maxWidth: '80%', fontSize: `${0.92 * FONT_SCALES[chatFontScale]}rem`, lineHeight: 1.5,
                     fontFamily: 'var(--font-inter)', whiteSpace: 'pre-wrap',
                   }}>
-                    {msg.content}
+                    {text}
                   </div>
                 </div>
               ))}
