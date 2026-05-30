@@ -8,6 +8,14 @@ export async function POST(request) {
     const VALID_SIZES = ['1024x1024', '1024x1536', '1536x1024']
     const resolvedSize = VALID_SIZES.includes(size) ? size : '1024x1536'
 
+    // VISIBILITY: log exactly what the image endpoint received
+    console.log('[/api/image]', {
+      mode: referenceB64s && referenceB64s.length > 0 ? 'edit' : 'generate',
+      size: resolvedSize,
+      references: referenceB64s ? referenceB64s.length : 0,
+      prompt,
+    })
+
     let response
 
     if (referenceB64s && referenceB64s.length > 0) {

@@ -1303,7 +1303,24 @@ Do not generate bubble options in this response.`
     // Reuse pending placeholder slot if one exists, otherwise create a new version
     const pendingVersion = imageVersions.find(v => v.isPending)
     const versionId = pendingVersion?.id || `v-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const generatingVersion = { id: versionId, b64: null, prompt: concept, format: fmt, isGenerating: true, error: null, parentId, isPending: false }
+
+    // Build the exact prompt + size up front so we can store & log what is sent.
+    const sizeMap = { '9/16': '1024x1536', '1:1': '1024x1024', '4:5': '1024x1536', '16/9': '1536x1024' }
+    const formatDesc = fmt === '1:1' ? 'square format photo' : fmt === '4:5' ? 'vertical 4:5 portrait photo' : fmt === '16/9' ? 'horizontal 16:9 landscape photo' : 'cinematic vertical 9:16 portrait photo'
+    const isEdit = referenceB64s.length > 0
+    const sizeValue = sizeMap[fmt] || '1024x1536'
+    const promptText = `${formatDesc}, ${concept}, no text, no logos, photorealistic, documentary style`
+
+    // VISIBILITY: log the exact prompt being sent (open browser console to inspect)
+    console.log('[image gen]', {
+      mode: isEdit ? 'EDIT (with reference image)' : 'GENERATE (fresh)',
+      size: sizeValue,
+      references: referenceB64s.length,
+      yourText: concept,
+      promptSent: promptText,
+    })
+
+    const generatingVersion = { id: versionId, b64: null, prompt: concept, sentPrompt: promptText, isEdit, format: fmt, isGenerating: true, error: null, parentId, isPending: false }
 
     if (pendingVersion) {
       // Reuse the pending slot in place — move the carousel onto it so the
@@ -1317,23 +1334,20 @@ Do not generate bubble options in this response.`
     }
 
     try {
-      const sizeMap = { '9/16': '1024x1536', '1:1': '1024x1024', '4:5': '1024x1536', '16/9': '1536x1024' }
-      const formatDesc = fmt === '1:1' ? 'square format photo' : fmt === '4:5' ? 'vertical 4:5 portrait photo' : fmt === '16/9' ? 'horizontal 16:9 landscape photo' : 'cinematic vertical 9:16 portrait photo'
-      const promptText = `${formatDesc}, ${concept}, no text, no logos, photorealistic, documentary style`
-
       const res = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          size: sizeMap[fmt] || '1024x1536',
-          ...(referenceB64s.length > 0 ? { referenceB64s } : {}),
+          size: sizeValue,
+          ...(isEdit ? { referenceB64s } : {}),
         }),
       })
       const data = await res.json()
       if (data.b64) {
         setImageVersions(prev => prev.map(v => v.id === versionId ? { ...v, b64: data.b64, isGenerating: false } : v))
       } else {
+        console.warn('[image gen] failed:', data.error)
         setImageVersions(prev => prev.map(v => v.id === versionId ? { ...v, isGenerating: false, error: data.error || 'Generation failed. Try again.' } : v))
       }
     } catch (err) {
@@ -2907,9 +2921,12 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           <div style={{ fontSize: '0.48rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', marginBottom: 2 }}>
                             {clampedIdx + 1} / {totalFrames}
                           </div>
-                          {currentFrame?.prompt && (
-                            <div style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', maxWidth: 240, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {currentFrame.prompt}
+                          {(currentFrame?.sentPrompt || currentFrame?.prompt) && (
+                            <div
+                              title={currentFrame.sentPrompt || currentFrame.prompt}
+                              style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', maxWidth: 240, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            >
+                              {currentFrame.isEdit ? '✎ edit · ' : ''}{currentFrame.sentPrompt || currentFrame.prompt}
                             </div>
                           )}
                         </div>
