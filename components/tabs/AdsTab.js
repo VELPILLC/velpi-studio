@@ -184,7 +184,7 @@ const EMPTY_AVATAR_DATA = () => ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled, onSaved, pendingAvatarAction, onAvatarActionConsumed, onAvatarChange }) {
+export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd, onLoadAdConsumed, selectedProfile, onGoToProfile, pendingTabChange, onTabChangeApproved, onTabChangeCancelled, onSaved }) {
   // Section state
   const [activeSection, setActiveSection] = useState('avatar')
   const [sectionChats, setSectionChats] = useState(EMPTY_SECTION_OBJ())
@@ -250,7 +250,9 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [avatarEditMode, setAvatarEditMode] = useState(false)
   const [avatarEditingField, setAvatarEditingField] = useState(null)
   const [avatarEditingId, setAvatarEditingId] = useState(null)
-  // avatarDropdown/avatarDeleteConfirm/avatarMenuPos removed — handled in Studio.js tab bar
+  const [avatarDropdown, setAvatarDropdown] = useState(null)
+  const [avatarDeleteConfirm, setAvatarDeleteConfirm] = useState(null)
+  const [avatarMenuPos, setAvatarMenuPos] = useState({ top: 0, left: 0 })
 
   // ─── useEffects ───────────────────────────────────────────────────────────────
 
@@ -268,38 +270,6 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     setTypeOwn('')
     setBubbleHistory([])
   }, [activeSection])
-
-  // Sync avatar data to Studio.js tab bar
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { onAvatarChange?.(avatars, selectedAvatar) }, [avatars, selectedAvatar])
-
-  // Handle avatar actions dispatched from Studio.js tab bar
-  useEffect(() => {
-    if (!pendingAvatarAction) return
-    switch (pendingAvatarAction.type) {
-      case 'select':
-        handleAvatarSelect(pendingAvatarAction.avatar)
-        break
-      case 'new':
-        startNewAvatarFunnel()
-        break
-      case 'edit':
-        handleEditAvatarFromBar(pendingAvatarAction.avatar)
-        break
-      case 'avatarDeleted':
-        loadAvatars()
-        if (selectedAvatar?.id === pendingAvatarAction.avatarId) {
-          setSelectedAvatar(null)
-          setSectionValues(prev => ({ ...prev, avatar: null }))
-          setActiveSection('avatar')
-          initAvatarFunnel()
-        }
-        break
-      default: break
-    }
-    onAvatarActionConsumed?.()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAvatarAction])
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -2229,6 +2199,42 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               )}
             </div>
 
+            {/* 3a. Avatar selector — shown at top of avatar section when avatars exist */}
+            {activeSection === 'avatar' && avatars.length > 0 && !avatarEditMode && (
+              <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                <div style={{ fontSize: '0.46rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+                  Your Avatars
+                </div>
+                {avatars.map(av => (
+                  <div key={av.id} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <div
+                      onClick={() => handleAvatarSelect(av)}
+                      style={{
+                        flex: 1, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                        background: selectedAvatar?.id === av.id ? '#2990fa' : '#060d1f',
+                        border: `1px solid ${selectedAvatar?.id === av.id ? '#2990fa' : '#152840'}`,
+                        fontSize: '0.82rem', color: '#ffffff', fontFamily: 'var(--font-inter)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>{av.name}</span>
+                      {selectedAvatar?.id === av.id && <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>✓</span>}
+                    </div>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        setAvatarMenuPos({ top: rect.bottom + 4, left: rect.left })
+                        setAvatarDropdown(prev => prev === av.id ? null : av.id)
+                      }}
+                      style={{ background: 'transparent', border: 'none', color: '#2990fa', fontSize: '1.1rem', cursor: 'pointer', padding: '4px 8px', flexShrink: 0, lineHeight: 1 }}
+                    >⋯</button>
+                  </div>
+                ))}
+                <div style={{ height: 1, background: '#152840', margin: '8px 0 10px 0' }} />
+              </div>
+            )}
+
             {/* 3. Controls area — conditional */}
             {activeSection === 'avatar' ? (
 
@@ -3397,6 +3403,53 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── AVATAR THREE DOTS POPUP ── */}
+      {avatarDropdown && (
+        <>
+          <div onClick={() => setAvatarDropdown(null)} style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
+          <div style={{
+            position: 'fixed', top: avatarMenuPos.top, left: avatarMenuPos.left,
+            zIndex: 9999, background: '#0a1628', border: '1px solid #2990fa',
+            borderRadius: 8, padding: 4, minWidth: 120, boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+          }}>
+            <div
+              onClick={() => { const av = avatars.find(a => a.id === avatarDropdown); if (av) handleEditAvatarFromBar(av); setAvatarDropdown(null) }}
+              style={{ padding: '8px 14px', color: '#ffffff', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >✎ Edit</div>
+            <div
+              onClick={() => { const av = avatars.find(a => a.id === avatarDropdown); if (av) { setAvatarDeleteConfirm(av); setAvatarDropdown(null) } }}
+              style={{ padding: '8px 14px', color: '#ff4455', fontSize: '0.82rem', fontFamily: 'var(--font-inter)', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#1a0a0d'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >🗑 Delete</div>
+          </div>
+        </>
+      )}
+
+      {/* ── AVATAR DELETE CONFIRM ── */}
+      {avatarDeleteConfirm && (
+        <div onClick={() => setAvatarDeleteConfirm(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(2,8,16,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>Delete Avatar</div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
+              Delete <strong>{avatarDeleteConfirm.name}</strong>? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { handleDeleteAvatar(avatarDeleteConfirm); setAvatarDeleteConfirm(null) }}
+                style={{ flex: 1, background: '#ff4455', border: 'none', borderRadius: 8, padding: '11px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+              >DELETE</button>
+              <button
+                onClick={() => setAvatarDeleteConfirm(null)}
+                style={{ flex: 1, background: 'transparent', border: '1px solid #2990fa', borderRadius: 8, padding: '11px 0', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+              >CANCEL</button>
+            </div>
           </div>
         </div>
       )}
