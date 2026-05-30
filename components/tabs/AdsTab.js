@@ -1912,15 +1912,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     const val = typeOwn.trim()
     setTypeOwn('')
     setCurrentBubbles(prev => prev.includes(val) ? prev : [...prev, val])
-    if (activeSection === 'image') {
-      setSelectedBubbles([val]) // single-select for image
-    } else {
-      setSelectedBubbles(prev => {
-        if (prev.includes(val)) return prev
-        if (prev.length < 2) return [...prev, val]
-        return [prev[1], val]
-      })
-    }
+    setSelectedBubbles(prev => {
+      if (prev.includes(val)) return prev
+      if (prev.length < 2) return [...prev, val]
+      return [prev[1], val]
+    })
   }
 
   function handleEditSave(idx) {
@@ -1934,11 +1930,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
   }
 
   function handleBubbleClick(bubble) {
-    if (activeSection === 'image') {
-      // Single-select only for image section
-      setSelectedBubbles(prev => prev.includes(bubble) ? [] : [bubble])
-      return
-    }
     setSelectedBubbles(prev => {
       if (prev.includes(bubble)) return prev.filter(b => b !== bubble)
       if (prev.length < 2) return [...prev, bubble]
@@ -1997,6 +1988,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
   const sectionAngles = SECTION_ANGLES[activeSection] || []
   const canSubmit = selectedBubbles.length === 1 && !isLoading
+  const canRefine = !isLoading && activeSection && activeSection !== 'avatar' &&
+    (selectedBubbles.length >= 2 || (selectedBubbles.length === 1 && !!typeOwn.trim()))
   const avatarStepIdx = AVATAR_FUNNEL_STEPS.indexOf(avatarFunnelStep)
   const activeStepForMax = avatarEditingField || avatarFunnelStep
   const avatarMaxSelect = activeStepForMax === 'mediaTrust' ? 4 : 2
@@ -2142,8 +2135,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               )}
             </div>
 
-            {/* 1b. Undo + text-size controls */}
-            {activeSection && activeSection !== 'avatar' && (
+            {/* 1b. Undo + text-size controls — not in image section */}
+            {activeSection && activeSection !== 'avatar' && activeSection !== 'image' && (
               <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                 <button
                   onClick={handleUndoBubbles}
@@ -2641,9 +2634,20 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     <button
                       onClick={handleSendToJarvis}
                       disabled={isLoading}
-                      style={{ border: '1px solid #2990fa', background: 'transparent', color: '#2990fa', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: isLoading ? 'not-allowed' : 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box', opacity: isLoading ? 0.5 : 1 }}
+                      style={{
+                        border: `1px solid ${canRefine ? '#2990fa' : '#152840'}`,
+                        background: canRefine ? '#2990fa' : 'transparent',
+                        color: canRefine ? '#ffffff' : 'rgba(255,255,255,0.4)',
+                        borderRadius: 8, padding: '8px 14px',
+                        fontSize: canRefine ? '0.72rem' : '0.82rem',
+                        fontFamily: 'var(--font-ibm-plex-mono)',
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                        flexShrink: 0, height: 36, boxSizing: 'border-box',
+                        opacity: isLoading ? 0.5 : 1,
+                        letterSpacing: canRefine ? '0.05em' : 0,
+                      }}
                     >
-                      →
+                      {canRefine ? 'REFINE' : '→'}
                     </button>
                   )}
                   {/* Regen with selected image as reference */}
@@ -2674,48 +2678,8 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           {activeSection === 'image' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
 
-              {/* Row 1: size buttons + center col resize */}
-              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-                  {[
-                    { id: '9/16', label: '9:16', desc: 'Story' },
-                    { id: '1:1', label: '1:1', desc: 'Square' },
-                    { id: '4:5', label: '4:5', desc: 'Portrait' },
-                    { id: '16/9', label: '16:9', desc: 'Wide' },
-                  ].map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => handleSizeClick(f.id)}
-                      style={{
-                        flex: 1,
-                        background: imageFormat === f.id ? '#2990fa' : '#0a1628',
-                        border: `2px solid ${imageFormat === f.id ? '#2990fa' : '#152840'}`,
-                        borderRadius: 8, padding: '7px 4px', cursor: 'pointer',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                      }}
-                    >
-                      <span style={{ fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', fontWeight: 600 }}>{f.label}</span>
-                      <span style={{ fontSize: '0.44rem', fontFamily: 'var(--font-ibm-plex-mono)', color: imageFormat === f.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)' }}>{f.desc}</span>
-                    </button>
-                  ))}
-                </div>
-                {/* Center col resize */}
-                <div style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
-                  <button
-                    onClick={() => setCenterColIdx(prev => Math.max(0, prev - 1))}
-                    disabled={centerColIdx === 0}
-                    style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === 0 ? 'default' : 'pointer' }}
-                  >−</button>
-                  <button
-                    onClick={() => setCenterColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))}
-                    disabled={centerColIdx === COL_SIZES.length - 1}
-                    style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}
-                  >+</button>
-                </div>
-              </div>
-
-              {/* Row 2: new image + view toggle */}
-              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              {/* Header row: new image + view toggle + center col resize */}
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 8 }}>
                 <button
                   onClick={handleNewImage}
                   style={{
@@ -2726,22 +2690,36 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 >
                   + NEW IMAGE
                 </button>
-                <div style={{ display: 'flex', gap: 3 }}>
-                  {['single', 'multi'].map(mode => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {['single', 'multi'].map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setImageViewMode(mode)}
+                        style={{
+                          background: imageViewMode === mode ? '#2990fa' : '#0a1628',
+                          border: `1px solid ${imageViewMode === mode ? '#2990fa' : '#152840'}`,
+                          borderRadius: 6, padding: '5px 9px', cursor: 'pointer',
+                          fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)',
+                          color: '#ffffff', letterSpacing: '0.06em', textTransform: 'uppercase',
+                        }}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
                     <button
-                      key={mode}
-                      onClick={() => setImageViewMode(mode)}
-                      style={{
-                        background: imageViewMode === mode ? '#2990fa' : '#0a1628',
-                        border: `1px solid ${imageViewMode === mode ? '#2990fa' : '#152840'}`,
-                        borderRadius: 6, padding: '5px 9px', cursor: 'pointer',
-                        fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)',
-                        color: '#ffffff', letterSpacing: '0.06em', textTransform: 'uppercase',
-                      }}
-                    >
-                      {mode}
-                    </button>
-                  ))}
+                      onClick={() => setCenterColIdx(prev => Math.max(0, prev - 1))}
+                      disabled={centerColIdx === 0}
+                      style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === 0 ? 'default' : 'pointer' }}
+                    >−</button>
+                    <button
+                      onClick={() => setCenterColIdx(prev => Math.min(COL_SIZES.length - 1, prev + 1))}
+                      disabled={centerColIdx === COL_SIZES.length - 1}
+                      style={{ background: 'transparent', border: '1px solid #152840', color: centerColIdx === COL_SIZES.length - 1 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 4, padding: '0px 7px', fontSize: '1rem', lineHeight: '20px', cursor: centerColIdx === COL_SIZES.length - 1 ? 'default' : 'pointer' }}
+                    >+</button>
+                  </div>
                 </div>
               </div>
 
@@ -2771,29 +2749,43 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   const frameRatio = frameFormat === '1:1' ? '1/1' : frameFormat === '4:5' ? '4/5' : frameFormat === '16/9' ? '16/9' : frameFormat === '9/16' ? '9/16' : null
 
                   return (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 6 }}>
-                      {/* Nav + frame */}
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 0 }}>
-                        {/* Left arrow */}
-                        <button
-                          onClick={() => setCurrentImageIdx(prev => Math.max(0, prev - 1))}
-                          style={{
-                            background: 'transparent', border: '1px solid #152840',
-                            color: (!hasFrames || clampedIdx === 0) ? 'rgba(255,255,255,0.12)' : '#ffffff',
-                            borderRadius: 6, padding: '8px 10px',
-                            cursor: (!hasFrames || clampedIdx === 0) ? 'default' : 'pointer',
-                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', flexShrink: 0,
-                          }}
-                        >←</button>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, gap: 4 }}>
 
-                        {/* Frame */}
+                      {/* ── CAROUSEL (peek effect) ── */}
+                      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
+
+                        {/* Left peek — previous frame */}
+                        {hasFrames && clampedIdx > 0 && (() => {
+                          const lf = allFrames[clampedIdx - 1]
+                          const lFmt = lf.format || imageFormat
+                          const lRatio = lFmt === '1:1' ? '1/1' : lFmt === '4:5' ? '4/5' : lFmt === '16/9' ? '16/9' : '9/16'
+                          return (
+                            <div
+                              onClick={() => setCurrentImageIdx(clampedIdx - 1)}
+                              style={{
+                                position: 'absolute', left: 0, zIndex: 2,
+                                height: '56%', aspectRatio: lRatio,
+                                transform: 'translateX(-62%)',
+                                borderRadius: 8, overflow: 'hidden',
+                                background: '#060d1f',
+                                border: '1px solid rgba(41,144,250,0.12)',
+                                opacity: 0.5, cursor: 'pointer',
+                              }}
+                            >
+                              {lf.b64 && <img src={`data:image/png;base64,${lf.b64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                              {lf.isGenerating && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="img-pulse" style={{ fontSize: '1.2rem' }}>⚡</span></div>}
+                            </div>
+                          )
+                        })()}
+
+                        {/* Center frame */}
                         <div
                           onClick={() => isReady && handleImageVersionClick(currentFrame)}
                           style={{
                             ...(frameRatio
-                              ? { aspectRatio: frameRatio, maxHeight: 'calc(100vh - 390px)' }
+                              ? { aspectRatio: frameRatio, maxHeight: 'calc(100vh - 420px)' }
                               : { width: 180, height: 240 }),
-                            maxWidth: '100%', minWidth: 80,
+                            maxWidth: '80%', minWidth: 80,
                             overflow: 'hidden', borderRadius: 10, flexShrink: 0,
                             border: (isReady && selectedImageIds.includes(currentFrame?.id))
                               ? '2px solid #2990fa'
@@ -2801,12 +2793,25 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                             background: '#060d1f',
                             cursor: isReady ? 'pointer' : 'default',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            position: 'relative',
+                            position: 'relative', zIndex: 3,
                           }}
                         >
                           {isReady ? (
                             <>
                               <img src={`data:image/png;base64,${currentFrame.b64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {/* Download icon — inside image, bottom-right */}
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  const name = (sectionValues.hook || 'velpi-image').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+                                  const a = document.createElement('a')
+                                  a.href = `data:image/png;base64,${currentFrame.b64}`
+                                  a.download = `${name}.png`
+                                  a.click()
+                                }}
+                                title="Download"
+                                style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', color: '#ffffff', borderRadius: 5, padding: '4px 7px', cursor: 'pointer', fontSize: '0.85rem', zIndex: 4 }}
+                              >⬇</button>
                               {selectedImageIds.includes(currentFrame.id) && (
                                 <div style={{ position: 'absolute', top: 6, right: 6, background: '#2990fa', borderRadius: 4, padding: '2px 6px', fontSize: '0.46rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#fff' }}>✓</div>
                               )}
@@ -2822,15 +2827,12 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                               <div style={{ fontSize: '1.2rem' }}>⚠</div>
                               <div style={{ fontSize: '0.52rem', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', textAlign: 'center' }}>FAILED</div>
                               <button
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  generateImageVersion(currentFrame.prompt || dallePrompt || sectionValues.image || '', currentFrame.format || imageFormat || '9/16', [], currentFrame.parentId)
-                                }}
+                                onClick={e => { e.stopPropagation(); generateImageVersion(currentFrame.prompt || dallePrompt || sectionValues.image || '', currentFrame.format || imageFormat || '9/16', [], currentFrame.parentId) }}
                                 style={{ background: 'transparent', border: '1px solid #ff4455', borderRadius: 6, padding: '4px 10px', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', cursor: 'pointer' }}
                               >Retry</button>
                             </div>
                           ) : (
-                            /* Placeholder — empty or pending */
+                            /* Placeholder */
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: 24 }}>
                               <div style={{ fontSize: '2rem', opacity: 0.08 }}>⚡</div>
                               <button
@@ -2843,48 +2845,83 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                                   fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem',
                                   cursor: 'pointer', letterSpacing: '0.08em',
                                 }}
-                              >
-                                GENERATE IMAGE
-                              </button>
+                              >GENERATE IMAGE</button>
                               {!frameRatio && (
                                 <div style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.18)', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.1em', textAlign: 'center', lineHeight: 1.9 }}>
-                                  SELECT A SIZE ABOVE
+                                  SELECT A SIZE BELOW
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
 
-                        {/* Right arrow */}
-                        <button
-                          onClick={() => setCurrentImageIdx(prev => Math.min(totalFrames - 1, prev + 1))}
-                          style={{
-                            background: 'transparent', border: '1px solid #152840',
-                            color: (!hasFrames || clampedIdx >= totalFrames - 1) ? 'rgba(255,255,255,0.12)' : '#ffffff',
-                            borderRadius: 6, padding: '8px 10px',
-                            cursor: (!hasFrames || clampedIdx >= totalFrames - 1) ? 'default' : 'pointer',
-                            fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', flexShrink: 0,
-                          }}
-                        >→</button>
+                        {/* Right peek — next frame */}
+                        {hasFrames && clampedIdx < totalFrames - 1 && (() => {
+                          const rf = allFrames[clampedIdx + 1]
+                          const rFmt = rf.format || imageFormat
+                          const rRatio = rFmt === '1:1' ? '1/1' : rFmt === '4:5' ? '4/5' : rFmt === '16/9' ? '16/9' : '9/16'
+                          return (
+                            <div
+                              onClick={() => setCurrentImageIdx(clampedIdx + 1)}
+                              style={{
+                                position: 'absolute', right: 0, zIndex: 2,
+                                height: '56%', aspectRatio: rRatio,
+                                transform: 'translateX(62%)',
+                                borderRadius: 8, overflow: 'hidden',
+                                background: '#060d1f',
+                                border: '1px solid rgba(41,144,250,0.12)',
+                                opacity: 0.5, cursor: 'pointer',
+                              }}
+                            >
+                              {rf.b64 && <img src={`data:image/png;base64,${rf.b64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                              {rf.isGenerating && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="img-pulse" style={{ fontSize: '1.2rem' }}>⚡</span></div>}
+                            </div>
+                          )
+                        })()}
+                      </div>
+
+                      {/* Size buttons — below carousel */}
+                      <div style={{ flexShrink: 0, display: 'flex', gap: 4, marginTop: 2 }}>
+                        {[
+                          { id: '9/16', label: '9:16', desc: 'Story' },
+                          { id: '1:1', label: '1:1', desc: 'Square' },
+                          { id: '4:5', label: '4:5', desc: 'Portrait' },
+                          { id: '16/9', label: '16:9', desc: 'Wide' },
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => handleSizeClick(f.id)}
+                            style={{
+                              flex: 1,
+                              background: imageFormat === f.id ? '#2990fa' : '#0a1628',
+                              border: `2px solid ${imageFormat === f.id ? '#2990fa' : '#152840'}`,
+                              borderRadius: 8, padding: '6px 4px', cursor: 'pointer',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                            }}
+                          >
+                            <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#ffffff', fontWeight: 600 }}>{f.label}</span>
+                            <span style={{ fontSize: '0.42rem', fontFamily: 'var(--font-ibm-plex-mono)', color: imageFormat === f.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)' }}>{f.desc}</span>
+                          </button>
+                        ))}
                       </div>
 
                       {/* Counter + prompt */}
                       {hasFrames && (
                         <div style={{ flexShrink: 0, textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', marginBottom: 2 }}>
+                          <div style={{ fontSize: '0.48rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', marginBottom: 2 }}>
                             {clampedIdx + 1} / {totalFrames}
                           </div>
                           {currentFrame?.prompt && (
-                            <div style={{ fontSize: '0.46rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', maxWidth: 240, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '0.44rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'var(--font-ibm-plex-mono)', maxWidth: 240, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {currentFrame.prompt}
                             </div>
                           )}
                         </div>
                       )}
 
-                      {/* SUBMIT IMAGE + download */}
+                      {/* SUBMIT IMAGE */}
                       {isReady && (
-                        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <div style={{ flexShrink: 0, textAlign: 'center' }}>
                           <button
                             onClick={() => handleImageSubmit(currentFrame)}
                             style={{
@@ -2896,17 +2933,6 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           >
                             SUBMIT IMAGE →
                           </button>
-                          <button
-                            onClick={() => {
-                              const name = (sectionValues.hook || 'velpi-image').replace(/[^a-z0-9]/gi, '-').toLowerCase()
-                              const a = document.createElement('a')
-                              a.href = `data:image/png;base64,${currentFrame.b64}`
-                              a.download = `${name}.png`
-                              a.click()
-                            }}
-                            title="Download image"
-                            style={{ background: 'transparent', border: '1px solid #152840', color: 'rgba(255,255,255,0.5)', borderRadius: 6, padding: '7px 10px', cursor: 'pointer', fontSize: '0.9rem' }}
-                          >⬇</button>
                         </div>
                       )}
 
