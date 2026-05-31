@@ -223,6 +223,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [chatFontScale, setChatFontScale] = useState(2) // index into FONT_SCALES
   const [avatarRestartModal, setAvatarRestartModal] = useState(false)
 
+  // Review screen (full-screen editable ad preview)
+  const [showReview, setShowReview] = useState(false)
+  const [reviewRestartConfirm, setReviewRestartConfirm] = useState(false)
+
   const chatScrollRef = useRef(null)
 
   // Avatar funnel state
@@ -3286,6 +3290,20 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
             {/* Action buttons — fixed below scroll, always visible */}
             <div style={{ flexShrink: 0, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Review — prominent, shown once at least one section is confirmed */}
+              {hasUnsavedWork && (
+                <button
+                  onClick={() => setShowReview(true)}
+                  style={{
+                    background: '#2990fa', border: '1px solid #5a9aff', borderRadius: 10, padding: '13px 0',
+                    color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem',
+                    cursor: 'pointer', width: '100%', letterSpacing: '0.08em',
+                    boxShadow: '0 4px 18px rgba(41,144,250,0.35)',
+                  }}
+                >
+                  ★ REVIEW AD
+                </button>
+              )}
               {allConfirmed && (
                 <button
                   onClick={saveToLibrary}
@@ -3590,6 +3608,167 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── REVIEW SCREEN — full-screen editable ad preview ── */}
+      {showReview && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 5000,
+          background: '#0f1e35',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Header */}
+          <div style={{
+            flexShrink: 0, height: 52, borderBottom: '1px solid rgba(41,144,250,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0 1.25rem',
+          }}>
+            <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', letterSpacing: '0.1em' }}>
+              REVIEW AD
+            </span>
+            <span style={{ fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em' }}>
+              Tap any text to edit
+            </span>
+          </div>
+
+          {/* Scrollable ad body */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 20px' }}>
+            <div style={{ maxWidth: 620, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 26 }}>
+              {[
+                { key: 'hook', label: 'HOOK' },
+                { key: 'image', label: 'IMAGE' },
+                { key: 'headline', label: 'HEADLINE' },
+                { key: 'primary_text', label: 'PRIMARY TEXT' },
+                { key: 'description', label: 'DESCRIPTION' },
+                { key: 'cta', label: 'CALL TO ACTION' },
+              ].map(({ key, label }) => {
+                // Image row — show the confirmed picture at its aspect ratio; skip if none
+                if (key === 'image') {
+                  if (!imageB64) return null
+                  const fmt = imageVersions.find(v => v.id === selectedImageIds[0])?.format || imageFormat || '9/16'
+                  const ratio = fmt === '1:1' ? '1/1' : fmt === '4:5' ? '4/5' : fmt === '16/9' ? '16/9' : '9/16'
+                  return (
+                    <div key={key}>
+                      <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+                        {label}
+                      </div>
+                      <div style={{ width: '100%', maxWidth: 320, aspectRatio: ratio, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(41,144,250,0.25)' }}>
+                        <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    </div>
+                  )
+                }
+                // Text rows — skip empty; render as directly-editable text
+                const value = sectionValues[key]
+                if (!value) return null
+                return (
+                  <div key={key}>
+                    <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+                      {label}
+                    </div>
+                    <textarea
+                      value={value}
+                      onChange={e => setSectionValues(prev => ({ ...prev, [key]: e.target.value }))}
+                      ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
+                      spellCheck={false}
+                      style={{
+                        width: '100%', background: 'transparent', border: '1px solid transparent',
+                        borderRadius: 8, color: '#ffffff', fontFamily: 'var(--font-inter)',
+                        fontSize: key === 'headline' ? '1.5rem' : key === 'hook' ? '1.25rem' : '1.05rem',
+                        lineHeight: 1.5, padding: '6px 8px', margin: '-6px -8px',
+                        resize: 'none', overflow: 'hidden', boxSizing: 'border-box', display: 'block',
+                      }}
+                      onFocus={e => { e.target.style.border = '1px solid rgba(41,144,250,0.5)'; e.target.style.background = '#0a1628' }}
+                      onBlur={e => { e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent' }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Footer — three actions */}
+          <div style={{
+            flexShrink: 0, borderTop: '1px solid rgba(41,144,250,0.3)',
+            padding: '14px 20px', display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 620 }}>
+              <button
+                onClick={() => setShowReview(false)}
+                style={{
+                  flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.4)',
+                  borderRadius: 8, padding: '12px 0', color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.74rem', cursor: 'pointer', letterSpacing: '0.04em',
+                }}
+              >
+                Continue Editing
+              </button>
+              <button
+                onClick={async () => {
+                  if (allConfirmed) {
+                    setShowReview(false)
+                    await saveToLibrary()
+                  } else {
+                    await saveDraft(false)
+                    setShowReview(false)
+                    onSaved?.()
+                  }
+                }}
+                style={{
+                  flex: 1, background: '#2990fa', border: 'none',
+                  borderRadius: 8, padding: '12px 0', color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.74rem', cursor: 'pointer', letterSpacing: '0.04em',
+                }}
+              >
+                Save to Library
+              </button>
+              <button
+                onClick={() => setReviewRestartConfirm(true)}
+                style={{
+                  flex: 1, background: 'transparent', border: '1px solid rgba(255,68,85,0.5)',
+                  borderRadius: 8, padding: '12px 0', color: '#ff4455',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.74rem', cursor: 'pointer', letterSpacing: '0.04em',
+                }}
+              >
+                Restart Session
+              </button>
+            </div>
+          </div>
+
+          {/* Restart confirmation dialog */}
+          {reviewRestartConfirm && (
+            <div
+              onClick={() => setReviewRestartConfirm(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 5100, background: 'rgba(2,8,16,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: 16 }}
+              >
+                <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+                  Restart Session
+                </div>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
+                  This will clear your entire current ad. Are you sure?
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => { setReviewRestartConfirm(false); setShowReview(false); doFullReset() }}
+                    style={{ flex: 1, background: '#ff4455', border: 'none', borderRadius: 8, padding: '11px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+                  >
+                    Yes, restart
+                  </button>
+                  <button
+                    onClick={() => setReviewRestartConfirm(false)}
+                    style={{ flex: 1, background: 'transparent', border: '1px solid #2990fa', borderRadius: 8, padding: '11px 0', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', cursor: 'pointer', letterSpacing: '0.06em' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
