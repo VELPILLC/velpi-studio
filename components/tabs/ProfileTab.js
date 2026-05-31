@@ -90,7 +90,7 @@ function bubbleStyle(selected) {
     background: selected ? '#0a1f3f' : '#060d1f',
     color: '#ffffff',
     padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-    fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
+    fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
     lineHeight: 1.4, textAlign: 'left', width: '100%', boxSizing: 'border-box',
   }
 }
@@ -604,7 +604,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   background: msg.role === 'user' ? '#2990fa' : '#0a1628',
                   border: msg.role === 'assistant' ? '1px solid rgba(41,144,250,0.3)' : 'none',
                   color: '#ffffff', padding: '10px 14px', borderRadius: 10,
-                  maxWidth: '85%', fontSize: '0.92rem', lineHeight: 1.6,
+                  maxWidth: '85%', fontSize: '0.88rem', lineHeight: 1.6,
                   fontFamily: 'var(--font-inter)', whiteSpace: 'pre-wrap',
                 }}>
                   {text}

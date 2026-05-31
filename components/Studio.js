@@ -66,7 +66,7 @@ export default function Studio() {
         }}
       >
         <VelpiLogo />
-        <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', letterSpacing: '0.1em' }}>
+        <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.1em' }}>
           VELPI STUDIO
         </span>
         <div style={{ flex: 1 }} />
@@ -93,7 +93,7 @@ export default function Studio() {
               borderBottom: activeTab === t.id ? '2px solid #2990fa' : '2px solid transparent',
               color: activeTab === t.id ? '#2990fa' : '#ffffff',
               padding: '0.7rem 1.5rem',
-              fontSize: '0.6rem',
+              fontSize: '0.75rem',
               fontFamily: 'var(--font-ibm-plex-mono)',
               letterSpacing: '0.06em',
               cursor: 'pointer',

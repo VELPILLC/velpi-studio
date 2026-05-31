@@ -227,7 +227,11 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [showReview, setShowReview] = useState(false)
   const [reviewRestartConfirm, setReviewRestartConfirm] = useState(false)
 
+  // Refresh / close warning dialog
+  const [refreshPrompt, setRefreshPrompt] = useState(false)
+
   const chatScrollRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   // Avatar funnel state
   const [avatarFunnelStep, setAvatarFunnelStep] = useState('industry')
@@ -348,7 +352,10 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingTabChange])
 
-  // Warn before browser refresh/close when there is unsaved work
+  // Warn before browser refresh/close when there is unsaved work.
+  // beforeunload covers the reload button + tab close (native dialog only).
+  // A keydown intercept on F5 / Ctrl+R / Cmd+R catches keyboard refresh so we
+  // can show our own 3-option dialog (Save / Continue / Delete & Refresh).
   useEffect(() => {
     function handleBeforeUnload(e) {
       const work = SECTIONS.some(s => sectionValues[s] !== null)
@@ -357,8 +364,20 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
         e.returnValue = ''
       }
     }
+    function handleRefreshKey(e) {
+      const isReload = e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))
+      if (!isReload) return
+      const work = SECTIONS.some(s => sectionValues[s] !== null)
+      if (!work) return
+      e.preventDefault()
+      setRefreshPrompt(true)
+    }
     window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('keydown', handleRefreshKey)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('keydown', handleRefreshKey)
+    }
   }, [sectionValues])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -1423,6 +1442,73 @@ Be concrete and specific. Preserve the exact wording of any text visible in the 
     }
   }
 
+  // ── Insert image from device ──────────────────────────────────────────────────
+  // Adds an uploaded image into the carousel as a normal frame so it can be
+  // selected, used as a reference for generation, submitted, or downloaded.
+  function addUploadedImage(b64) {
+    const fmt = imageFormat || '9/16'
+    const id = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const newVersion = { id, b64, prompt: 'Uploaded image', sentPrompt: null, isEdit: false, format: fmt, isGenerating: false, error: null, parentId: null, isPending: false }
+    const pendingIdx = imageVersions.findIndex(v => v.isPending)
+    if (pendingIdx >= 0) {
+      setImageVersions(prev => prev.map(v => v.isPending ? newVersion : v))
+      setCurrentImageIdx(pendingIdx)
+    } else {
+      setImageVersions(prev => [...prev, newVersion])
+      setCurrentImageIdx(imageVersions.length)
+    }
+    setImageViewMode('single')
+  }
+
+  function handleFileSelected(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const okTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (file.type && !okTypes.includes(file.type)) {
+      setImgSelectMsg('Use a JPG, PNG, or WEBP image')
+      setTimeout(() => setImgSelectMsg(null), 2500)
+      e.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const b64 = String(reader.result || '').split(',')[1] || ''
+      if (b64) addUploadedImage(b64)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = '' // allow re-selecting the same file
+  }
+
+  // Save the current ad (complete if all confirmed, else as a draft) then reload.
+  async function saveThenReload() {
+    try {
+      const allDone = SECTIONS.every(s => sectionValues[s] !== null)
+      await fetch('/api/library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          avatar_id: selectedAvatar?.id || null,
+          avatar_name: selectedAvatar?.name || 'No Avatar',
+          hook: sectionValues.hook,
+          image_concept: sectionValues.image,
+          image_b64: imageB64,
+          headline: sectionValues.headline,
+          primary_text: sectionValues.primary_text,
+          description: sectionValues.description,
+          cta: sectionValues.cta,
+          angle: sectionValues.avatar,
+          ad_type: '',
+          status: allDone ? 'complete' : 'draft',
+          version_number: 1,
+          parent_id: null,
+        }),
+      })
+    } catch (err) {
+      console.error('saveThenReload error:', err)
+    }
+    window.location.reload()
+  }
+
   // Regenerate a new image using selected image(s) as reference + typed prompt
   function handleRegenWithImage() {
     if (!typeOwn.trim() || !imageFormat) return
@@ -2094,7 +2180,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
       background: selected ? '#0a1f3f' : '#060d1f',
       color: '#ffffff',
       padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-      fontSize: '0.88rem', fontFamily: 'var(--font-inter)',
+      fontSize: '0.9rem', fontFamily: 'var(--font-inter)',
       lineHeight: 1.4, textAlign: 'left', width: '100%', boxSizing: 'border-box',
     }
   }
@@ -2213,7 +2299,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
             {/* 1. Section title row — label only, no nav arrows */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 6px 0', flexShrink: 0 }}>
-              <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.0rem', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.5)', letterSpacing: '0.08em' }}>
+              <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.85rem', textTransform: 'uppercase', color: activeSection ? '#2990fa' : 'rgba(255,255,255,0.5)', letterSpacing: '0.1em' }}>
                 {activeSection ? SECTION_LABELS[activeSection] : 'SELECT SECTION'}
               </div>
             </div>
@@ -2264,7 +2350,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     background: msg.role === 'user' ? '#2990fa' : '#0a1628',
                     border: msg.role === 'assistant' ? '1px solid rgba(41,144,250,0.3)' : 'none',
                     color: '#ffffff', padding: '10px 14px', borderRadius: 10,
-                    maxWidth: '80%', fontSize: `${0.92 * FONT_SCALES[chatFontScale]}rem`, lineHeight: 1.5,
+                    maxWidth: '80%', fontSize: `${0.88 * FONT_SCALES[chatFontScale]}rem`, lineHeight: 1.5,
                     fontFamily: 'var(--font-inter)', whiteSpace: 'pre-wrap',
                   }}>
                     {text}
@@ -2646,7 +2732,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                             background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
                             color: '#ffffff', padding: `${14 * FONT_SCALES[chatFontScale]}px ${18 * FONT_SCALES[chatFontScale]}px`, borderRadius: 10, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                            fontSize: `${1.0 * FONT_SCALES[chatFontScale]}rem`, fontFamily: 'var(--font-inter)', lineHeight: 1.5, minHeight: 44,
+                            fontSize: `${0.9 * FONT_SCALES[chatFontScale]}rem`, fontFamily: 'var(--font-inter)', lineHeight: 1.5, minHeight: 44,
                           }}
                         >
                           <span>{bubble}</span>
@@ -2784,18 +2870,38 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           {activeSection === 'image' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
 
-              {/* Header row: new image + view toggle + center col resize */}
+              {/* Header row: new image + insert image + view toggle */}
               <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 8 }}>
-                <button
-                  onClick={handleNewImage}
-                  style={{
-                    background: 'transparent', border: '1px solid #152840', color: 'rgba(255,255,255,0.6)',
-                    borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
-                    fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em',
-                  }}
-                >
-                  + NEW IMAGE
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    onClick={handleNewImage}
+                    style={{
+                      background: 'transparent', border: '1px solid #152840', color: 'rgba(255,255,255,0.6)',
+                      borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+                      fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.06em',
+                    }}
+                  >
+                    + NEW IMAGE
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Insert image from device (JPG, PNG, WEBP)"
+                    style={{
+                      background: 'transparent', border: '1px solid #152840', color: 'rgba(255,255,255,0.6)',
+                      borderRadius: 6, padding: '4px 9px', cursor: 'pointer',
+                      fontSize: '0.85rem', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    📁
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleFileSelected}
+                    style={{ display: 'none' }}
+                  />
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     {['single', 'multi'].map(mode => (
@@ -3769,6 +3875,38 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── REFRESH / CLOSE WARNING ── */}
+      {refreshPrompt && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(2,8,16,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 28, width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em' }}>
+              Unsaved Ad
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5, marginBottom: 4 }}>
+              You have unsaved changes. What do you want to do before refreshing?
+            </div>
+            <button
+              onClick={() => { setRefreshPrompt(false); saveThenReload() }}
+              style={{ background: '#2990fa', border: 'none', borderRadius: 8, padding: '12px 0', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.06em', width: '100%' }}
+            >
+              Save to Library
+            </button>
+            <button
+              onClick={() => setRefreshPrompt(false)}
+              style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 8, padding: '12px 0', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.06em', width: '100%' }}
+            >
+              Continue Editing
+            </button>
+            <button
+              onClick={() => { window.location.reload() }}
+              style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.5)', borderRadius: 8, padding: '12px 0', color: '#ff4455', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', cursor: 'pointer', letterSpacing: '0.06em', width: '100%' }}
+            >
+              Delete and Refresh
+            </button>
+          </div>
         </div>
       )}
 
