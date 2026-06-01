@@ -2336,6 +2336,29 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               padding: 12, background: '#060d1f', borderRadius: 10, border: '1px solid #152840',
               marginBottom: 10,
             }}>
+              {/* Pinned confirmed value — stays at the top of the chat when the
+                  active section already has a confirmed value (every section
+                  except the avatar funnel, which has its own UI) */}
+              {activeSection && activeSection !== 'avatar' && sectionValues[activeSection] && (
+                <div style={{
+                  position: 'sticky', top: 0, zIndex: 3,
+                  margin: '-12px -12px 2px -12px',
+                  padding: '12px 12px 10px 12px',
+                  background: '#060d1f',
+                  borderBottom: '1px solid rgba(41,144,250,0.3)',
+                }}>
+                  <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+                    CURRENT {SECTION_LABELS[activeSection]}
+                  </div>
+                  <div style={{
+                    background: '#0a1f3f', border: '1px solid #2990fa', borderRadius: 8,
+                    padding: '10px 12px', color: '#ffffff', fontFamily: 'var(--font-inter)',
+                    fontSize: '0.9rem', lineHeight: 1.5, whiteSpace: 'pre-wrap',
+                  }}>
+                    {sectionValues[activeSection]}
+                  </div>
+                </div>
+              )}
               {activeSection === null && (
                 <div style={{ color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-inter)', fontSize: '0.88rem', textAlign: 'center', paddingTop: 24 }}>
                   Select a section to continue
