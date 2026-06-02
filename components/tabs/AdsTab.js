@@ -2201,6 +2201,42 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     })
   }
 
+  // Enter handling for the workspace input. Plan:
+  //  • Cmd/Ctrl+Enter        → always send to Jarvis (refine)
+  //  • text typed            → send to Jarvis (instruction/question + any selection)
+  //  • empty + 1 selected    → confirm it and advance (not in image — image has its own flow)
+  //  • empty + 2 selected    → send to Jarvis to refine/blend
+  //  • avatar: text          → add as choice / ask Jarvis; empty + selection → advance
+  function handleWorkspaceEnter(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    if (isLoading) return
+    const text = typeOwn.trim()
+
+    // Avatar funnel
+    if (activeSection === 'avatar') {
+      if (avatarEditMode || avatarFunnelStep === 'review') return
+      if (text) { handleAvatarTypeOwn(text); return }
+      if (avatarSelectedBubbles.length > 0) { handleAvatarAdvance(); return }
+      return
+    }
+
+    if (!activeSection) return
+
+    // Cmd/Ctrl+Enter forces a refine even when a bubble is selected
+    if (e.metaKey || e.ctrlKey) { handleSendToJarvis(); return }
+
+    // Typed text → send to Jarvis (chosen behavior)
+    if (text) { handleSendToJarvis(); return }
+
+    // Empty input: confirm a single selection and advance (image keeps its own
+    // generate/submit flow, so never auto-confirm a concept there)
+    if (activeSection !== 'image' && selectedBubbles.length === 1) { handleSubmit(); return }
+
+    // Empty input with a selection elsewhere → refine/blend via Jarvis
+    if (selectedBubbles.length >= 1) { handleSendToJarvis(); return }
+  }
+
   // Undo last bubble generation
   function handleUndoBubbles() {
     if (bubbleHistory.length === 0) return
@@ -2974,14 +3010,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   <input
                     value={typeOwn}
                     onChange={e => setTypeOwn(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        if (activeSection !== 'avatar' && activeSection !== null) {
-                          handleSendToJarvis()
-                        }
-                      }
-                    }}
+                    onKeyDown={handleWorkspaceEnter}
                     placeholder={activeSection === 'avatar' ? 'Type your own or ask Jarvis...' : 'Type your own or ask a question...'}
                     style={{
                       flex: 1, background: '#060d1f', border: '1px solid #2990fa',
