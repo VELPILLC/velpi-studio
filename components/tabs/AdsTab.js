@@ -234,6 +234,9 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [editPanel, setEditPanel] = useState(null)
   const [editPanelText, setEditPanelText] = useState('')
 
+  // Auto-save draft indicator
+  const [draftSaved, setDraftSaved] = useState(false)
+
   // Refresh / close warning dialog
   const [refreshPrompt, setRefreshPrompt] = useState(false)
 
@@ -436,6 +439,19 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     window.addEventListener('keydown', onEsc)
     return () => window.removeEventListener('keydown', onEsc)
   }, [showReview, showPreview, reviewRestartConfirm])
+
+  // Auto-save the in-progress ad as a draft (debounced) once a hook exists, so
+  // work is never lost. The draft record is promoted to complete on Save to Library.
+  useEffect(() => {
+    if (adEntryMode !== 'working') return
+    if (!sectionValues.hook) return
+    const t = setTimeout(async () => {
+      await saveDraft(false)
+      setDraftSaved(true)
+      setTimeout(() => setDraftSaved(false), 2000)
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [sectionValues, imageB64, adEntryMode])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -1771,27 +1787,39 @@ Be concrete and specific. Preserve the exact wording of any text visible in the 
   async function saveToLibrary() {
     const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
     if (!allConfirmed) return
+    const body = {
+      avatar_id: selectedAvatar?.id || null,
+      avatar_name: selectedAvatar?.name || 'No Avatar',
+      hook: sectionValues.hook,
+      image_concept: sectionValues.image,
+      image_b64: imageB64,
+      headline: sectionValues.headline,
+      primary_text: sectionValues.primary_text,
+      description: sectionValues.description,
+      cta: sectionValues.cta,
+      angle: sectionValues.avatar,
+      ad_type: '',
+      status: 'complete',
+      version_number: 1,
+      parent_id: null,
+    }
     try {
-      const res = await fetch('/api/library', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          avatar_id: selectedAvatar?.id || null,
-          avatar_name: selectedAvatar?.name || 'No Avatar',
-          hook: sectionValues.hook,
-          image_concept: sectionValues.image,
-          image_b64: imageB64,
-          headline: sectionValues.headline,
-          primary_text: sectionValues.primary_text,
-          description: sectionValues.description,
-          cta: sectionValues.cta,
-          angle: sectionValues.avatar,
-          ad_type: '',
-          status: 'complete',
-          version_number: 1,
-          parent_id: null,
-        }),
-      })
+      // If this ad was auto-saved as a draft, promote that record to complete
+      // instead of creating a duplicate. Otherwise create a fresh complete ad.
+      let res
+      if (currentDraftId) {
+        res = await fetch('/api/library', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentDraftId, ...body }),
+        })
+      } else {
+        res = await fetch('/api/library', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
       if (res.ok) {
         setCurrentDraftId(null)
         onSaved?.()
@@ -2244,6 +2272,27 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     if (sectionValues.description) parts.push(`DESCRIPTION:\n${sectionValues.description}`)
     if (sectionValues.cta) parts.push(`CALL TO ACTION:\n${sectionValues.cta}`)
     copyToClipboard(parts.join('\n\n'))
+  }
+
+  // Live character counter vs Meta limits. Headline/primary text have hard limits
+  // (turn red when exceeded); description shows the 125-char "See more" note.
+  function fieldCounter(key, value) {
+    const len = (value || '').length
+    if (key === 'description') {
+      return (
+        <span style={{ fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+          {len} chars · first 125 show before “See more”
+        </span>
+      )
+    }
+    const limits = { headline: 40, primary_text: 30 }
+    const limit = limits[key]
+    const over = limit && len > limit
+    return (
+      <span style={{ fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', color: over ? '#ff4455' : 'rgba(255,255,255,0.4)', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+        {len}{limit ? ` / ${limit}` : ''} chars
+      </span>
+    )
   }
 
   // ─── Derived ──────────────────────────────────────────────────────────────────
@@ -2828,6 +2877,15 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                         </div>
                       )
                     })()}
+                  </div>
+                )}
+
+                {/* Loading skeletons — shown while the first set of options generates */}
+                {isChatLoading && currentBubbles.length === 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="vp-skeleton" style={{ height: 42, opacity: 1 - i * 0.18 }} />
+                    ))}
                   </div>
                 )}
 
@@ -3543,9 +3601,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                           rows={3}
                           style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 6, color: '#ffffff', padding: '6px 8px', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', lineHeight: 1.45, resize: 'vertical', boxSizing: 'border-box' }}
                         />
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                           <button onClick={e => { e.stopPropagation(); savePanelEdit(section) }} style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 5, padding: '4px 12px', fontSize: '0.62rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Save</button>
                           <button onClick={e => { e.stopPropagation(); setEditPanel(null) }} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 5, padding: '4px 12px', fontSize: '0.62rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Cancel</button>
+                          <div style={{ marginLeft: 'auto' }}>{fieldCounter(section, editPanelText)}</div>
                         </div>
                       </div>
                     ) : (
@@ -3654,6 +3713,11 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               >
                 {isBuildingSummary ? '...' : '↺ Restart Session'}
               </button>
+              {hasUnsavedWork && (
+                <div style={{ textAlign: 'center', fontSize: '0.52rem', fontFamily: 'var(--font-ibm-plex-mono)', color: draftSaved ? '#00e5c8' : 'rgba(255,255,255,0.3)', letterSpacing: '0.04em' }}>
+                  {draftSaved ? '✓ Draft auto-saved' : currentDraftId ? 'Draft auto-saves as you build' : 'Auto-saves once you confirm a hook'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3989,14 +4053,17 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 if (!value) return null
                 return (
                   <div key={key}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                        {label}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                          {label}
+                        </div>
+                        {fieldCounter(key, value)}
                       </div>
                       <button
                         onClick={() => copyToClipboard(value)}
                         title="Copy"
-                        style={{ background: 'transparent', border: '1px solid rgba(41,144,250,0.4)', borderRadius: 5, padding: '2px 8px', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+                        style={{ background: 'transparent', border: '1px solid rgba(41,144,250,0.4)', borderRadius: 5, padding: '2px 8px', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem', cursor: 'pointer', letterSpacing: '0.04em', flexShrink: 0 }}
                       >
                         {copied ? '✓' : '⧉ Copy'}
                       </button>

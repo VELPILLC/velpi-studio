@@ -116,6 +116,18 @@ select:focus-visible {
   animation: imgPulse 1.4s ease-in-out infinite !important;
 }
 
+/* Loading skeleton shimmer — class selector beats the global animation:none */
+@keyframes vpShimmer {
+  0% { background-position: -240px 0; }
+  100% { background-position: 240px 0; }
+}
+.vp-skeleton {
+  background: linear-gradient(90deg, #0a1628 25%, #16273f 37%, #0a1628 63%);
+  background-size: 480px 100%;
+  border-radius: 10px;
+  animation: vpShimmer 1.3s ease-in-out infinite !important;
+}
+
 @media print {
   #app-header,
   #app-tabs,

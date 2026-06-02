@@ -106,6 +106,7 @@ export default function LibraryTab({ onEdit }) {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [compareView, setCompareView] = useState(false)
 
   // ── Card context menu ──
   const [cardMenu, setCardMenu] = useState(null) // { id, top, left }
@@ -351,6 +352,14 @@ export default function LibraryTab({ onEdit }) {
               >
                 Select All
               </button>
+              {selectedIds.length === 2 && (
+                <button
+                  onClick={() => setCompareView(true)}
+                  style={{ background: 'transparent', border: '1px solid #2990fa', borderRadius: 6, padding: '5px 14px', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+                >
+                  ⇄ Compare
+                </button>
+              )}
               {selectedIds.length > 0 && (
                 <button
                   onClick={() => setBulkDeleteConfirm(true)}
@@ -1051,6 +1060,61 @@ export default function LibraryTab({ onEdit }) {
           </div>
         </div>
       )}
+
+      {/* ── A/B COMPARE ── */}
+      {compareView && (() => {
+        const pair = ads.filter(a => selectedIds.includes(a.id)).slice(0, 2)
+        if (pair.length < 2) return null
+        const FIELDS = [
+          { key: 'hook', label: 'HOOK' },
+          { key: 'headline', label: 'HEADLINE' },
+          { key: 'primaryText', label: 'PRIMARY TEXT' },
+          { key: 'description', label: 'DESCRIPTION' },
+          { key: 'cta', label: 'CTA' },
+        ]
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) setCompareView(false) }}
+            style={{ position: 'fixed', inset: 0, zIndex: 3002, background: 'rgba(2,8,16,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          >
+            <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 20, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em' }}>COMPARE ADS</span>
+                <button onClick={() => setCompareView(false)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 6, padding: '5px 12px', color: '#ffffff', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', cursor: 'pointer' }}>Close</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {pair.map(ad => (
+                  <div key={ad.id} style={{ border: '1px solid #152840', borderRadius: 10, overflow: 'hidden', background: '#060d1f' }}>
+                    <div style={{ aspectRatio: '9 / 16', background: '#060d1f', position: 'relative', maxHeight: 320, overflow: 'hidden' }}>
+                      {ad.imageB64 ? (
+                        <img src={`data:image/png;base64,${ad.imageB64}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>No image</div>
+                      )}
+                      {(ad.status === 'Working' || ad.status === 'Not Working') && (
+                        <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(6,13,31,0.78)', borderRadius: 10, padding: '2px 7px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[ad.status] }} />
+                          <span style={{ fontSize: '0.46rem', fontFamily: 'var(--font-ibm-plex-mono)', color: STATUS_COLORS[ad.status], letterSpacing: '0.04em' }}>
+                            {ad.status === 'Working' ? 'WORKING' : 'NOT WORKING'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {FIELDS.map(({ key, label }) => ad[key] ? (
+                        <div key={key}>
+                          <div style={{ fontSize: '0.5rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
+                          <div style={{ fontSize: '0.76rem', color: '#ffffff', fontFamily: 'var(--font-inter)', lineHeight: 1.45 }}>{ad[key]}</div>
+                        </div>
+                      ) : null)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── CARD CONTEXT MENU ── */}
       {cardMenu && (() => {
