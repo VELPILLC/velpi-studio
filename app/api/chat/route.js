@@ -1,54 +1,34 @@
 const SECTIONS_ORDER = ['avatar', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
 
 // ─── Automatic Claude model routing ──────────────────────────────────────────
-// Picks the cheapest model that can do the job well, escalating to the strongest
-// model for the most complex copy. Returns one of:
-//   'claude-haiku-4-5' | 'claude-sonnet-4-5' | 'claude-opus-4-5'
+// Sonnet is the default for EVERYTHING that involves understanding user input or
+// generating contextual content (funnel steps, intent detection, get-more-options,
+// bubble generation, chat, copy, refinement). Opus is reserved for the single most
+// complex piece of copy (primary_text). Haiku is used ONLY for a dedicated, simple
+// yes/no validation override that needs zero context — when in doubt, use Sonnet.
+// Returns one of: 'claude-haiku-4-5' | 'claude-sonnet-4-5' | 'claude-opus-4-5'
 function selectModel(currentSection, messages, systemOverride) {
   const HAIKU = 'claude-haiku-4-5'
   const SONNET = 'claude-sonnet-4-5'
   const OPUS = 'claude-opus-4-5'
 
-  const msgs = Array.isArray(messages) ? messages : []
-  const lastUser = [...msgs].reverse().find(m => m && m.role === 'user')
-  const text = (lastUser && lastUser.content ? String(lastUser.content) : '').trim()
-  const wordCount = text ? text.split(/\s+/).length : 0
-  const sys = systemOverride || ''
-  const sysLower = sys.toLowerCase()
+  const sys = (systemOverride || '').toLowerCase()
   const section = currentSection || ''
 
-  // ── OPUS — most complex, needs the most intelligence ──
-  // primary_text is the longest, most nuanced piece of copy in the flow
+  // ── OPUS — only the longest, most complex copy: primary_text generation ──
   if (section === 'primary_text') return OPUS
-  // very long, multi-part instruction (200+ words)
-  if (wordCount > 200) return OPUS
-  // full-ad analysis (e.g. the review screen requesting a complete critique)
-  if (sysLower.includes('full ad analysis') || sysLower.includes('analyze the full ad') || sysLower.includes('analyse the full ad')) return OPUS
 
-  // ── HAIKU — cheap, mechanical, low-nuance work ──
-  // Emotional avatar steps must NEVER be downgraded — they stay on Sonnet.
-  const isEmotionalAvatarStep = /\b(wants|fears|frustrations|statusdriver|status driver|what winning|winning looks like)\b/i.test(sys)
-  // Early avatar funnel steps: industry / role / business size / age range
-  const isEarlyAvatarStep = /current step:\s*(industry|role|businesssize|business size|agerange|age range)/i.test(sys)
-  // Profile early funnel field option generation
-  const isProfileFieldGen = sysLower.includes('business profile field')
-  // Simple validation check
-  const isValidation = sysLower.includes('validate') || sysLower.includes('"valid"')
-  // Very short, yes/no style message (under 20 words)
-  const isYesNo = wordCount > 0 && wordCount < 20 && /^(yes|no|yep|nope|yeah|sure|ok|okay|correct|right|wrong|true|false)\b/i.test(text)
-  // Simple/short custom system override for mechanical bubble generation
-  const isShortBubbleGen = sys.length > 0 && sys.length < 420 &&
-    (sysLower.includes('bubble option') || sysLower.includes('options for') || sysLower.includes('generate exactly') || sysLower.includes('more options'))
+  // ── HAIKU — ONLY a simple, context-free yes/no validation override ──
+  // Must be a short, dedicated validation system that asks for a valid yes/no
+  // verdict. Anything involving intent detection or option/copy generation must
+  // never land here — those all fall through to Sonnet below.
+  const isValidationOnly =
+    sys.length > 0 && sys.length < 300 &&
+    (sys.includes('"valid"') || sys.includes("'valid'") ||
+      (sys.includes('validate') && (sys.includes('yes') || sys.includes('no'))))
+  if (isValidationOnly) return HAIKU
 
-  if (section === 'avatar' && isEarlyAvatarStep) return HAIKU
-  if (isProfileFieldGen) return HAIKU
-  if (isValidation) return HAIKU
-  if (isYesNo) return HAIKU
-  if (isShortBubbleGen && !isEmotionalAvatarStep) return HAIKU
-
-  // ── SONNET — default: hook, visual format, image, headline, description, cta,
-  //    refines, in-chat questions, emotional avatar steps, general Jarvis chat,
-  //    and anything not matched above. ──
+  // ── SONNET — the default for everything else ──
   return SONNET
 }
 
