@@ -20,6 +20,19 @@ body {
   background: #0f1e35;
   color: #ffffff;
   font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(41, 144, 250, 0.35);
+  color: #ffffff;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2990fa transparent;
 }
 
 textarea,
@@ -48,16 +61,50 @@ input::placeholder {
   border-radius: 2px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: #4aa3ff;
+}
+
 button {
   cursor: pointer;
 }
 
-/* Prevent any global transitions or animations */
+/* Prevent any global LAYOUT transitions/animations (keeps the fixed chat panels jank-free) */
 *,
 *::before,
 *::after {
   transition: none !important;
   animation: none !important;
+}
+
+/* Re-enable ONLY safe, non-layout transitions on interactive elements.
+   Type/class selectors beat the universal `*` rule even with !important. */
+button,
+a,
+.vp-tab,
+.vp-card {
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease, box-shadow 0.18s ease, opacity 0.15s ease !important;
+}
+
+/* Subtle keyboard-focus ring (does not show on mouse click) */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(41, 144, 250, 0.6);
+  outline-offset: 1px;
+}
+
+/* App-shell tab hover */
+.vp-tab:hover {
+  color: #2990fa !important;
+}
+
+/* Card hover lift — box-shadow only, no layout shift */
+.vp-card:hover {
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+  border-color: #2990fa !important;
 }
 
 /* Image generation loading pulse — class selector beats * specificity even with !important */

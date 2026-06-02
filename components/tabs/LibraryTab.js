@@ -110,6 +110,10 @@ export default function LibraryTab({ onEdit }) {
   // ── Card context menu ──
   const [cardMenu, setCardMenu] = useState(null) // { id, top, left }
 
+  // ── Search + sort ──
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('newest') // 'newest' | 'oldest' | 'az'
+
   useEffect(() => {
     loadAds()
   }, [])
@@ -208,8 +212,26 @@ export default function LibraryTab({ onEdit }) {
 
   // A completed ad has all DRAFT_FIELDS populated; otherwise it is a draft
   const isAdComplete = (ad) => DRAFT_FIELDS.every(({ key }) => !!ad[key])
-  const drafts = ads.filter(ad => !isAdComplete(ad))
-  const completedAds = ads.filter(ad => isAdComplete(ad))
+
+  function matchesSearch(ad) {
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return [ad.hook, ad.headline, ad.primaryText, ad.description, ad.cta, ad.avatarName, ad.angle]
+      .some(v => (v || '').toLowerCase().includes(q))
+  }
+
+  function sortAds(list) {
+    const arr = [...list]
+    if (sortBy === 'newest') arr.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    else if (sortBy === 'oldest') arr.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+    else if (sortBy === 'az') arr.sort((a, b) => (a.headline || a.hook || '').localeCompare(b.headline || b.hook || ''))
+    return arr
+  }
+
+  const visibleAds = ads.filter(matchesSearch)
+  const drafts = sortAds(visibleAds.filter(ad => !isAdComplete(ad)))
+  const completedAds = sortAds(visibleAds.filter(ad => isAdComplete(ad)))
+  const noResults = ads.length > 0 && visibleAds.length === 0
 
   // Derived: which ad/version to display in modal
   const displayAd =
@@ -235,6 +257,35 @@ export default function LibraryTab({ onEdit }) {
           No ads saved yet.
           <br />
           Build an ad and click &ldquo;Save to Library&rdquo; to store it here.
+        </div>
+      )}
+
+      {/* ── SEARCH + SORT TOOLBAR ── */}
+      {ads.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.35)', fontSize: '0.85rem', pointerEvents: 'none' }}>⌕</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by hook, headline, avatar…"
+              style={{ width: '100%', background: '#0a1628', border: '1px solid #152840', borderRadius: 8, color: '#ffffff', padding: '9px 32px 9px 32px', fontSize: '0.85rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} title="Clear" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>×</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {[{ id: 'newest', label: 'Newest' }, { id: 'oldest', label: 'Oldest' }, { id: 'az', label: 'A–Z' }].map(o => (
+              <button
+                key={o.id}
+                onClick={() => setSortBy(o.id)}
+                style={{ background: sortBy === o.id ? '#2990fa' : '#0a1628', border: `1px solid ${sortBy === o.id ? '#2990fa' : '#152840'}`, color: '#ffffff', borderRadius: 6, padding: '7px 12px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -278,6 +329,13 @@ export default function LibraryTab({ onEdit }) {
         </div>
       )}
 
+      {/* ── NO SEARCH RESULTS ── */}
+      {noResults && (
+        <div style={{ textAlign: 'center', paddingTop: 60, color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', lineHeight: 1.8 }}>
+          No ads match &ldquo;{search}&rdquo;.
+        </div>
+      )}
+
       {/* ── DRAFTS SECTION ── */}
       {drafts.length > 0 && (
         <div style={{ marginBottom: 40 }}>
@@ -314,6 +372,7 @@ export default function LibraryTab({ onEdit }) {
               return (
                 <div
                   key={ad.id}
+                  className="vp-card"
                   onClick={() => {
                     if (selectMode) { toggleSelect(ad.id); return }
                     onEdit?.(ad)
@@ -478,6 +537,7 @@ export default function LibraryTab({ onEdit }) {
               return (
                 <div
                   key={ad.id}
+                  className="vp-card"
                   onClick={() => {
                     if (selectMode) { toggleSelect(ad.id); return }
                     setSelectedAd(ad)
