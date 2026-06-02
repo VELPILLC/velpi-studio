@@ -626,7 +626,7 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 value={freeformText}
                 onChange={e => setFreeformText(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleFreeformSubmit()
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFreeformSubmit() }
                 }}
                 placeholder="e.g. I run an HVAC company in Phoenix. We do AC installation, heating repair, and maintenance plans for homeowners. Family-owned for 12 years, same-day service is our biggest selling point."
                 rows={4}
@@ -681,7 +681,12 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 <input
                   value={typeOwn}
                   onChange={e => setTypeOwn(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    if (typeOwn.trim()) handleAdd()
+                    else if (selectedBubbles.length > 0) handleFollowupSubmit()
+                  }}
                   placeholder="Type your own..."
                   style={{
                     flex: 1, background: '#060d1f', border: '1px solid #2990fa',

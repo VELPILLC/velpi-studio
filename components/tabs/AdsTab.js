@@ -2411,7 +2411,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               <textarea
                 value={freeformIdeaText}
                 onChange={e => setFreeformIdeaText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleIdeaSubmit() }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleIdeaSubmit() } }}
                 placeholder="e.g. HVAC company in Phoenix targeting homeowners. Same-day AC repair, family-owned 12 years. Lead with the fear of breaking down in summer heat. Bold cinematic image — sweating family. CTA: Call Now. Meta ad."
                 rows={5}
                 style={{
