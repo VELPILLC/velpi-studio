@@ -414,6 +414,21 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     return () => window.removeEventListener('keydown', onKey)
   }, [adEntryMode, activeSection, currentBubbles, selectedBubbles, sectionValues, isLoading, showReview, unsavedPrompt, resetModal, refreshPrompt, avatarRestartModal, avatarDeleteConfirm, editingBubble])
 
+  // Esc closes the Review overlay (cancels the restart confirm first; blurs an
+  // active edit field first so you never close mid-edit by accident).
+  useEffect(() => {
+    if (!showReview) return
+    function onEsc(e) {
+      if (e.key !== 'Escape') return
+      if (reviewRestartConfirm) { setReviewRestartConfirm(false); return }
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'textarea' || tag === 'input') { document.activeElement.blur(); return }
+      setShowReview(false)
+    }
+    window.addEventListener('keydown', onEsc)
+    return () => window.removeEventListener('keydown', onEsc)
+  }, [showReview, reviewRestartConfirm])
+
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
   async function loadAvatars() {
@@ -2838,6 +2853,14 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   ))}
                 </div>
+
+                {/* Empty / failed state — never leave the workspace silently blank */}
+                {currentBubbles.length === 0 && !isLoading && !isChatLoading && !sectionValues[activeSection] && (
+                  <div style={{ textAlign: 'center', padding: '20px 12px', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.7rem', lineHeight: 1.8 }}>
+                    No options here yet.<br />
+                    Tap <span style={{ color: '#2990fa' }}>REFINE</span>, pick an angle, or type your own above.
+                  </div>
+                )}
               </div>
 
             ) : null}
