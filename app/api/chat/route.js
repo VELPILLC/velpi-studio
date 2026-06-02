@@ -15,9 +15,6 @@ function selectModel(currentSection, messages, systemOverride) {
   const sys = (systemOverride || '').toLowerCase()
   const section = currentSection || ''
 
-  // ── OPUS — only the longest, most complex copy: primary_text generation ──
-  if (section === 'primary_text') return OPUS
-
   // ── HAIKU — ONLY a simple, context-free yes/no validation override ──
   // Must be a short, dedicated validation system that asks for a valid yes/no
   // verdict. Anything involving intent detection or option/copy generation must
@@ -27,6 +24,21 @@ function selectModel(currentSection, messages, systemOverride) {
     (sys.includes('"valid"') || sys.includes("'valid'") ||
       (sys.includes('validate') && (sys.includes('yes') || sys.includes('no'))))
   if (isValidationOnly) return HAIKU
+
+  // ── SONNET — "Get more options" / bubble-option generation in ANY section.
+  // Checked before primary_text so get-more stays on Sonnet everywhere (these
+  // calls carry a dedicated options-generation system override). ──
+  const isOptionsHelper = sys.length > 0 && (
+    sys.includes('more options') ||
+    sys.includes('subcategory option') ||
+    sys.includes('bubble option') ||
+    sys.includes('different options for') ||
+    sys.includes('options for')
+  )
+  if (isOptionsHelper) return SONNET
+
+  // ── OPUS — only the longest, most complex copy: primary_text generation ──
+  if (section === 'primary_text') return OPUS
 
   // ── SONNET — the default for everything else ──
   return SONNET
