@@ -380,6 +380,40 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     }
   }, [sectionValues])
 
+  // Keyboard shortcuts inside the section workspace (non-avatar sections):
+  //   1/2/3…  toggle the matching option    Enter  confirm the selected one
+  //   Cmd/Ctrl+Enter  send to Jarvis (refine)
+  // Ignored while typing in an input/textarea or when any modal is open.
+  useEffect(() => {
+    function onKey(e) {
+      if (adEntryMode !== 'working') return
+      if (!activeSection || activeSection === 'avatar') return
+      if (showReview || unsavedPrompt || resetModal || refreshPrompt || avatarRestartModal || avatarDeleteConfirm || editingBubble !== null) return
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+
+      if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
+        const i = parseInt(e.key, 10) - 1
+        if (currentBubbles[i] !== undefined) {
+          e.preventDefault()
+          handleBubbleClick(currentBubbles[i])
+        }
+        return
+      }
+      if (e.key === 'Enter') {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault()
+          handleSendToJarvis()
+        } else if (activeSection !== 'image' && selectedBubbles.length === 1) {
+          e.preventDefault()
+          handleSubmit()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [adEntryMode, activeSection, currentBubbles, selectedBubbles, sectionValues, isLoading, showReview, unsavedPrompt, resetModal, refreshPrompt, avatarRestartModal, avatarDeleteConfirm, editingBubble])
+
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
   async function loadAvatars() {
@@ -1303,9 +1337,12 @@ Do not generate bubble options in this response.`
     setIsChatLoading(false)
   }
 
-  async function handleSubmit() {
-    if (selectedBubbles.length !== 1 || isLoading) return
-    const value = selectedBubbles[0]
+  async function handleSubmit(overrideValue = null) {
+    // overrideValue lets double-click / keyboard confirm a specific bubble directly.
+    const value = (typeof overrideValue === 'string' && overrideValue)
+      ? overrideValue
+      : (selectedBubbles.length === 1 ? selectedBubbles[0] : null)
+    if (!value || isLoading) return
     const section = activeSection
 
     const newSectionValues = { ...sectionValues, [section]: value }
@@ -2156,10 +2193,18 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     setActiveSection('avatar')
   }
 
+  // Copy text to the clipboard with a brief confirmation (reuses `copied`).
+  function copyToClipboard(text) {
+    try { navigator.clipboard?.writeText(text || '') } catch (_) {}
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
   const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
   const hasUnsavedWork = SECTIONS.some(s => sectionValues[s] !== null)
+  const confirmedCount = SECTIONS.filter(s => sectionValues[s] !== null).length
   const canSaveDraft = sectionValues.hook !== null
   const activeSectionIdx = SECTIONS.indexOf(activeSection)
   const sectionAngles = SECTION_ANGLES[activeSection] || []
@@ -2347,8 +2392,17 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   background: '#060d1f',
                   borderBottom: '1px solid rgba(41,144,250,0.3)',
                 }}>
-                  <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
-                    CURRENT {SECTION_LABELS[activeSection]}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                    <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      CURRENT {SECTION_LABELS[activeSection]}
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(sectionValues[activeSection])}
+                      title="Copy"
+                      style={{ background: 'transparent', border: '1px solid rgba(41,144,250,0.4)', borderRadius: 5, padding: '2px 8px', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem', cursor: 'pointer', letterSpacing: '0.04em', flexShrink: 0 }}
+                    >
+                      {copied ? '✓' : '⧉ Copy'}
+                    </button>
                   </div>
                   <div style={{
                     background: '#0a1f3f', border: '1px solid #2990fa', borderRadius: 8,
@@ -2750,15 +2804,28 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                       ) : (
                         <div
                           onClick={() => handleBubbleClick(bubble)}
+                          onDoubleClick={() => { if (activeSection !== 'image') handleSubmit(bubble) }}
+                          title={activeSection !== 'image' ? 'Double-click to confirm' : undefined}
                           style={{
                             border: '1px solid #2990fa',
                             background: selectedBubbles.includes(bubble) ? '#2990fa' : '#060d1f',
-                            color: '#ffffff', padding: `${14 * FONT_SCALES[chatFontScale]}px ${18 * FONT_SCALES[chatFontScale]}px`, borderRadius: 10, cursor: 'pointer',
+                            color: '#ffffff', padding: `${10 * FONT_SCALES[chatFontScale]}px ${14 * FONT_SCALES[chatFontScale]}px`, borderRadius: 10, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                            fontSize: `${0.9 * FONT_SCALES[chatFontScale]}rem`, fontFamily: 'var(--font-inter)', lineHeight: 1.5, minHeight: 44,
+                            fontSize: `${0.9 * FONT_SCALES[chatFontScale]}rem`, fontFamily: 'var(--font-inter)', lineHeight: 1.45, minHeight: 36,
                           }}
                         >
-                          <span>{bubble}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            {idx < 9 && (
+                              <span style={{
+                                flexShrink: 0, width: 16, height: 16, borderRadius: 4,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)',
+                                background: selectedBubbles.includes(bubble) ? 'rgba(255,255,255,0.25)' : 'rgba(41,144,250,0.15)',
+                                color: selectedBubbles.includes(bubble) ? '#ffffff' : '#2990fa',
+                              }}>{idx + 1}</span>
+                            )}
+                            <span style={{ overflow: 'hidden' }}>{bubble}</span>
+                          </span>
                           <span
                             onClick={e => { e.stopPropagation(); setEditingBubble(idx); setEditingText(bubble) }}
                             style={{ color: selectedBubbles.includes(bubble) ? 'rgba(255,255,255,0.7)' : '#2990fa', cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0 }}
@@ -2877,8 +2944,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   )}
                   {activeSection !== 'avatar' && activeSection !== 'image' && canSubmit && (
                     <button
-                      onClick={handleSubmit}
-                      style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
+                      onClick={() => handleSubmit()}
+                      title="Confirm (Enter)"
+                      style={{ background: '#2990fa', border: 'none', color: '#ffffff', borderRadius: 8, padding: '8px 14px', fontSize: '0.78rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer', flexShrink: 0, height: 36, boxSizing: 'border-box' }}
                     >
                       SUBMIT
                     </button>
@@ -3298,6 +3366,27 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
           <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
             {/* Scrollable panels area */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+
+            {/* ── BUILD PROGRESS ── */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  PROGRESS
+                </span>
+                <span style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>
+                  {confirmedCount}/{SECTIONS.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {SECTIONS.map(s => (
+                  <div
+                    key={s}
+                    title={`${SECTION_LABELS[s]}${sectionValues[s] !== null ? ' ✓' : ''}`}
+                    style={{ flex: 1, height: 4, borderRadius: 2, background: sectionValues[s] !== null ? '#2990fa' : '#152840' }}
+                  />
+                ))}
+              </div>
+            </div>
 
             {/* ── PLATFORM DROPDOWN ── */}
             <div style={{ position: 'relative', marginBottom: 2 }}>
@@ -3753,7 +3842,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '0 1.25rem',
           }}>
-            <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', letterSpacing: '0.1em' }}>
+            <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.1em' }}>
               REVIEW AD
             </span>
             <span style={{ fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em' }}>
@@ -3793,8 +3882,17 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 if (!value) return null
                 return (
                   <div key={key}>
-                    <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
-                      {label}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                        {label}
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(value)}
+                        title="Copy"
+                        style={{ background: 'transparent', border: '1px solid rgba(41,144,250,0.4)', borderRadius: 5, padding: '2px 8px', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+                      >
+                        {copied ? '✓' : '⧉ Copy'}
+                      </button>
                     </div>
                     <textarea
                       value={value}
