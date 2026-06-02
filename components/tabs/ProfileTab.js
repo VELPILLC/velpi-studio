@@ -928,13 +928,13 @@ Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`
       {profileDeleteConfirm && (
         <div
           onClick={() => setProfileDeleteConfirm(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(2,8,16,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(2,8,16,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 16 }}
           >
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ff4455', letterSpacing: '0.05em' }}>
               Delete Profile
             </div>
             <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>

@@ -110,9 +110,10 @@ export default function LibraryTab({ onEdit }) {
   // ── Card context menu ──
   const [cardMenu, setCardMenu] = useState(null) // { id, top, left }
 
-  // ── Search + sort ──
+  // ── Search + sort + status filter ──
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest') // 'newest' | 'oldest' | 'az'
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'Working' | 'Not Working'
 
   useEffect(() => {
     loadAds()
@@ -165,6 +166,33 @@ export default function LibraryTab({ onEdit }) {
       })
       await loadAds()
       if (selectedAd?.id === id) setSelectedAd(null)
+    } catch (_) {}
+  }
+
+  // Duplicate an ad — POST a fresh copy of all its fields, then reload.
+  async function duplicateAd(ad) {
+    try {
+      await fetch('/api/library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          avatar_id: ad.avatarId || ad.avatar_id || null,
+          avatar_name: ad.avatarName || ad.avatar_name || 'No Avatar',
+          hook: ad.hook,
+          image_concept: ad.imageConcept || ad.image_concept || '',
+          image_b64: ad.imageB64 || ad.image_b64 || '',
+          headline: ad.headline,
+          primary_text: ad.primaryText || ad.primary_text || '',
+          description: ad.description,
+          cta: ad.cta,
+          angle: ad.angle || '',
+          ad_type: ad.adType || ad.ad_type || '',
+          status: 'complete',
+          version_number: 1,
+          parent_id: null,
+        }),
+      })
+      await loadAds()
     } catch (_) {}
   }
 
@@ -228,10 +256,12 @@ export default function LibraryTab({ onEdit }) {
     return arr
   }
 
+  const statusMatches = (ad) => statusFilter === 'all' || ad.status === statusFilter
   const visibleAds = ads.filter(matchesSearch)
-  const drafts = sortAds(visibleAds.filter(ad => !isAdComplete(ad)))
-  const completedAds = sortAds(visibleAds.filter(ad => isAdComplete(ad)))
-  const noResults = ads.length > 0 && visibleAds.length === 0
+  // Drafts are unrated by nature — only show them when not filtering by status.
+  const drafts = statusFilter === 'all' ? sortAds(visibleAds.filter(ad => !isAdComplete(ad))) : []
+  const completedAds = sortAds(visibleAds.filter(ad => isAdComplete(ad) && statusMatches(ad)))
+  const noResults = ads.length > 0 && drafts.length === 0 && completedAds.length === 0
 
   // Derived: which ad/version to display in modal
   const displayAd =
@@ -285,6 +315,24 @@ export default function LibraryTab({ onEdit }) {
                 {o.label}
               </button>
             ))}
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {[
+              { id: 'all', label: 'All', color: '#2990fa' },
+              { id: 'Working', label: '✓ Working', color: '#00e5c8' },
+              { id: 'Not Working', label: '✕ Not', color: '#ff4455' },
+            ].map(o => {
+              const active = statusFilter === o.id
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => setStatusFilter(o.id)}
+                  style={{ background: active ? o.color + '22' : '#0a1628', border: `1px solid ${active ? o.color : '#152840'}`, color: active ? o.color : 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '7px 12px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', cursor: 'pointer', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}
+                >
+                  {o.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -587,6 +635,19 @@ export default function LibraryTab({ onEdit }) {
                         No image
                       </div>
                     )}
+                    {/* Status badge — top right (Working / Not Working) */}
+                    {!selectMode && (ad.status === 'Working' || ad.status === 'Not Working') && (
+                      <div style={{
+                        position: 'absolute', top: 6, right: 6, zIndex: 3,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        background: 'rgba(6,13,31,0.78)', borderRadius: 10, padding: '2px 7px',
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[ad.status] }} />
+                        <span style={{ fontSize: '0.46rem', fontFamily: 'var(--font-ibm-plex-mono)', color: STATUS_COLORS[ad.status], letterSpacing: '0.04em' }}>
+                          {ad.status === 'Working' ? 'WORKING' : 'NOT WORKING'}
+                        </span>
+                      </div>
+                    )}
                     {/* Selection indicator — top left (replaces version badge in select mode) */}
                     {selectMode ? (
                       <div style={{
@@ -685,7 +746,7 @@ export default function LibraryTab({ onEdit }) {
           onClick={() => setBulkDeleteConfirm(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 3001,
-            background: 'rgba(2,8,16,0.88)',
+            background: 'rgba(2,8,16,0.92)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
           }}
@@ -698,7 +759,7 @@ export default function LibraryTab({ onEdit }) {
               display: 'flex', flexDirection: 'column', gap: 16,
             }}
           >
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ff4455', letterSpacing: '0.05em' }}>
               Delete {selectedIds.length} {selectedIds.length === 1 ? 'Ad' : 'Ads'}
             </div>
             <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
@@ -738,7 +799,7 @@ export default function LibraryTab({ onEdit }) {
           onClick={() => setDeleteConfirm(null)}
           style={{
             position: 'fixed', inset: 0, zIndex: 3000,
-            background: 'rgba(2,8,16,0.88)',
+            background: 'rgba(2,8,16,0.92)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
           }}
@@ -751,7 +812,7 @@ export default function LibraryTab({ onEdit }) {
               display: 'flex', flexDirection: 'column', gap: 16,
             }}
           >
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ff4455', letterSpacing: '0.05em' }}>
               Delete Ad
             </div>
             <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
@@ -934,6 +995,28 @@ export default function LibraryTab({ onEdit }) {
               )}
             </div>
 
+            {/* Status rating */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', color: '#2990fa', letterSpacing: '0.08em', marginBottom: 6, textTransform: 'uppercase' }}>
+                STATUS
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['Working', 'Not Working'].map(st => {
+                  const active = displayAd?.status === st
+                  const color = STATUS_COLORS[st]
+                  return (
+                    <button
+                      key={st}
+                      onClick={() => updateAd(selectedAd.id, { status: active ? 'complete' : st })}
+                      style={{ flex: 1, background: active ? color + '22' : 'transparent', border: `1px solid ${active ? color : 'rgba(255,255,255,0.2)'}`, color: active ? color : 'rgba(255,255,255,0.6)', borderRadius: 8, padding: '8px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.7rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+                    >
+                      {st === 'Working' ? '✓ Working' : '✕ Not Working'}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* Edit button */}
             <div style={{ marginBottom: 8 }}>
               <button
@@ -1000,6 +1083,14 @@ export default function LibraryTab({ onEdit }) {
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 ✎ Edit
+              </div>
+              <div
+                onClick={() => { duplicateAd(menuAd); setCardMenu(null) }}
+                style={{ padding: '10px 16px', fontSize: '0.8rem', color: '#ffffff', fontFamily: 'var(--font-inter)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #152840' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#152840'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                ⧉ Duplicate
               </div>
               <div
                 onClick={() => { setDeleteConfirm(menuAd.id); setCardMenu(null) }}

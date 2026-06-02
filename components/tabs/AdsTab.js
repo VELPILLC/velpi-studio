@@ -227,6 +227,13 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
   const [showReview, setShowReview] = useState(false)
   const [reviewRestartConfirm, setReviewRestartConfirm] = useState(false)
 
+  // Live Meta-style ad preview drawer
+  const [showPreview, setShowPreview] = useState(false)
+
+  // Inline-edit of a confirmed value from the right-column panel
+  const [editPanel, setEditPanel] = useState(null)
+  const [editPanelText, setEditPanelText] = useState('')
+
   // Refresh / close warning dialog
   const [refreshPrompt, setRefreshPrompt] = useState(false)
 
@@ -388,7 +395,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     function onKey(e) {
       if (adEntryMode !== 'working') return
       if (!activeSection || activeSection === 'avatar') return
-      if (showReview || unsavedPrompt || resetModal || refreshPrompt || avatarRestartModal || avatarDeleteConfirm || editingBubble !== null) return
+      if (showReview || showPreview || unsavedPrompt || resetModal || refreshPrompt || avatarRestartModal || avatarDeleteConfirm || editingBubble !== null) return
       const tag = (document.activeElement?.tagName || '').toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return
 
@@ -412,14 +419,15 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [adEntryMode, activeSection, currentBubbles, selectedBubbles, sectionValues, isLoading, showReview, unsavedPrompt, resetModal, refreshPrompt, avatarRestartModal, avatarDeleteConfirm, editingBubble])
+  }, [adEntryMode, activeSection, currentBubbles, selectedBubbles, sectionValues, isLoading, showReview, showPreview, unsavedPrompt, resetModal, refreshPrompt, avatarRestartModal, avatarDeleteConfirm, editingBubble])
 
-  // Esc closes the Review overlay (cancels the restart confirm first; blurs an
-  // active edit field first so you never close mid-edit by accident).
+  // Esc closes the Preview drawer / Review overlay (cancels the restart confirm
+  // first; blurs an active edit field first so you never close mid-edit).
   useEffect(() => {
-    if (!showReview) return
+    if (!showReview && !showPreview) return
     function onEsc(e) {
       if (e.key !== 'Escape') return
+      if (showPreview) { setShowPreview(false); return }
       if (reviewRestartConfirm) { setReviewRestartConfirm(false); return }
       const tag = (document.activeElement?.tagName || '').toLowerCase()
       if (tag === 'textarea' || tag === 'input') { document.activeElement.blur(); return }
@@ -427,7 +435,7 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     }
     window.addEventListener('keydown', onEsc)
     return () => window.removeEventListener('keydown', onEsc)
-  }, [showReview, reviewRestartConfirm])
+  }, [showReview, showPreview, reviewRestartConfirm])
 
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -2215,6 +2223,29 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // Inline-edit a confirmed value directly from its right-column panel.
+  function startPanelEdit(section) {
+    setEditPanel(section)
+    setEditPanelText(sectionValues[section] || '')
+  }
+  function savePanelEdit(section) {
+    const v = editPanelText.trim()
+    if (v) setSectionValues(prev => ({ ...prev, [section]: v }))
+    setEditPanel(null)
+    setEditPanelText('')
+  }
+
+  // Copy the whole assembled ad, formatted for pasting into Meta.
+  function copyFullAd() {
+    const parts = []
+    if (sectionValues.hook) parts.push(`HOOK:\n${sectionValues.hook}`)
+    if (sectionValues.headline) parts.push(`HEADLINE:\n${sectionValues.headline}`)
+    if (sectionValues.primary_text) parts.push(`PRIMARY TEXT:\n${sectionValues.primary_text}`)
+    if (sectionValues.description) parts.push(`DESCRIPTION:\n${sectionValues.description}`)
+    if (sectionValues.cta) parts.push(`CALL TO ACTION:\n${sectionValues.cta}`)
+    copyToClipboard(parts.join('\n\n'))
+  }
+
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
   const allConfirmed = SECTIONS.every(s => sectionValues[s] !== null)
@@ -2800,8 +2831,10 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   </div>
                 )}
 
-                {/* Option bubbles */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
+                {/* Option bubbles — 2-column grid when every option is short, else stacked */}
+                <div style={currentBubbles.length > 0 && currentBubbles.every(b => (b || '').length <= 22)
+                  ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '4px 0', marginBottom: 8 }
+                  : { display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 8 }}>
                   {currentBubbles.map((bubble, idx) => (
                     <div key={idx}>
                       {editingBubble === idx ? (
@@ -3499,6 +3532,33 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                     </div>
                   )}
 
+                  {/* Confirmed value — click to edit inline (text sections only) */}
+                  {section !== 'avatar' && section !== 'image' && hasValue && (
+                    editPanel === section ? (
+                      <div onClick={e => e.stopPropagation()} style={{ marginTop: 6 }}>
+                        <textarea
+                          value={editPanelText}
+                          onChange={e => setEditPanelText(e.target.value)}
+                          autoFocus
+                          rows={3}
+                          style={{ width: '100%', background: '#060d1f', border: '1px solid #2990fa', borderRadius: 6, color: '#ffffff', padding: '6px 8px', fontSize: '0.78rem', fontFamily: 'var(--font-inter)', lineHeight: 1.45, resize: 'vertical', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                          <button onClick={e => { e.stopPropagation(); savePanelEdit(section) }} style={{ background: '#2990fa', border: 'none', color: '#fff', borderRadius: 5, padding: '4px 12px', fontSize: '0.62rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Save</button>
+                          <button onClick={e => { e.stopPropagation(); setEditPanel(null) }} style={{ background: 'transparent', border: '1px solid #2990fa', color: '#2990fa', borderRadius: 5, padding: '4px 12px', fontSize: '0.62rem', fontFamily: 'var(--font-ibm-plex-mono)', cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={e => { e.stopPropagation(); startPanelEdit(section) }}
+                        title="Click to edit"
+                        style={{ marginTop: 6, fontSize: '0.74rem', color: 'rgba(255,255,255,0.85)', fontFamily: 'var(--font-inter)', lineHeight: 1.45, cursor: 'text', borderLeft: '2px solid rgba(41,144,250,0.35)', paddingLeft: 8, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      >
+                        {sectionValues[section]}
+                      </div>
+                    )
+                  )}
+
                   {/* Image background generation indicator */}
                   {section === 'image' && !isActive && imageVersions.some(v => v.isGenerating) && (
                     <div style={{ marginTop: 3, fontSize: '0.5rem', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', letterSpacing: '0.04em' }}>
@@ -3545,6 +3605,30 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                   ★ REVIEW AD
                 </button>
               )}
+              {hasUnsavedWork && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setShowPreview(true)}
+                    style={{
+                      flex: 1, background: 'transparent', border: '1px solid rgba(41,144,250,0.5)', borderRadius: 8, padding: '9px 0',
+                      color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.66rem',
+                      cursor: 'pointer', letterSpacing: '0.04em',
+                    }}
+                  >
+                    👁 Preview
+                  </button>
+                  <button
+                    onClick={copyFullAd}
+                    style={{
+                      flex: 1, background: 'transparent', border: '1px solid rgba(41,144,250,0.5)', borderRadius: 8, padding: '9px 0',
+                      color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.66rem',
+                      cursor: 'pointer', letterSpacing: '0.04em',
+                    }}
+                  >
+                    {copied ? '✓ Copied' : '⧉ Copy Ad'}
+                  </button>
+                </div>
+              )}
               {allConfirmed && (
                 <button
                   onClick={saveToLibrary}
@@ -3580,7 +3664,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 4000,
-            background: 'rgba(2,8,16,0.94)',
+            background: 'rgba(2,8,16,0.92)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
           }}
@@ -3592,7 +3676,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               display: 'flex', flexDirection: 'column', gap: 12,
             }}
           >
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ffffff', letterSpacing: '0.05em' }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em' }}>
               Unsaved Work
             </div>
             <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5, marginBottom: 4 }}>
@@ -3681,7 +3765,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 5000,
-            background: 'rgba(2,8,16,0.95)',
+            background: 'rgba(2,8,16,0.92)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
           }}
@@ -3693,7 +3777,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
               display: 'flex', flexDirection: 'column', gap: 14,
             }}
           >
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.3rem', color: '#ffffff', letterSpacing: '0.05em' }}>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em' }}>
               YOUR IDEA SO FAR
             </div>
 
@@ -3784,9 +3868,9 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
       {/* ── AVATAR DELETE CONFIRM ── */}
       {avatarDeleteConfirm && (
-        <div onClick={() => setAvatarDeleteConfirm(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(2,8,16,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div onClick={() => setAvatarDeleteConfirm(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(2,8,16,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>Delete Avatar</div>
+            <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ff4455', letterSpacing: '0.05em' }}>Delete Avatar</div>
             <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
               Delete <strong>{avatarDeleteConfirm.name}</strong>? This cannot be undone.
             </div>
@@ -3806,7 +3890,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
 
       {/* ── AVATAR RESTART MODAL ── */}
       {avatarRestartModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(2,8,16,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(2,8,16,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 28, width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em', marginBottom: 4 }}>
               AVATAR RESTART
@@ -3996,7 +4080,7 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
                 onClick={e => e.stopPropagation()}
                 style={{ background: '#0a1628', border: '1px solid #ff4455', borderRadius: 12, padding: 28, width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: 16 }}
               >
-                <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.4rem', color: '#ff4455', letterSpacing: '0.05em' }}>
+                <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ff4455', letterSpacing: '0.05em' }}>
                   Restart Session
                 </div>
                 <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#ffffff', lineHeight: 1.5 }}>
@@ -4022,9 +4106,81 @@ Return JSON only: {"options":["opt1","opt2","opt3","opt4","opt5","opt6"]}`
         </div>
       )}
 
+      {/* ── LIVE META-STYLE AD PREVIEW (slide-over) ── */}
+      {showPreview && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowPreview(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 5500, background: 'rgba(2,8,16,0.6)', display: 'flex', justifyContent: 'flex-end' }}
+        >
+          <div style={{ width: '100%', maxWidth: 420, height: '100%', background: '#0f1e35', borderLeft: '1px solid rgba(41,144,250,0.3)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, height: 52, borderBottom: '1px solid rgba(41,144,250,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+              <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.1em' }}>AD PREVIEW</span>
+              <button onClick={() => setShowPreview(false)} title="Close (Esc)" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontSize: '0.55rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textAlign: 'center' }}>
+                FACEBOOK / INSTAGRAM FEED
+              </div>
+              {/* Meta feed card */}
+              <div style={{ background: '#ffffff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 6px 24px rgba(0,0,0,0.45)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px 8px' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#2990fa', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-bebas-neue)', fontSize: '1.1rem', flexShrink: 0 }}>
+                    {(selectedProfile?.name || 'V').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.85rem', fontWeight: 600, color: '#050505' }}>
+                      {selectedProfile?.name || 'Your Business'}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.68rem', color: '#65676b' }}>
+                      Sponsored · 🌐
+                    </div>
+                  </div>
+                  <span style={{ color: '#65676b', fontSize: '1.1rem' }}>⋯</span>
+                </div>
+                {(sectionValues.hook || sectionValues.description) && (
+                  <div style={{ padding: '0 12px 10px', fontFamily: 'var(--font-inter)', fontSize: '0.82rem', color: '#050505', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                    {sectionValues.hook && <div style={{ fontWeight: 600, marginBottom: sectionValues.description ? 4 : 0 }}>{sectionValues.hook}</div>}
+                    {sectionValues.description}
+                  </div>
+                )}
+                {imageB64 ? (
+                  <img src={`data:image/png;base64,${imageB64}`} alt="" style={{ width: '100%', display: 'block', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '1 / 1', background: '#e4e6eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#90949c', fontFamily: 'var(--font-inter)', fontSize: '0.8rem' }}>
+                    No image yet
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f0f2f5', padding: '10px 12px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.62rem', color: '#65676b', letterSpacing: '0.02em' }}>
+                      {(selectedProfile?.name || 'velpi').toLowerCase().replace(/[^a-z0-9]/g, '') || 'velpi'}.com
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.85rem', fontWeight: 700, color: '#050505', lineHeight: 1.3 }}>
+                      {sectionValues.headline || 'Your headline appears here'}
+                    </div>
+                    {sectionValues.primary_text && (
+                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.7rem', color: '#65676b' }}>{sectionValues.primary_text}</div>
+                    )}
+                  </div>
+                  <button style={{ flexShrink: 0, background: '#e4e6eb', border: 'none', borderRadius: 6, padding: '8px 12px', fontFamily: 'var(--font-inter)', fontSize: '0.72rem', fontWeight: 600, color: '#050505', cursor: 'default' }}>
+                    {sectionValues.cta || 'Learn More'}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={copyFullAd}
+                style={{ marginTop: 2, background: 'transparent', border: '1px solid rgba(41,144,250,0.5)', borderRadius: 8, padding: '10px 0', color: '#2990fa', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', cursor: 'pointer', letterSpacing: '0.04em' }}
+              >
+                {copied ? '✓ Copied' : '⧉ Copy Ad Text'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── REFRESH / CLOSE WARNING ── */}
       {refreshPrompt && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(2,8,16,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(2,8,16,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div style={{ background: '#0a1628', border: '1px solid #2990fa', borderRadius: 12, padding: 28, width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.2rem', color: '#ffffff', letterSpacing: '0.05em' }}>
               Unsaved Ad
