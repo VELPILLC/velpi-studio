@@ -1,49 +1,5 @@
 const SECTIONS_ORDER = ['avatar', 'hook', 'image', 'headline', 'primary_text', 'description', 'cta']
 
-// ─── Automatic Claude model routing ──────────────────────────────────────────
-// Sonnet is the default for EVERYTHING that involves understanding user input or
-// generating contextual content (funnel steps, intent detection, get-more-options,
-// bubble generation, chat, copy, refinement). Opus is reserved for the single most
-// complex piece of copy (primary_text). Haiku is used ONLY for a dedicated, simple
-// yes/no validation override that needs zero context — when in doubt, use Sonnet.
-// Returns one of: 'claude-haiku-4-5' | 'claude-sonnet-4-5' | 'claude-opus-4-5'
-function selectModel(currentSection, messages, systemOverride) {
-  const HAIKU = 'claude-haiku-4-5'
-  const SONNET = 'claude-sonnet-4-5'
-  const OPUS = 'claude-opus-4-5'
-
-  const sys = (systemOverride || '').toLowerCase()
-  const section = currentSection || ''
-
-  // ── HAIKU — ONLY a simple, context-free yes/no validation override ──
-  // Must be a short, dedicated validation system that asks for a valid yes/no
-  // verdict. Anything involving intent detection or option/copy generation must
-  // never land here — those all fall through to Sonnet below.
-  const isValidationOnly =
-    sys.length > 0 && sys.length < 300 &&
-    (sys.includes('"valid"') || sys.includes("'valid'") ||
-      (sys.includes('validate') && (sys.includes('yes') || sys.includes('no'))))
-  if (isValidationOnly) return HAIKU
-
-  // ── SONNET — "Get more options" / bubble-option generation in ANY section.
-  // Checked before primary_text so get-more stays on Sonnet everywhere (these
-  // calls carry a dedicated options-generation system override). ──
-  const isOptionsHelper = sys.length > 0 && (
-    sys.includes('more options') ||
-    sys.includes('subcategory option') ||
-    sys.includes('bubble option') ||
-    sys.includes('different options for') ||
-    sys.includes('options for')
-  )
-  if (isOptionsHelper) return SONNET
-
-  // ── OPUS — only the longest, most complex copy: primary_text generation ──
-  if (section === 'primary_text') return OPUS
-
-  // ── SONNET — the default for everything else ──
-  return SONNET
-}
-
 const JARVIS_SYSTEM = `CRITICAL IDENTITY RULES — NEVER VIOLATE THESE:
 
 There are THREE distinct identities in this system:
@@ -466,12 +422,8 @@ Primary emotion: ${avatar.primary_emotion || 'Not specified'}`,
       baseMessages = [...messages]
     }
 
-    // Dynamic model routing based on section + request complexity
-    const model = selectModel(currentSection, messages, system)
-    console.log('[model routing]', { currentSection: currentSection || null, model })
-
     const response = await client.messages.create({
-      model,
+      model: 'claude-sonnet-4-5',
       max_tokens: 2000,
       system: finalSystem,
       messages: baseMessages,

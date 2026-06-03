@@ -247,19 +247,28 @@ Return JSON only with no extra text:
 
   // ─── Follow-up: AI generates a contextual question + bubble options ────────
 
+  // Everything answered so far in the profile funnel — carried into every step
+  // and every get-more call so nothing already provided is forgotten or re-asked.
+  function profileContextSummary(data) {
+    const d = data || profileData
+    const parts = []
+    if (d.industry) parts.push(`Industry: ${d.industry}`)
+    if (d.services) parts.push(`Services: ${d.services}`)
+    if (d.whoServe) parts.push(`Who they serve: ${d.whoServe}`)
+    if (d.differentiator) parts.push(`What sets them apart: ${d.differentiator}`)
+    return parts.join('\n')
+  }
+
   async function startFollowup(field, data, remaining) {
     setCurrentFollowupField(field)
     setMode('followup')
     setSelectedBubbles([])
     setIsLoading(true)
 
-    const knownParts = []
-    if (data.industry) knownParts.push(`Industry: ${data.industry}`)
-    if (data.services) knownParts.push(`Services: ${data.services}`)
-    if (data.whoServe) knownParts.push(`Who they serve: ${data.whoServe}`)
+    const knownParts = profileContextSummary(data)
 
     const system = `Generate 5 to 6 short, specific bubble options for a business profile field: "${field}".
-${knownParts.length ? 'Context already known:\n' + knownParts.join('\n') : ''}
+${knownParts ? 'Context already known (never re-ask for any of this):\n' + knownParts : ''}
 Make each option practical and relevant to the known context.
 Return JSON only: {"options": ["opt1", "opt2", "opt3", "opt4", "opt5"]}`
 
@@ -362,7 +371,8 @@ Return JSON only: {"options": ["opt1", "opt2", "opt3", "opt4", "opt5"]}`
     const field = currentFollowupField || editingField
     const excludeList = currentBubbles.join(', ')
     const system = `Generate exactly 6 different options for business profile field: "${field}".
-Industry context: "${profileData.industry || 'unknown'}"
+Everything known about this business so far (stay consistent with all of it):
+${profileContextSummary(profileData) || 'nothing answered yet'}
 Do NOT repeat these: [${excludeList}]
 Options must be specific and practical.
 Return JSON only: {"options": ["opt1","opt2","opt3","opt4","opt5","opt6"]}`

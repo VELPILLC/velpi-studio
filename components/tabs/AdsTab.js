@@ -644,9 +644,27 @@ export default function AdsTab({ pendingRefine, onRefineConsumed, pendingLoadAd,
     }
   }
 
+  // Full accumulated avatar context — EVERY answer given so far in the funnel, so
+  // each step (and every question / get-more call) knows everything decided earlier
+  // and never re-asks for something already provided.
+  function avatarContextSummary(data) {
+    const d = data || avatarData
+    const parts = []
+    if (d.industry) parts.push(`Industry: ${d.industry}`)
+    if (d.role) parts.push(`Role: ${d.role}`)
+    if (d.businessSize) parts.push(`Business size: ${d.businessSize}`)
+    if (d.ageRange) parts.push(`Age range: ${d.ageRange}`)
+    if (d.wants) parts.push(`What they want: ${d.wants}`)
+    if (d.fears) parts.push(`What they fear: ${d.fears}`)
+    if (d.frustrations) parts.push(`Frustrations: ${d.frustrations}`)
+    if (d.statusDriver) parts.push(`What winning looks like: ${d.statusDriver}`)
+    if (d.mediaTrust) parts.push(`Media they trust: ${d.mediaTrust}`)
+    return parts.length ? parts.join('\n') : 'nothing answered yet'
+  }
+
   async function generateDynamicAvatarBubbles(step, data) {
     const d = data || avatarData
-    const context = `industry=${d.industry || 'unknown'}, role=${d.role || 'unknown'}, businessSize=${d.businessSize || 'unknown'}, ageRange=${d.ageRange || 'unknown'}`
+    const context = avatarContextSummary(d)
     const dynamicSystem = step === 'statusDriver'
       ? `Generate 4 bubble options for what winning looks like for this avatar.
 These should describe success moments, achievements, and status wins.
@@ -787,6 +805,8 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
       avatar: [...prev.avatar, { role: 'user', content: question }],
     }))
     const questionSystem = `The user is building their avatar. They are on step: ${avatarFunnelStep}.
+What they have already told us (never ask for any of this again):
+${avatarContextSummary(avatarData)}
 They asked: ${question}${contextNote ? ' Context: ' + contextNote : ''}
 Answer their question in 1-2 sentences using plain simple language.
 Then redirect them back to the current step question.
@@ -827,7 +847,8 @@ Do not generate bubble options in this response.`
     const excludeList = currentBubbles.join(', ')
     const system = `You are an expert in consumer psychology and ad targeting.
 Generate exactly 4 different options for this avatar funnel step: "${step}".
-Avatar context so far: industry="${avatarData.industry || '?'}", role="${avatarData.role || '?'}", businessSize="${avatarData.businessSize || '?'}", ageRange="${avatarData.ageRange || '?'}"
+Everything we know about this avatar so far (never contradict or re-ask for any of it):
+${avatarContextSummary(avatarData)}
 Do NOT repeat these already-shown options: [${excludeList}]
 Options must be specific, practical, and different from what is already shown.
 Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4"]}`
@@ -947,6 +968,8 @@ Return JSON only: {"step":"avatar_dynamic","options":["opt1","opt2","opt3","opt4
         avatar: [...prev.avatar, { role: 'user', content: text }],
       }))
       const questionSystem = `The user is building their avatar. They are on step: ${avatarFunnelStep}.
+What they have already told us (never ask for any of this again):
+${avatarContextSummary(avatarData)}
 They asked: ${text}
 Answer their question in 1-2 sentences using plain simple language.
 Then redirect them back to the current step question.
