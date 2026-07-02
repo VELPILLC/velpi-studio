@@ -82,7 +82,12 @@ export async function POST(request) {
       return Response.json({ error: 'Please enter a website URL or business name.' }, { status: 400 })
     }
     if (!process.env.FIRECRAWL_API_KEY) {
-      return Response.json({ error: 'Firecrawl API key is not set. Add FIRECRAWL_API_KEY to .env.local, then restart the server (double-click start-velpi.bat).' }, { status: 400 })
+      const onVercel = !!process.env.VERCEL
+      return Response.json({
+        error: onVercel
+          ? 'FIRECRAWL_API_KEY is not set on this deployment. In Vercel: Settings → Environment Variables → add FIRECRAWL_API_KEY (plus ANTHROPIC_API_KEY and OPENAI_API_KEY), then Redeploy.'
+          : 'Firecrawl API key is not set. Add FIRECRAWL_API_KEY to .env.local, then restart the server (double-click start-velpi.bat).',
+      }, { status: 400 })
     }
 
     const FirecrawlApp = (await import('@mendable/firecrawl-js')).default
