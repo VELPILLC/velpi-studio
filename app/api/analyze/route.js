@@ -1,3 +1,6 @@
+// Vercel: allow long-running AI work (up to 5 min with fluid compute)
+export const maxDuration = 300
+
 import { callClaude, parseJson } from '../../../lib/claude'
 
 const INDUSTRY_PATTERNS = `INDUSTRY STRUCTURE PATTERNS — apply the matching one (detect any other industry automatically and apply the best-fit structure):

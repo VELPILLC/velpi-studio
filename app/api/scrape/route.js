@@ -1,3 +1,6 @@
+// Vercel: allow long-running AI work (up to 5 min with fluid compute)
+export const maxDuration = 300
+
 import { getSavedPalette, savePalette } from '../../../lib/supabase'
 
 // Crawl the WHOLE site: resolve input -> map site links -> scrape the key pages

@@ -1,3 +1,6 @@
+// Vercel: allow long-running AI work (up to 5 min with fluid compute)
+export const maxDuration = 300
+
 // Executes STEP 4 (image sourcing) decisions made during analysis:
 //   action "keep"     -> use the real photo URL as-is
 //   action "enhance"  -> gpt-image-1 EDIT the real photo with the enhancement prompt

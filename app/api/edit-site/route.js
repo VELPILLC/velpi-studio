@@ -1,3 +1,6 @@
+// Vercel: allow long-running AI work (up to 5 min with fluid compute)
+export const maxDuration = 300
+
 import { callClaude, stripFences } from '../../../lib/claude'
 
 const SYSTEM = `You edit an existing single-page HTML website.
