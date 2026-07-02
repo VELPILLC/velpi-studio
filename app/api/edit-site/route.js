@@ -15,12 +15,12 @@ RULES:
 
 export async function POST(request) {
   try {
-    const { html, instruction } = await request.json()
+    const { html, instruction, palette } = await request.json()
     if (!html || !instruction || !instruction.trim()) {
       return Response.json({ error: 'Need both the current HTML and a change to make.' }, { status: 400 })
     }
 
-    const user = `CHANGE TO MAKE: ${instruction.trim()}
+    const user = `${Array.isArray(palette) && palette.length ? `BRAND THEME COLORS — any color you touch must come from: ${palette.join(', ')}\n\n` : ''}CHANGE TO MAKE: ${instruction.trim()}
 
 CURRENT HTML:
 ${html}`

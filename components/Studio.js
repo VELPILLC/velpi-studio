@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { matchStyleToIndustry } from '../lib/designStyles'
+import { matchStyleToIndustry, matchTopStyles } from '../lib/designStyles'
 
 const BLUE = '#2990fa'
 const BG = '#060d1f'
@@ -127,7 +127,6 @@ export default function Studio() {
   const [savingStyle, setSavingStyle] = useState(false)
 
   // Info panel
-  const [showFullText, setShowFullText] = useState(false)
   const [copiedInfo, setCopiedInfo] = useState(false)
 
   // Refine chat
@@ -144,9 +143,9 @@ export default function Studio() {
   function previewHtml() {
     if (!htmlTemplate) return ''
     return htmlTemplate.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
-      if (id === 'logo') return logoUrl || placeholderSvg('logo')
       if (ghlUrls[id]) return ghlUrls[id]
       if (assetsById[id]) return assetsById[id]
+      if (id === 'logo') return logoUrl || placeholderSvg('logo')
       const slot = slots.find(s => s.id === id)
       return placeholderSvg(slot ? slot.name : id)
     })
@@ -155,11 +154,21 @@ export default function Studio() {
   function finalHtml() {
     if (!htmlTemplate) return ''
     return htmlTemplate.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
-      if (id === 'logo') return logoUrl || placeholderSvg('logo')
       if (ghlUrls[id]) return ghlUrls[id]
+      if (id === 'logo') return logoUrl || 'https://PASTE-LOGO-URL-HERE'
       const n = slots.findIndex(s => s.id === id) + 1
       return `https://PASTE-IMAGE-${n || 'X'}-URL-HERE`
     })
+  }
+
+  // Claude-artifact-style: click → the mockup opens full-page in a new tab.
+  function openPreview() {
+    const out = previewHtml()
+    if (!out) return
+    const blob = new Blob([out], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
   const missingLinks = slots.filter(s => !ghlUrls[s.id]).length
@@ -240,19 +249,25 @@ export default function Studio() {
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
 
-      // Named photo slots (skip logo) — same ids the image generator will use
+      // Named photo slots (same ids the image generator will use) + the LOGO as
+      // slot #6 — the user downloads the logo themselves and pastes its link.
       const inv = analysis.image_inventory || []
       const photoSlots = inv
         .map((item, i) => ({ item, id: slotIdFor(item, i) }))
         .filter(x => x.id !== 'logo')
         .map(x => ({ id: x.id, name: x.item.what || x.id, section: x.item.section || '', prompt: x.item.prompt || '' }))
-      setSlots(photoSlots)
+      setSlots([...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }])
 
-      let chosenStyle = styles.find(s => s.id === styleId) || null
-      if (styleId === 'auto') {
-        chosenStyle = matchStyleToIndustry(styles, `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`)
+      // Smart agent: manual pick = follow that one system precisely.
+      // Auto-Match = top 3 niche matches, mixed & matched by the builder.
+      let chosenStyles = []
+      const manual = styles.find(s => s.id === styleId)
+      if (manual) {
+        chosenStyles = [manual]
+      } else if (styleId === 'auto') {
+        chosenStyles = matchTopStyles(styles, `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`, 3)
       }
-      setMatchedStyleName(chosenStyle ? chosenStyle.name : '')
+      setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
 
       // IMAGES run in the background while copy + HTML build proceed —
@@ -262,7 +277,7 @@ export default function Studio() {
         .then(({ images }) => {
           const map = {}
           for (const a of images?.assets || []) {
-            if (a.kind !== 'logo' && a.src) map[a.id] = a.src
+            if (a.src) map[a.id] = a.src // includes the scraped logo when found
           }
           setAssetsById(map)
           setImagesReady(true)
@@ -280,8 +295,11 @@ export default function Studio() {
       mark('build', 'active')
       const { html } = await callRoute('/api/build-site', {
         analysis, copy,
-        slots: [...(logoSlotOf(inv) ? [{ id: 'logo', name: 'Logo', section: 'header' }] : []), ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section }))],
-        styleMd: chosenStyle ? chosenStyle.content : null,
+        slots: [
+          { id: 'logo', name: 'Logo', section: 'header' },
+          ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
+        ],
+        styleMds: chosenStyles.map(s => s.content),
       })
       setHtmlTemplate(html)
       setBuilt(true)
@@ -297,17 +315,17 @@ export default function Studio() {
     }
   }
 
-  function logoSlotOf(inv) {
-    return (inv || []).some((item, i) => slotIdFor(item, i) === 'logo')
-  }
-
   async function sendEdit() {
     const instruction = chatInput.trim()
     if (!instruction || editing || !htmlTemplate) return
     setEditing(true)
     setError(null)
     try {
-      const { html: updated } = await callRoute('/api/edit-site', { html: htmlTemplate, instruction })
+      const { html: updated } = await callRoute('/api/edit-site', {
+        html: htmlTemplate,
+        instruction,
+        palette: analysisData?.color_palette || [], // theme lock on refinements
+      })
       setHtmlTemplate(updated)
       setChatInput('')
     } catch (e) {
@@ -353,6 +371,7 @@ export default function Studio() {
     }
   }
 
+  // Copies the front-view card (what a customer would see on Google).
   function copyAllInfo() {
     if (!analysisData) return
     const f = analysisData.facts || {}
@@ -360,13 +379,10 @@ export default function Studio() {
       `BUSINESS: ${analysisData.business_name || ''}`,
       `INDUSTRY: ${analysisData.industry || ''}${analysisData.niche ? ` — ${analysisData.niche}` : ''}`,
       f.phone ? `PHONE: ${f.phone}` : null,
-      f.emails?.length ? `EMAILS: ${f.emails.join(', ')}` : null,
+      f.emails?.length ? `EMAIL: ${f.emails[0]}` : null,
       f.address ? `ADDRESS: ${f.address}` : null,
       f.hours ? `HOURS: ${f.hours}` : null,
-      f.socials?.length ? `SOCIALS: ${f.socials.join(', ')}` : null,
-      f.services?.length ? `SERVICES:\n- ${f.services.join('\n- ')}` : null,
-      f.reviews?.length ? `REVIEWS:\n- ${f.reviews.join('\n- ')}` : null,
-      analysisData.color_palette?.length ? `PALETTE: ${analysisData.color_palette.join(', ')}` : null,
+      analysisData.color_palette?.length ? `THEME COLORS: ${analysisData.color_palette.join(', ')}` : null,
     ].filter(Boolean)
     try { navigator.clipboard?.writeText(lines.join('\n')) } catch (_) {}
     setCopiedInfo(true)
@@ -617,7 +633,8 @@ export default function Studio() {
                         <span style={{ color: '#e5c07b', marginLeft: 10 }}>{missingLinks} image link{missingLinks > 1 ? 's' : ''} pending</span>
                       )}
                     </span>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={openPreview} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>↗ Open Preview</button>
                       <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> View code'}</button>
                       <button onClick={downloadHtml} style={monoBtn}>⬇ Download HTML</button>
                       <button onClick={copyHtml} style={monoBtn}>{copiedHtml ? 'Copied' : 'Copy HTML'}</button>
@@ -747,36 +764,13 @@ export default function Studio() {
                 </div>
                 {facts.phone && <div><div style={infoLabel}>Phone</div><div style={infoValue}>{facts.phone}</div></div>}
                 {facts.emails?.length > 0 && (
-                  <div><div style={infoLabel}>Email</div>{facts.emails.map((e, i) => <div key={i} style={infoValue}>{e}</div>)}</div>
+                  <div><div style={infoLabel}>Email</div><div style={infoValue}>{facts.emails[0]}</div></div>
                 )}
                 {facts.address && <div><div style={infoLabel}>Address</div><div style={infoValue}>{facts.address}</div></div>}
                 {facts.hours && <div><div style={infoLabel}>Hours</div><div style={{ ...infoValue, whiteSpace: 'pre-wrap' }}>{facts.hours}</div></div>}
-                {facts.socials?.length > 0 && (
-                  <div><div style={infoLabel}>Socials / Platforms</div>{facts.socials.map((s, i) => <div key={i} style={{ ...infoValue, fontSize: '0.72rem' }}>{s}</div>)}</div>
-                )}
-                {facts.services?.length > 0 && (
-                  <div>
-                    <div style={infoLabel}>Services ({facts.services.length})</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      {facts.services.map((s, i) => (
-                        <div key={i} style={{ ...infoValue, fontSize: '0.74rem', paddingLeft: 10, borderLeft: `2px solid ${BORDER}` }}>{s}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {facts.reviews?.length > 0 && (
-                  <div>
-                    <div style={infoLabel}>Reviews ({facts.reviews.length})</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {facts.reviews.map((r, i) => (
-                        <div key={i} style={{ ...infoValue, fontSize: '0.72rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.7)' }}>&ldquo;{r}&rdquo;</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {analysisData.color_palette?.length > 0 && (
                   <div>
-                    <div style={infoLabel}>Palette</div>
+                    <div style={infoLabel}>Theme Colors</div>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                       {analysisData.color_palette.map((c, i) => (
                         <div key={i} title={c} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -787,24 +781,8 @@ export default function Studio() {
                     </div>
                   </div>
                 )}
-                {siteText && (
-                  <div>
-                    <button onClick={() => setShowFullText(v => !v)} style={{ ...monoBtn, width: '100%', padding: '6px 0', fontSize: '0.62rem' }}>
-                      {showFullText ? 'Hide full site text ▲' : 'Full site text ▼'}
-                    </button>
-                    {showFullText && (
-                      <div style={{ marginTop: 8 }}>
-                        <button
-                          onClick={() => { try { navigator.clipboard?.writeText(siteText) } catch (_) {} }}
-                          style={{ ...monoBtn, padding: '3px 10px', fontSize: '0.58rem', marginBottom: 6 }}
-                        >⧉ Copy text</button>
-                        <pre style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, padding: 10, fontSize: '0.62rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.6)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 300, overflowY: 'auto', margin: 0 }}>
-                          {siteText}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Everything else (services, reviews, socials, full site text) stays
+                    backend-only — it feeds analysis, copy, and the build. */}
               </div>
             </aside>
           </div>

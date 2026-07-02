@@ -86,7 +86,7 @@ IMAGES FOUND ON SITE (${(scrapedData.images || []).length}):
 ${(scrapedData.images || []).slice(0, 25).map((u, i) => `${i + 1}. ${u}`).join('\n') || '(none)'}
 
 FULL CRAWLED CONTENT:
-${(scrapedData.content || '').slice(0, 14000)}`
+${(scrapedData.content || '').slice(0, 20000)}`
 
     const raw = await callClaude({ system: SYSTEM, user, maxTokens: 3500 })
     const analysis = parseJson(raw)

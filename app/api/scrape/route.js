@@ -159,7 +159,7 @@ export async function POST(request) {
     for (const p of pages) {
       const path = (() => { try { return new URL(p.url).pathname || '/' } catch (_) { return p.url } })()
       content += `\n\n===== PAGE: ${path} =====\n${p.markdown}`
-      if (content.length > 16000) { content = content.slice(0, 16000); break }
+      if (content.length > 24000) { content = content.slice(0, 24000); break }
     }
 
     // 5. Images / logo / palette from the home page. Palette cached per domain.

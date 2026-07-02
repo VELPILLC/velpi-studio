@@ -49,7 +49,12 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 
 export async function POST(request) {
   try {
-    const { analysis, copy, slots, styleMd } = await request.json()
+    const body = await request.json()
+    const { analysis, copy, slots } = body
+    // Accept one style (styleMd) or several (styleMds) — several = smart mix & match.
+    const styleMds = Array.isArray(body.styleMds) && body.styleMds.length
+      ? body.styleMds.filter(Boolean)
+      : (body.styleMd ? [body.styleMd] : [])
     if (!analysis || !copy) {
       return Response.json({ error: 'Missing analysis or copy to build the site.' }, { status: 400 })
     }
@@ -80,20 +85,22 @@ INDUSTRY: ${analysis.industry} ${analysis.niche ? `(${analysis.niche})` : ''}
 TONE: ${analysis.tone || ''}
 DESIGN DIRECTION: ${analysis.design_direction || '(decide the highest-end direction for this industry)'}
 TARGET 3-SECOND FEELING: ${analysis.target_feeling || '(decide it, then build toward it)'}
-COLOR PALETTE: ${palette.join(', ')}
+BRAND THEME COLORS — THEME LOCK: ${palette.join(', ')}
+Every color on the page must come from this palette (plus white and one near-black for text). This is the business's real theme — never drift off it.
 SECTION ORDER (arrest -> build desire -> convert): ${JSON.stringify(sectionOrder)}
 LAYOUT NOTE: ${analysis.layout?.notes || ''}
 
 ${factsBlock}
 
-${styleMd ? `DESIGN SYSTEM TO FOLLOW PRECISELY:\n${styleMd}\n` : ''}
+${styleMds.length === 1 ? `DESIGN SYSTEM TO FOLLOW PRECISELY:\n${styleMds[0]}\n` : ''}${styleMds.length > 1 ? `DESIGN SYSTEMS TO MIX & MATCH (${styleMds.length}) — you are a smart design agent: take the strongest ideas from each (a hero treatment from one, a menu/list pattern from another, typography pairing from a third), fuse them into ONE cohesive direction perfectly niched to THIS business, and map every color decision onto the brand theme colors above. Never produce a franken-page — the blend must feel like a single intentional system.\n\n${styleMds.map((s, i) => `--- SYSTEM ${i + 1} ---\n${s}`).join('\n\n')}\n` : ''}
 COPY (JSON — use exactly, never invent):
 ${JSON.stringify(copy.sections, null, 2)}
 
 IMAGE SLOTS (use every token, in its noted section):
 ${slotBlock}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 24000 })
+    // No quality-limiting cap — the mockup has to be good. Streaming handles the size.
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 32000 })
     const html = stripFences(raw)
     if (!/<html|<!doctype/i.test(html)) {
       return Response.json({ error: 'The mockup could not be built (invalid HTML returned). Try again.' }, { status: 502 })
