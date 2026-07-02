@@ -1,11 +1,15 @@
 import { getSavedPalette, savePalette } from '../../../lib/supabase'
 
-// Decide whether the input is a URL or a business name.
+// Crawl the WHOLE site: resolve input -> map site links -> scrape the key pages
+// (home + about/services/menu/contact/etc) -> merge everything into one content blob.
+
+const EXTRA_PAGE_LIMIT = 5
+const PRIORITY = /about|service|menu|contact|team|gallery|pricing|location|hour|review|testimonial|portfolio|work|faq/i
+
 function looksLikeUrl(input) {
   const s = input.trim()
   if (/\s/.test(s) && !/^https?:\/\//i.test(s)) return false
   if (/^https?:\/\//i.test(s)) return true
-  // bare domain like "example.com" or "www.shop.example.co.uk"
   return /^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(s)
 }
 
@@ -15,23 +19,14 @@ function normalizeUrl(input) {
 }
 
 function domainOf(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch (_) {
-    return ''
-  }
+  try { return new URL(url).hostname.replace(/^www\./, '') } catch (_) { return '' }
 }
 
 function absolutize(src, baseUrl) {
   if (!src) return null
-  try {
-    return new URL(src, baseUrl).href
-  } catch (_) {
-    return null
-  }
+  try { return new URL(src, baseUrl).href } catch (_) { return null }
 }
 
-// Pull image URLs out of raw HTML and absolutize them.
 function extractImages(html, baseUrl) {
   const out = []
   const seen = new Set()
@@ -47,10 +42,8 @@ function extractImages(html, baseUrl) {
   return out
 }
 
-// Best-effort: find a logo image URL.
 function extractLogo(html, baseUrl, metadata) {
-  const re = /<img[^>]+(?:src|alt|class)=["'][^"']*logo[^"']*["'][^>]*>/i
-  const block = html.match(re)
+  const block = html.match(/<img[^>]+(?:src|alt|class)=["'][^"']*logo[^"']*["'][^>]*>/i)
   if (block) {
     const srcMatch = block[0].match(/src=["']([^"']+)["']/i)
     if (srcMatch) {
@@ -62,7 +55,6 @@ function extractLogo(html, baseUrl, metadata) {
   return null
 }
 
-// Frequency-rank hex colors found in the page source.
 function extractPalette(html) {
   const counts = {}
   const re = /#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g
@@ -71,15 +63,13 @@ function extractPalette(html) {
     let hex = m[1].toLowerCase()
     if (hex.length === 3) hex = hex.split('').map(c => c + c).join('')
     const full = `#${hex}`
-    // skip pure white/black noise from resets
     counts[full] = (counts[full] || 0) + 1
   }
-  const ranked = Object.entries(counts)
+  return Object.entries(counts)
     .filter(([hex]) => hex !== '#ffffff' && hex !== '#000000')
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([hex]) => hex)
-  return ranked
 }
 
 export async function POST(request) {
@@ -88,84 +78,106 @@ export async function POST(request) {
     if (!input || !input.trim()) {
       return Response.json({ error: 'Please enter a website URL or business name.' }, { status: 400 })
     }
-
     if (!process.env.FIRECRAWL_API_KEY) {
-      return Response.json(
-        { error: 'Firecrawl API key is not set. Add FIRECRAWL_API_KEY to .env.local to enable scraping.' },
-        { status: 400 },
-      )
+      return Response.json({ error: 'Firecrawl API key is not set. Add FIRECRAWL_API_KEY to .env.local, then restart the server (double-click start-velpi.bat).' }, { status: 400 })
     }
 
     const FirecrawlApp = (await import('@mendable/firecrawl-js')).default
     const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY })
 
-    // 1. Resolve to a URL — either directly or by searching the business name.
+    // 1. Resolve to a URL (search business name if needed).
     let targetUrl
     if (looksLikeUrl(input)) {
       targetUrl = normalizeUrl(input)
     } else {
       let search
-      try {
-        search = await app.search(input, { limit: 1 })
-      } catch (e) {
+      try { search = await app.search(input, { limit: 1 }) } catch (e) {
         return Response.json({ error: `Could not search for "${input}": ${e.message}` }, { status: 502 })
       }
       const first = (search?.data || search?.web || [])[0]
       if (!first?.url) {
-        return Response.json(
-          { error: `No website found for "${input}". Try entering the full URL instead.` },
-          { status: 404 },
-        )
+        return Response.json({ error: `No website found for "${input}". Try entering the full URL instead.` }, { status: 404 })
       }
       targetUrl = first.url
     }
-
     const domain = domainOf(targetUrl)
 
-    // 2. Scrape the page.
-    let scrape
+    // 2. Scrape the home page (markdown + html for images/palette/logo).
+    let home
     try {
-      scrape = await app.scrapeUrl(targetUrl, { formats: ['markdown', 'html'] })
+      const s = await app.scrapeUrl(targetUrl, { formats: ['markdown', 'html'] })
+      home = s?.data || s || {}
     } catch (e) {
       return Response.json({ error: `Failed to scrape ${targetUrl}: ${e.message}` }, { status: 502 })
     }
-    const data = scrape?.data || scrape || {}
-    const html = data.html || ''
-    const markdown = data.markdown || ''
-    const metadata = data.metadata || {}
-
-    if (!html && !markdown) {
-      return Response.json(
-        { error: `Nothing could be read from ${targetUrl}. The site may block scrapers.` },
-        { status: 502 },
-      )
+    const homeHtml = home.html || ''
+    const metadata = home.metadata || {}
+    if (!homeHtml && !home.markdown) {
+      return Response.json({ error: `Nothing could be read from ${targetUrl}. The site may block scrapers.` }, { status: 502 })
     }
 
-    // 3. Extract structured pieces.
-    const images = extractImages(html, targetUrl)
-    const logo = extractLogo(html, targetUrl, metadata)
+    // 3. Map the whole site and pick the most useful extra pages.
+    let extraUrls = []
+    try {
+      const map = await app.mapUrl(targetUrl, { limit: 60 })
+      const links = (map?.links || map?.data?.links || [])
+        .map(l => (typeof l === 'string' ? l : l?.url))
+        .filter(Boolean)
+        .filter(u => domainOf(u) === domain && u.replace(/\/$/, '') !== targetUrl.replace(/\/$/, ''))
+      const prioritized = [
+        ...links.filter(u => PRIORITY.test(u)),
+        ...links.filter(u => !PRIORITY.test(u)),
+      ]
+      extraUrls = [...new Set(prioritized)].slice(0, EXTRA_PAGE_LIMIT)
+    } catch (_) {
+      // mapping is best-effort — home page alone still works
+    }
 
-    // 4. Color palette — reuse from Supabase if we've seen this domain before.
+    // 4. Scrape the extra pages in parallel (markdown only), merge everything.
+    const pages = [{ url: targetUrl, markdown: home.markdown || '' }]
+    if (extraUrls.length) {
+      const results = await Promise.allSettled(
+        extraUrls.map(u => app.scrapeUrl(u, { formats: ['markdown'] })),
+      )
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          const d = r.value?.data || r.value || {}
+          if (d.markdown) pages.push({ url: extraUrls[i], markdown: d.markdown })
+        }
+      })
+    }
+
+    let content = ''
+    for (const p of pages) {
+      const path = (() => { try { return new URL(p.url).pathname || '/' } catch (_) { return p.url } })()
+      content += `\n\n===== PAGE: ${path} =====\n${p.markdown}`
+      if (content.length > 16000) { content = content.slice(0, 16000); break }
+    }
+
+    // 5. Images / logo / palette from the home page. Palette cached per domain.
+    const images = extractImages(homeHtml, targetUrl)
+    const logo = extractLogo(homeHtml, targetUrl, metadata)
     let palette = await getSavedPalette(domain)
-    let paletteFromCache = !!palette
+    const paletteFromCache = !!palette
     if (!palette) {
-      palette = extractPalette(html)
+      palette = extractPalette(homeHtml)
       if (palette.length) await savePalette(domain, palette)
     }
 
-    const scrapedData = {
-      url: targetUrl,
-      domain,
-      title: metadata.title || metadata.ogTitle || '',
-      description: metadata.description || metadata.ogDescription || '',
-      content: markdown.slice(0, 12000),
-      images,
-      logo,
-      palette,
-      paletteFromCache,
-    }
-
-    return Response.json({ scrapedData })
+    return Response.json({
+      scrapedData: {
+        url: targetUrl,
+        domain,
+        pagesCrawled: pages.length,
+        title: metadata.title || metadata.ogTitle || '',
+        description: metadata.description || metadata.ogDescription || '',
+        content: content.trim(),
+        images,
+        logo,
+        palette,
+        paletteFromCache,
+      },
+    })
   } catch (err) {
     console.error('scrape error:', err)
     return Response.json({ error: `Scrape failed: ${err.message}` }, { status: 500 })

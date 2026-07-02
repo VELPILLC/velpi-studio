@@ -41,6 +41,9 @@ TARGET CUSTOMER: ${analysis.target_customer || ''}
 TONE: ${analysis.tone || ''}
 SECTIONS (use these exact keys): ${JSON.stringify(analysis.sections || ['hero', 'services', 'about', 'contact'])}
 
+REAL FACTS (use these in copy and CTAs — never invent others):
+${JSON.stringify(analysis.facts || {}, null, 2)}
+
 Base everything on what is true for this business. Do not invent facts.`
 
     const raw = await callClaude({ system: SYSTEM, user, maxTokens: 3000 })

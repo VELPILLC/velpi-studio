@@ -5,8 +5,9 @@ const SYSTEM = `You edit an existing single-page HTML website.
 RULES:
 - You are given the CURRENT full HTML and ONE change instruction.
 - Make ONLY the requested change. Keep everything else byte-for-byte the same where possible.
-- Preserve the existing structure, palette, fonts, images (including any data: URIs and remote URLs), and inline-CSS-only approach.
-- No external dependencies, no animations/transitions, no gradients. Keep it iframe-safe.
+- Preserve the existing structure, palette, fonts, and inline-CSS-only approach.
+- CRITICAL: preserve every %%IMG:...%% image placeholder token EXACTLY as it is — never replace, rename, or remove them (unless the instruction explicitly asks to remove that image).
+- Keep the GoHighLevel constraints: everything scoped under .velpi-page, fonts via @import inside the <style> tag, no JavaScript, no position:fixed.
 - Return ONLY the complete, updated HTML document. Start with <!DOCTYPE html>. No markdown, no commentary.`
 
 export async function POST(request) {
@@ -21,7 +22,8 @@ export async function POST(request) {
 CURRENT HTML:
 ${html}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 8000 })
+    // Must be able to return the FULL updated document, which can be large.
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 24000 })
     const updated = stripFences(raw)
     if (!/<html|<!doctype/i.test(updated)) {
       return Response.json({ error: 'The edit could not be applied. Try rephrasing the change.' }, { status: 502 })

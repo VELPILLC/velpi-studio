@@ -1,73 +1,106 @@
 import { callClaude, stripFences } from '../../../lib/claude'
 
-const VERSION_BRIEFS = {
-  1: 'VERSION 1 — Clean and modern. The standard, trustworthy layout for this industry. Generous whitespace, clear hierarchy, conventional section order.',
-  2: 'VERSION 2 — Bold and aggressive. Much bigger headlines, high-contrast color blocks, stronger and more urgent CTAs repeated through the page. Punchy and confident.',
-  3: 'VERSION 3 — Most unique layout that still fits the niche. Unexpected but tasteful structure (e.g. split-screen hero, asymmetric grid, sticky side nav) while staying appropriate for the industry.',
-}
+const SYSTEM = `You are an elite web designer. You produce ONE mockup at a time. Commit to a single direction and execute it at the highest level — never produce multiple versions and never hedge between styles.
 
-function neutralImage(color) {
-  const c = (color || '#11223a').replace('#', '%23')
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'><rect width='100%' height='100%' fill='${c}'/></svg>`
-  return `data:image/svg+xml,${svg}`
-}
+Before writing a single line of code, answer these three questions internally:
+1. What industry is this business in?
+2. What does the highest-end version of a website in this industry look like?
+3. What feeling should a visitor have within 3 seconds of landing on this page?
+Then build toward that feeling — not toward a template.
+
+INDUSTRY AWARENESS — different niches have different visual languages. A lakeside restaurant should feel like a warm summer evening: open, airy, atmospheric. A tattoo studio editorial and raw. A law office authoritative and clean. A gym high-energy and bold. Never apply the same layout or color logic across industries.
+
+LAYOUT HIERARCHY — the page must do three things in order:
+- ARREST attention: the hero (full-bleed atmospheric image, confident headline, one strong CTA).
+- BUILD desire: middle sections — atmosphere, social proof / real reviews, service or food photography.
+- CONVERT: hours, contact, and one clear primary call to action.
+
+VISUAL QUALITY:
+- TYPOGRAPHY: pair a display serif OR strong display sans for headlines with a clean neutral for body. Strong, deliberate size contrast between heading levels.
+- WHITESPACE: use it aggressively.
+- COLOR: maximum three colors plus white and one dark. Every color earns its place. Use the brand's real palette.
+- IMAGES are the most important design element — size and crop every slot to serve the layout (object-fit: cover, intentional aspect ratios, full-bleed hero).
+- BUTTONS have weight: generous size, contrast, subtle shadow.
+- NAV clean and light.
+
+NEVER DO THESE (they read as cheap): dark navy as the primary page background; amber/orange accents on hospitality unless it is the brand color; generic equal-padding card grids; centered hero text with no atmospheric overlay; Bootstrap-looking review sections; dark-box footers with dumped links; uniform heading sizes; borders dividing every section.
+
+DENSITY & CRAFT — THIS IS A PREMIUM DELIVERABLE, NOT A SKELETON:
+- Minimum 8 distinct, fully-realized sections. A thin page is a failed page.
+- The CSS must be extensive and polished — sticky nav with scroll-solid background, a layered hero (image + scrim + typographic composition), asymmetric grids, alternating section rhythms, hover states on every interactive element, and complete responsive breakpoints. Aim for 500+ lines of CSS.
+- Use EVERY image slot provided, each at a meaningful size (full-bleed hero, large split-section images, gallery row) — never thumbnail-sized filler.
+- Populate sections richly with the real extracted facts: full services/menu list with prices when provided, every real review with attribution, real hours, real address, real phone and email in the contact section and footer.
+- Micro-details that signal quality: consistent 8px spacing system, letterspaced uppercase labels above headings, oversized section numerals or stat numerals where fitting, a real footer with columns (brand, links, hours, contact).
+
+DESIGN SYSTEM ADHERENCE: when a DESIGN.md system is provided below, follow it precisely — its colors (mapping the brand's palette into its accent slots), typography, spacing, component treatments, and its "Never" rules override your defaults.
+
+OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
+- Return ONLY the HTML. Start with <!DOCTYPE html>. No markdown, no commentary.
+- ONE self-contained file: ALL CSS in a single <style> tag. Google Fonts loaded via @import at the TOP of that <style> tag (never a <link> tag) — @import survives when the code is pasted into a GoHighLevel custom-code element.
+- SCOPING: wrap ALL body content in <div class="velpi-page"> ... </div> and prefix EVERY CSS selector with .velpi-page (e.g. ".velpi-page .hero", ".velpi-page h2"). This prevents style collisions when pasted into a GoHighLevel page. Set base font-size/color/background on .velpi-page itself, not on body/html.
+- No JavaScript. No external scripts, CDNs, or frameworks. No position:fixed. Sticky nav is allowed via position:sticky inside .velpi-page.
+- Fully responsive with @media queries: clean at 1440px, 1024px, and 390px.
+- LEGIBILITY: any text over a photo sits on a dark scrim. Headlines constrained and wrapping — never overflowing.
+- IMAGE PLACEHOLDERS — CRITICAL: for every image use the EXACT placeholder token as the src, e.g. <img src="%%IMG:img_1%%"> or a CSS background-image url('%%IMG:img_1%%'). Use each provided slot id exactly once or more. NEVER invent an image URL, never use data URIs, never leave a src empty. The logo slot (if provided) goes in the nav; if there is no logo slot, render the business name as a clean text wordmark.
+- CONTENT: use only the copy and facts provided. Do NOT invent hours, addresses, phone numbers, emails, reviews, awards, or claims. Omit what you don't have.`
 
 export async function POST(request) {
   try {
-    const { analysis, copy, images, version } = await request.json()
+    const { analysis, copy, slots, styleMd } = await request.json()
     if (!analysis || !copy) {
       return Response.json({ error: 'Missing analysis or copy to build the site.' }, { status: 400 })
     }
-    const v = Number(version) || 1
-    const assets = images?.assets || []
+    const slotList = Array.isArray(slots) ? slots : []
     const palette = analysis.color_palette || ['#2990fa', '#0a1628', '#ffffff']
+    const sectionOrder = analysis.layout?.section_order?.length
+      ? analysis.layout.section_order
+      : (analysis.sections || Object.keys(copy.sections || {}))
 
-    // Give Claude only ids + roles (never the base64) and tell it to use placeholders.
-    const assetList = assets.map(a => `- id "${a.id}" (${a.kind}${a.role ? `, ${a.role}` : ''}) -> use src="%%IMG:${a.id}%%"`).join('\n') || '(no images available — use solid color blocks instead of images)'
+    const slotBlock = slotList.length
+      ? slotList.map(s => `- token %%IMG:${s.id}%% — ${s.name}${s.section ? ` (place in section: ${s.section})` : ''}`).join('\n')
+      : '(no image slots — use solid color blocks and bold typography instead)'
 
-    const system = `You build a complete, single-page marketing website as ONE valid HTML document.
+    const facts = analysis.facts || {}
+    const factsBlock = `KNOWN FACTS (only these may appear — use ALL of them):
+Phone: ${facts.phone || '(none — omit)'}
+Emails: ${Array.isArray(facts.emails) && facts.emails.length ? facts.emails.join(', ') : '(none — omit)'}
+Address: ${facts.address || '(none — omit)'}
+Hours: ${facts.hours || '(none — omit)'}
+Socials/platforms: ${Array.isArray(facts.socials) && facts.socials.length ? facts.socials.join(', ') : '(none — omit)'}
+Services/menu: ${Array.isArray(facts.services) && facts.services.length ? facts.services.join(' | ') : '(none)'}
+Real reviews: ${Array.isArray(facts.reviews) && facts.reviews.length ? facts.reviews.map(r => `"${r}"`).join(' | ') : '(none — omit the reviews section quotes)'}`
 
-OUTPUT RULES (critical):
-- Return ONLY the HTML. Start with <!DOCTYPE html>. No markdown, no commentary.
-- ALL CSS must be inline in a single <style> tag in the <head>. No external stylesheets.
-- NO external dependencies of any kind: no <link>, no external <script>, no web-font imports, no CDN URLs. Use a system font stack only.
-- No animations, no transitions, no JavaScript behavior required. Solid colors only, no gradients.
-- It must render correctly inside a sandboxed iframe with no network access for code (images may be remote URLs or data URIs that are already provided).
-- Use ONLY the colors from the provided palette plus white/near-black for text.
-- For images, use the EXACT placeholder string for the matching asset id, e.g. <img src="%%IMG:logo%%" ...>. Do not invent image URLs. Place the logo in the header exactly as provided.
-- Use only the copy provided. Do not invent facts, numbers, testimonials, or claims.
-- Build every section listed. Make it look like a real, modern, professional business website.
-
-${VERSION_BRIEFS[v] || VERSION_BRIEFS[1]}`
-
-    const user = `Build the complete HTML site.
+    const user = `Build ONE complete, high-end HTML mockup for this business. Commit fully to the right direction for its industry.
 
 BUSINESS: ${analysis.business_name}
 INDUSTRY: ${analysis.industry} ${analysis.niche ? `(${analysis.niche})` : ''}
 TONE: ${analysis.tone || ''}
-COLOR PALETTE (use these): ${palette.join(', ')}
-SECTIONS (in order): ${JSON.stringify(analysis.sections || Object.keys(copy.sections || {}))}
+DESIGN DIRECTION: ${analysis.design_direction || '(decide the highest-end direction for this industry)'}
+TARGET 3-SECOND FEELING: ${analysis.target_feeling || '(decide it, then build toward it)'}
+COLOR PALETTE: ${palette.join(', ')}
+SECTION ORDER (arrest -> build desire -> convert): ${JSON.stringify(sectionOrder)}
+LAYOUT NOTE: ${analysis.layout?.notes || ''}
 
-COPY (JSON):
+${factsBlock}
+
+${styleMd ? `DESIGN SYSTEM TO FOLLOW PRECISELY:\n${styleMd}\n` : ''}
+COPY (JSON — use exactly, never invent):
 ${JSON.stringify(copy.sections, null, 2)}
 
-AVAILABLE IMAGE ASSETS (reference by placeholder):
-${assetList}`
+IMAGE SLOTS (use every token, in its noted section):
+${slotBlock}`
 
-    const raw = await callClaude({ system, user, maxTokens: 8000 })
-    let html = stripFences(raw)
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 24000 })
+    const html = stripFences(raw)
     if (!/<html|<!doctype/i.test(html)) {
-      return Response.json({ error: 'The site could not be built (invalid HTML returned). Try again.' }, { status: 502 })
+      return Response.json({ error: 'The mockup could not be built (invalid HTML returned). Try again.' }, { status: 502 })
     }
 
-    // Swap image placeholders for the real srcs.
-    const byId = {}
-    assets.forEach(a => { byId[a.id] = a.src })
-    html = html.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => byId[id] || neutralImage(palette[0]))
-
+    // Placeholders are intentionally NOT substituted here — the client maps each
+    // %%IMG:id%% token to a generated preview image or a pasted GoHighLevel URL.
     return Response.json({ html })
   } catch (err) {
     console.error('build-site error:', err)
-    return Response.json({ error: `Site build failed: ${err.message}` }, { status: 500 })
+    return Response.json({ error: `Mockup build failed: ${err.message}` }, { status: 500 })
   }
 }
