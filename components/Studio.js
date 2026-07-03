@@ -22,6 +22,7 @@ const STEP_DEFS = [
   { id: 'logo', label: 'Refining logo' },
   { id: 'crawl', label: 'Crawling website' },
   { id: 'analyze', label: 'Analyzing brand' },
+  { id: 'brief', label: 'Writing design brief' },
   { id: 'copy', label: 'Writing copy' },
   { id: 'build', label: 'Building website' },
   { id: 'elevate', label: 'Elevating design — pass 2' },
@@ -130,7 +131,7 @@ function parseBulkStyles(text) {
 
 // Plain-text report of everything the generator extracted, decided, and used —
 // made to be copy-pasted into a chat so the "thinking" can be critiqued.
-function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied) {
+function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief) {
   const a = analysis || {}
   const f = a.facts || {}
   const b = a.brand || {}
@@ -153,6 +154,11 @@ function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applie
   L.push(`Styles mixed: ${(chosenStyles || []).map(s => s.name).join(' + ') || '(none)'}`)
   L.push(`Second elevation pass applied: ${pass2Applied ? 'yes' : 'NO — pass 1 only'}`)
   L.push('')
+  if (designBrief) {
+    L.push('--- DESIGN BRIEF (the committed direction) ---')
+    L.push(designBrief)
+    L.push('')
+  }
   L.push('--- CONVERSION STRATEGY (the thinking) ---')
   const cs = a.conversion_strategy || {}
   L.push(`Primary action: ${cs.primary_action || '?'} | Secondary: ${cs.secondary_action || '?'}`)
@@ -469,6 +475,18 @@ export default function Studio() {
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
 
+      // Design brief — a creative director fuses brand + vibe + the matched
+      // systems into ONE committed spec before any HTML is written.
+      mark('brief', 'active')
+      let designBrief = ''
+      try {
+        const res = await callRoute('/api/design-brief', { analysis, vibe: vibeText, styleMds: chosenStyles.map(s => s.content) })
+        designBrief = res.brief || ''
+        mark('brief', 'complete')
+      } catch (_) {
+        mark('brief', 'error') // non-fatal — build falls back to raw systems
+      }
+
       mark('images', 'active')
       const imagesPromise = callRoute('/api/generate-images', { analysis })
         .then(({ images }) => {
@@ -499,6 +517,7 @@ export default function Studio() {
           ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
         ],
         styleMds: chosenStyles.map(s => s.content),
+        brief: designBrief,
       })
       setHtmlTemplate(html)
       setBuilt(true)
@@ -510,7 +529,7 @@ export default function Studio() {
       mark('elevate', 'active')
       let pass2Applied = false
       try {
-        const res = await callRoute('/api/enhance-site', { html, analysis, vibe: vibeText })
+        const res = await callRoute('/api/enhance-site', { html, analysis, vibe: vibeText, brief: designBrief })
         if (res.html) {
           setHtmlTemplate(res.html)
           pass2Applied = !!res.pass2
@@ -521,7 +540,7 @@ export default function Studio() {
       }
 
       // Build report — everything the generator thought and used, copyable.
-      setBuildReport(composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied))
+      setBuildReport(composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief))
 
       await imagesPromise
     } catch (e) {

@@ -159,7 +159,7 @@ export async function POST(request) {
     for (const p of pages) {
       const path = (() => { try { return new URL(p.url).pathname || '/' } catch (_) { return p.url } })()
       content += `\n\n===== PAGE: ${path} =====\n${p.markdown}`
-      if (content.length > 24000) { content = content.slice(0, 24000); break }
+      if (content.length > 40000) { content = content.slice(0, 40000); break }
     }
 
     // 5. Images from the home page HTML plus every crawled page's markdown

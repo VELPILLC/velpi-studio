@@ -65,7 +65,13 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 - ONE self-contained file: ALL CSS in a single <style> tag. Google Fonts loaded via @import at the TOP of that <style> tag (never a <link> tag) — @import survives when the code is pasted into a GoHighLevel custom-code element.
 - SCOPING: wrap ALL body content in <div class="velpi-page"> ... </div> and prefix EVERY CSS selector with .velpi-page (e.g. ".velpi-page .hero", ".velpi-page h2"). This prevents style collisions when pasted into a GoHighLevel page. Set base font-size/color/background on .velpi-page itself, not on body/html.
 - No JavaScript. No external scripts, CDNs, or frameworks. No position:fixed. Sticky nav is allowed via position:sticky inside .velpi-page.
-- Fully responsive with @media queries: clean at 1440px, 1024px, and 390px.
+- MOBILE-FIRST OUTPUT CONTRACT (the page is judged on a phone first):
+  * Write base CSS for ~390px screens, then enhance upward with @media (min-width: 768px) and (min-width: 1200px) — never the reverse.
+  * EDGE-TO-EDGE on mobile: sections, hero, images, and color bands run the full viewport width with NO page gutter. Text inside gets a minimal inset (12-16px max). No boxed-in cards floating in wide margins — content spreads to the edges so text lines run wide and nothing feels cramped inside a box.
+  * Minimal padding/margins throughout mobile: tight, intentional spacing (sections ~40-56px vertical), no decorative dead space. Desktop may open up generously.
+  * Fluid type with clamp() everywhere (e.g. hero clamp(2.4rem, 9vw, 7rem)) so headlines fill the phone width edge to edge without overflowing.
+  * CTAs and cards go FULL-WIDTH on mobile (100% width, generous tap height ≥ 52px); grids collapse to single column with zero horizontal gutter.
+  * Absolutely no horizontal scroll at 390px — test every oversized/overlapping element with max-width: 100% and overflow-x guards.
 - LEGIBILITY: any text over a photo sits on a dark scrim. Headlines constrained and wrapping — never overflowing.
 - IMAGE PLACEHOLDERS — CRITICAL: for every image use the EXACT placeholder token as the src, e.g. <img src="%%IMG:img_1%%"> or a CSS background-image url('%%IMG:img_1%%'). Use each provided slot id exactly once or more. NEVER invent an image URL, never use data URIs, never leave a src empty. The logo slot (if provided) goes in the nav; if there is no logo slot, render the business name as a clean text wordmark.
 - CONTENT: use only the copy and facts provided. Do NOT invent hours, addresses, phone numbers, emails, reviews, awards, or claims. Omit what you don't have.`
@@ -73,7 +79,7 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { analysis, copy, slots } = body
+    const { analysis, copy, slots, brief } = body
     // Accept one style (styleMd) or several (styleMds) — several = smart mix & match.
     const styleMds = Array.isArray(body.styleMds) && body.styleMds.length
       ? body.styleMds.filter(Boolean)
@@ -121,7 +127,7 @@ CONVERSION STRATEGY (the page's brain — execute exactly):
 ${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}
 
 ${analysis.brand ? `BRAND ANALYSIS (elevate THIS brand — do not invent a new one):\n${JSON.stringify(analysis.brand, null, 2)}\n` : ''}
-${styleMds.length === 1 ? `DESIGN SYSTEM TO FOLLOW PRECISELY:\n${styleMds[0]}\n` : ''}${styleMds.length > 1 ? `DESIGN SYSTEMS TO MIX & MATCH (${styleMds.length}) — you are a smart design agent: take the strongest ideas from each (a hero treatment from one, a menu/list pattern from another, typography pairing from a third), fuse them into ONE cohesive direction perfectly niched to THIS business, and map every color decision onto the brand theme colors above. Never produce a franken-page — the blend must feel like a single intentional system.\n\n${styleMds.map((s, i) => `--- SYSTEM ${i + 1} ---\n${s}`).join('\n\n')}\n` : ''}
+${brief ? `DESIGN BRIEF — THE COMMITTED CREATIVE DIRECTION (a creative director already fused the brand, vibe, and reference systems into this; execute it EXACTLY — palette map, type system, hero concept, section treatments, signature details, mobile behavior):\n${brief}\n\n` : ''}${styleMds.length === 1 ? `${brief ? 'REFERENCE DESIGN SYSTEM (already fused into the brief — consult only where the brief is silent):' : 'DESIGN SYSTEM TO FOLLOW PRECISELY:'}\n${styleMds[0]}\n` : ''}${styleMds.length > 1 ? `${brief ? `REFERENCE DESIGN SYSTEMS (${styleMds.length}) — already fused into the brief above; consult only where the brief is silent.` : `DESIGN SYSTEMS TO MIX & MATCH (${styleMds.length}) — you are a smart design agent: take the strongest ideas from each (a hero treatment from one, a menu/list pattern from another, typography pairing from a third), fuse them into ONE cohesive direction perfectly niched to THIS business, and map every color decision onto the brand theme colors above. Never produce a franken-page — the blend must feel like a single intentional system.`}\n\n${styleMds.map((s, i) => `--- SYSTEM ${i + 1} ---\n${s}`).join('\n\n')}\n` : ''}
 COPY (JSON — use exactly, never invent):
 ${JSON.stringify(copy.sections, null, 2)}
 

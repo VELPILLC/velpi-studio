@@ -123,9 +123,9 @@ IMAGES FOUND ON SITE (${(scrapedData.images || []).length}) — url plus alt tex
 ${(scrapedData.images || []).slice(0, 30).map((im, i) => typeof im === 'string' ? `${i + 1}. ${im}` : `${i + 1}. ${im.url}${im.alt ? ` — alt: "${im.alt}"` : ''}`).join('\n') || '(none)'}
 
 FULL CRAWLED CONTENT:
-${(scrapedData.content || '').slice(0, 20000)}`
+${(scrapedData.content || '').slice(0, 36000)}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 3500 })
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 8000 })
     const analysis = parseJson(raw)
     if (!analysis || !analysis.business_name) {
       return Response.json({ error: 'Could not analyze the website content. Try a different site.' }, { status: 502 })

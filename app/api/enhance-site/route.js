@@ -23,12 +23,13 @@ HARD CONSTRAINTS (violating any of these fails the review):
 - Preserve EVERY piece of real content: business name, copy, services, prices, hours, addresses, phones, emails, reviews. Nothing invented, nothing dropped.
 - Preserve EVERY image placeholder token %%IMG:...%% exactly as written — same tokens, you may reposition/resize/crop their containers but never rename, add, or remove tokens.
 - Keep the brand color palette exactly — no new hues, only tints/shades of the existing palette plus white and one near-black.
-- Keep the GoHighLevel constraints: ALL body content inside <div class="velpi-page">, every CSS selector prefixed .velpi-page, all CSS in ONE <style> tag, Google Fonts via @import at the top of that style tag, NO JavaScript, no position:fixed (sticky is fine), fully responsive at 1440/1024/390.
+- Keep the GoHighLevel constraints: ALL body content inside <div class="velpi-page">, every CSS selector prefixed .velpi-page, all CSS in ONE <style> tag, Google Fonts via @import at the top of that style tag, NO JavaScript, no position:fixed (sticky is fine).
+- Keep the MOBILE-FIRST contract: base CSS targets ~390px with EDGE-TO-EDGE sections (no page gutters on mobile, 12-16px text insets max, minimal padding, full-width CTAs, clamp() fluid type, zero horizontal scroll), enhanced upward via min-width media queries.
 - Return ONLY the complete rebuilt HTML document starting with <!DOCTYPE html>. No markdown, no commentary.`
 
 export async function POST(request) {
   try {
-    const { html, analysis, vibe } = await request.json()
+    const { html, analysis, vibe, brief } = await request.json()
     if (!html) {
       return Response.json({ error: 'Missing HTML to elevate.' }, { status: 400 })
     }
@@ -39,6 +40,7 @@ BRAND PALETTE (locked): ${palette.join(', ') || '(use the draft’s existing pal
 DESIGN DIRECTION: ${analysis?.design_direction || ''}
 3-SECOND FEELING: ${analysis?.target_feeling || ''}
 ${vibe ? `CREATOR'S VIBE SELECTIONS (honor these): ${vibe}` : ''}
+${brief ? `DESIGN BRIEF (the committed creative direction — every elevation must deepen this exact direction, never drift from it):\n${brief}\n` : ''}
 ${analysis?.conversion_strategy ? `CONVERSION STRATEGY (the page's brain — every elevation must serve it, and no strategic element may be weakened or dropped):\n${JSON.stringify(analysis.conversion_strategy, null, 2)}` : ''}
 
 FIRST DRAFT TO ELEVATE:

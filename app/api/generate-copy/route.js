@@ -58,7 +58,7 @@ Execution rules for the strategy:
 
 Base everything on what is true for this business. Do not invent facts.`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 3000 })
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 8000 })
     const copy = parseJson(raw)
     if (!copy || !copy.sections) {
       return Response.json({ error: 'Could not generate copy for this business.' }, { status: 502 })
