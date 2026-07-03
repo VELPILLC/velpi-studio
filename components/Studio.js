@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { pickCreativeMix } from '../lib/designStyles'
+import LightningBackground from './LightningBackground'
 
 // Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
 // answers steer style mixing + the build direction so every site is themed to
@@ -13,9 +14,10 @@ const VIBE_QUESTIONS = [
 ]
 
 const BLUE = '#2990fa'
-const BG = '#060d1f'
-const PANEL = '#0a1628'
-const BORDER = '#152840'
+// Translucent surfaces let the ambient lightning glow through the UI.
+const BG = 'rgba(6, 13, 31, 0.72)'
+const PANEL = 'rgba(10, 22, 40, 0.82)'
+const BORDER = 'rgba(41, 144, 250, 0.16)'
 const GREEN = '#39d98a'
 
 const STEP_DEFS = [
@@ -675,15 +677,28 @@ export default function Studio() {
   const facts = analysisData?.facts || {}
 
   return (
-    <div style={{ minHeight: '100vh', background: BG, color: '#fff', padding: '28px 14px 90px' }}>
-      <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+    <div style={{ minHeight: '100vh', color: '#fff', position: 'relative' }}>
+      <LightningBackground />
 
-        {/* ── Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 0 }}>
-          <VelpiLogo size={30} />
-          <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.7rem', letterSpacing: '0.12em' }}>VELPI STUDIO</span>
+      {/* ── App bar ── */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 5,
+        background: 'rgba(4, 9, 22, 0.72)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+        borderBottom: `1px solid ${BORDER}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <VelpiLogo size={26} />
+          <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.25rem', letterSpacing: '0.14em' }}>VELPI STUDIO</span>
         </div>
-        <div style={{ ...label, color: 'rgba(255,255,255,0.4)', marginTop: -8, marginBottom: 8 }}>Website Mockup Generator</div>
+        <span style={{ ...{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase' }, color: generating ? BLUE : 'rgba(255,255,255,0.4)' }}>
+          {generating ? '⚡ Generating' : 'Website Mockup Generator'}
+        </span>
+      </header>
+
+      <div style={{ position: 'relative', zIndex: 1, padding: '26px 12px 90px' }}>
+      <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
 
         {/* ── STEP 1 — URL ── */}
         <div style={card}>
@@ -1106,6 +1121,7 @@ export default function Studio() {
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

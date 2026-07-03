@@ -89,13 +89,16 @@ export async function POST(request) {
           if (item.action === 'enhance' && item.url) {
             if (attempt === 1) aiOps++
             const file = await fetchAsFile(item.url, toFile)
-            const res = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, n: 1, size: '1024x1024' })
+            const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
+            const res = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, n: 1, size: isHero ? '1536x1024' : '1024x1024', quality: isHero ? 'high' : 'medium' })
             const b64 = res.data?.[0]?.b64_json
             assets.push({ ...base, kind: 'enhanced', src: b64 ? `data:image/png;base64,${b64}` : item.url })
             done = true
           } else {
             if (attempt === 1) aiOps++
-            const res = await openai.images.generate({ model: 'gpt-image-1', prompt, n: 1, size: '1024x1024', quality: 'medium' })
+            const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
+            // Heroes render full-bleed — landscape + high quality; support images stay square/medium.
+            const res = await openai.images.generate({ model: 'gpt-image-1', prompt, n: 1, size: isHero ? '1536x1024' : '1024x1024', quality: isHero ? 'high' : 'medium' })
             const b64 = res.data?.[0]?.b64_json
             if (b64) { assets.push({ ...base, kind: 'generated', src: `data:image/png;base64,${b64}` }); done = true }
             else if (attempt === 2 && item.url) { assets.push({ ...base, kind: 'photo', src: item.url }); done = true }

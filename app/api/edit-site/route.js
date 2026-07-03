@@ -26,7 +26,7 @@ CURRENT HTML:
 ${html}`
 
     // Must be able to return the FULL updated document, which can be large.
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 32000 })
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 64000 })
     const updated = stripFences(raw)
     if (!/<html|<!doctype/i.test(updated)) {
       return Response.json({ error: 'The edit could not be applied. Try rephrasing the change.' }, { status: 502 })
