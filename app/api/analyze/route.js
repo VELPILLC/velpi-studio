@@ -86,13 +86,13 @@ Rules:
 
 export async function POST(request) {
   try {
-    const { scrapedData } = await request.json()
+    const { scrapedData, vibe } = await request.json()
     if (!scrapedData) {
       return Response.json({ error: 'Missing scraped data to analyze.' }, { status: 400 })
     }
 
     const user = `Analyze this crawled website (${scrapedData.pagesCrawled || 1} page(s)) and return the JSON analysis.
-
+${vibe ? `\nCREATOR'S VIBE SELECTIONS (multiple-choice answers from the person commissioning this site — fold these directly into design_direction, target_feeling, and tone; they outrank your own instincts): ${vibe}\n` : ''}
 TITLE: ${scrapedData.title || '(none)'}
 DESCRIPTION: ${scrapedData.description || '(none)'}
 DOMAIN: ${scrapedData.domain || '(none)'}

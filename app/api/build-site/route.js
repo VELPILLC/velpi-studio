@@ -28,6 +28,16 @@ VISUAL QUALITY:
 
 NEVER DO THESE (they read as cheap): dark navy as the primary page background; amber/orange accents on hospitality unless it is the brand color; generic equal-padding card grids; centered hero text with no atmospheric overlay; Bootstrap-looking review sections; dark-box footers with dumped links; uniform heading sizes; borders dividing every section.
 
+CREATIVITY MANDATE — NEVER THE SAME SITE TWICE:
+You are a creative director, not a template engine. The creator's vibe selections + the brand's real identity drive every composition choice. Two businesses in the same industry with different vibes must get visibly different sites — different hero construction, different section rhythms, different typographic attitude. Surprise tastefully: an unexpected hero crop, an oversized numeral, an editorial pull-quote, an asymmetric split — always appropriate to the niche, never generic. Sophistication and luxury when the vibe calls for it, but NEVER at the cost of conversion.
+
+CONVERSION ARCHITECTURE — THIS SITE MUST SELL, NOT JUST LOOK GOOD:
+- The primary action (from the creator's "what should visitors do" selection) is reachable at every scroll position: CTA in the sticky nav + hero CTA above the fold + a full conversion band at the end.
+- Every phone number rendered is a tap-to-call link (<a href="tel:...">). Every email is a mailto link.
+- Social proof sits adjacent to conversion points — a review beside the booking CTA converts harder than a review in a quarantined section.
+- One clear offer/value moment mid-page (what they get, why now).
+- The brand identity work (vibe, luxury, editorial flair) exists to make the CTA feel inevitable — hierarchy always lands the eye on the next action.
+
 DENSITY & CRAFT — THIS IS A PREMIUM DELIVERABLE, NOT A SKELETON:
 - Minimum 8 distinct, fully-realized sections. A thin page is a failed page.
 - The CSS must be extensive and polished — sticky nav with scroll-solid background, a layered hero (image + scrim + typographic composition), asymmetric grids, alternating section rhythms, hover states on every interactive element, and complete responsive breakpoints. Aim for 500+ lines of CSS.
@@ -89,7 +99,9 @@ Socials/platforms: ${Array.isArray(facts.socials) && facts.socials.length ? fact
 Services/menu: ${Array.isArray(facts.services) && facts.services.length ? facts.services.join(' | ') : '(none)'}
 Real reviews: ${Array.isArray(facts.reviews) && facts.reviews.length ? facts.reviews.map(r => `"${r}"`).join(' | ') : '(none — omit the reviews section quotes)'}`
 
+    const vibe = typeof body.vibe === 'string' ? body.vibe.trim() : ''
     const user = `Build ONE complete, high-end HTML mockup for this business. Commit fully to the right direction for its industry.
+${vibe ? `\nCREATOR'S VIBE SELECTIONS — these outrank everything except the brand's real identity; theme the entire site around them and architect conversion around the chosen visitor action:\n${vibe}\n` : ''}
 
 BUSINESS: ${analysis.business_name}
 INDUSTRY: ${analysis.industry} ${analysis.niche ? `(${analysis.niche})` : ''}

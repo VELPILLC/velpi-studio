@@ -1,6 +1,16 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { matchTopStyles } from '../lib/designStyles'
+import { pickCreativeMix } from '../lib/designStyles'
+
+// Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
+// answers steer style mixing + the build direction so every site is themed to
+// the brand's vibe instead of one default format per industry.
+const VIBE_QUESTIONS = [
+  { id: 'vibe', q: 'What vibe should it give off?', options: ['Luxurious & refined', 'Bold & high-energy', 'Warm & welcoming', 'Minimal & modern', 'Editorial & artistic', 'Classic & trusted'] },
+  { id: 'feel', q: 'First impression in 3 seconds?', options: ['Premium — worth paying more', 'Instantly trustworthy', 'Exciting & alive', 'Calm & serene', 'Established authority', 'Friendly & local'] },
+  { id: 'layout', q: 'Visual personality?', options: ['Dramatic full-screen imagery', 'Clean structured grid', 'Asymmetric & editorial', 'Airy whitespace', 'Dark & moody', 'Rich & layered'] },
+  { id: 'convert', q: 'What should visitors do?', options: ['Call now', 'Book / schedule', 'Request a quote', 'Browse menu / products', 'Visit in person', 'Trust first, then contact'] },
+]
 
 const BLUE = '#2990fa'
 const BG = '#060d1f'
@@ -122,6 +132,7 @@ export default function Studio() {
   const [input, setInput] = useState('')
   const [logo, setLogo] = useState(null)            // { data, preview, name } original upload
   const [logoNotes, setLogoNotes] = useState('')
+  const [vibe, setVibe] = useState({})              // question id -> up to 2 selected options
   const [refinedLogo, setRefinedLogo] = useState(null) // data uri after refinement
   const logoInputRef = useRef(null)
 
@@ -169,6 +180,25 @@ export default function Studio() {
 
   const readyToGenerate = !!input.trim() && !!logo
   const missing = [!input.trim() && 'website URL', !logo && 'logo'].filter(Boolean)
+  const vibeCount = Object.values(vibe).reduce((a, arr) => a + (arr?.length || 0), 0)
+
+  function toggleVibe(qid, opt) {
+    setVibe(prev => {
+      const cur = prev[qid] || []
+      if (cur.includes(opt)) return { ...prev, [qid]: cur.filter(o => o !== opt) }
+      if (cur.length >= 2) return { ...prev, [qid]: [cur[1], opt] } // keep newest two
+      return { ...prev, [qid]: [...cur, opt] }
+    })
+  }
+
+  function vibeSummary() {
+    const parts = []
+    for (const q of VIBE_QUESTIONS) {
+      const sel = vibe[q.id] || []
+      if (sel.length) parts.push(`${q.q} ${sel.join(' + ')}`)
+    }
+    return parts.join(' | ')
+  }
 
   // ── HTML rendering ──
   function previewHtml() {
@@ -301,7 +331,8 @@ export default function Studio() {
       mark('crawl', 'complete')
 
       mark('analyze', 'active')
-      const { analysis } = await callRoute('/api/analyze', { scrapedData })
+      const vibeText = vibeSummary()
+      const { analysis } = await callRoute('/api/analyze', { scrapedData, vibe: vibeText })
       setBizName(analysis.business_name || '')
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
@@ -317,7 +348,14 @@ export default function Studio() {
       const manual = styles.find(s => s.id === styleId)
       if (manual) chosenStyles = [manual]
       else if (styleId === 'auto') {
-        chosenStyles = matchTopStyles(styles, `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`, 3)
+        // Creative mix: niche anchor + vibe carrier + wildcard — vibe answers
+        // change the blend, so the same industry doesn't always look the same.
+        chosenStyles = pickCreativeMix(
+          styles,
+          `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`,
+          `${vibeText} ${analysis.tone || ''} ${analysis.brand?.brand_personality || ''} ${analysis.brand?.design_language || ''}`,
+          3,
+        )
       }
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
@@ -346,6 +384,7 @@ export default function Studio() {
       mark('build', 'active')
       const { html } = await callRoute('/api/build-site', {
         analysis, copy,
+        vibe: vibeText,
         slots: [
           { id: 'logo', name: 'Logo', section: 'header' },
           ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
@@ -563,6 +602,44 @@ export default function Studio() {
               style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '11px 14px', fontSize: '0.85rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 10 }}
             />
           )}
+        </div>
+
+        {/* ── STEP 3 — Vibe (multiple choice, up to 2 per question) ── */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span style={stepBadge(vibeCount > 0)}>{vibeCount > 0 ? '✓' : '3'}</span>
+            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Set the vibe</span>
+            <span style={{ ...label, fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>tap up to 2 each</span>
+          </div>
+          <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 12 }}>
+            These steer the design — the blend of styles, mood, and what the site pushes visitors to do.
+          </div>
+          {VIBE_QUESTIONS.map(q => (
+            <div key={q.id} style={{ marginBottom: 12 }}>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.82rem', fontWeight: 600, color: '#fff', marginBottom: 7 }}>{q.q}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {q.options.map(opt => {
+                  const on = (vibe[q.id] || []).includes(opt)
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => !generating && toggleVibe(q.id, opt)}
+                      style={{
+                        background: on ? 'rgba(41,144,250,0.16)' : BG,
+                        border: `1px solid ${on ? BLUE : BORDER}`,
+                        color: on ? '#fff' : 'rgba(255,255,255,0.7)',
+                        borderRadius: 999, padding: '7px 13px',
+                        fontFamily: 'var(--font-inter)', fontSize: '0.76rem',
+                        cursor: generating ? 'default' : 'pointer',
+                      }}
+                    >
+                      {on ? '✓ ' : ''}{opt}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* ── Design style (collapsed) ── */}
