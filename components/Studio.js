@@ -362,6 +362,13 @@ export default function Studio() {
   const [reportOpen, setReportOpen] = useState(false)
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
+
+  // ── Project library ──
+  const [projects, setProjects] = useState([])
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [savingProject, setSavingProject] = useState(false)
+  const [savedMsg, setSavedMsg] = useState(null)
+  const [loadingProjectId, setLoadingProjectId] = useState(null)
   const [regenIds, setRegenIds] = useState({})
 
   // ── Styles library ──
@@ -388,7 +395,69 @@ export default function Studio() {
 
   useEffect(() => {
     fetch('/api/styles').then(r => r.json()).then(d => setStyles(d.styles || [])).catch(() => {})
+    fetch('/api/projects').then(r => r.json()).then(d => setProjects(d.projects || [])).catch(() => {})
   }, [])
+
+  // ── Project library: save / load / delete ──
+  async function saveProjectToLibrary() {
+    if (!htmlTemplate || savingProject) return
+    setSavingProject(true)
+    setError(null)
+    try {
+      const name = `${bizName || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      const data = {
+        bizName, analysisData, slots, assetsById, ghlUrls, htmlTemplate, buildReport,
+        vibe, refinedLogo, logoUrl, input,
+        savedAt: new Date().toISOString(),
+      }
+      const { project } = await callRoute('/api/projects', { name, data })
+      setProjects(prev => [project, ...prev])
+      setSavedMsg(`Saved "${project.name}" to the library`)
+      setTimeout(() => setSavedMsg(null), 3000)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
+  async function loadProject(id) {
+    if (generating || loadingProjectId) return
+    setLoadingProjectId(id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(id)}`)
+      const json = await res.json()
+      if (json.error || !json.project?.data) throw new Error(json.error || 'Project data missing.')
+      const d = json.project.data
+      setBizName(d.bizName || '')
+      setAnalysisData(d.analysisData || null)
+      setSlots(d.slots || [])
+      setAssetsById(d.assetsById || {})
+      setGhlUrls(d.ghlUrls || {})
+      setHtmlTemplate(d.htmlTemplate || null)
+      setBuildReport(d.buildReport || '')
+      setVibe(d.vibe || {})
+      setRefinedLogo(d.refinedLogo || null)
+      setLogoUrl(d.logoUrl || null)
+      setInput(d.input || '')
+      setBuilt(!!d.htmlTemplate)
+      setImagesReady(true)
+      setSteps(STEP_DEFS.map(s => ({ ...s, status: 'complete' })))
+      setLibraryOpen(false)
+    } catch (e) {
+      setError(`Could not load that project: ${e.message}`)
+    } finally {
+      setLoadingProjectId(null)
+    }
+  }
+
+  async function removeProject(id) {
+    try {
+      await fetch('/api/projects', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      setProjects(prev => prev.filter(p => p.id !== id))
+    } catch (_) {}
+  }
 
   // The logo is auto-detected from the website and refined automatically —
   // uploading one is now just an optional override.
@@ -1002,6 +1071,41 @@ export default function Studio() {
           )}
         </div>
 
+        {/* ── Library (saved builds — load & keep refining) ── */}
+        {projects.length > 0 && (
+          <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+            <button
+              onClick={() => setLibraryOpen(v => !v)}
+              style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+            >
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
+                📁 Library <span style={{ color: 'rgba(255,255,255,0.4)' }}>({projects.length} saved)</span>
+              </span>
+              <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{libraryOpen ? '▲' : '▼'}</span>
+            </button>
+            {libraryOpen && (
+              <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {projects.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.82rem', color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem', color: 'rgba(255,255,255,0.4)' }}>
+                        {p.created_at ? new Date(p.created_at).toLocaleString() : ''}
+                      </div>
+                    </div>
+                    <button onClick={() => loadProject(p.id)} disabled={!!loadingProjectId} style={{ ...monoBtn, padding: '6px 14px', fontSize: '0.62rem', opacity: loadingProjectId ? 0.5 : 1 }}>
+                      {loadingProjectId === p.id ? 'Loading…' : 'Load'}
+                    </button>
+                    <button onClick={() => removeProject(p.id)} style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '6px 10px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem' }}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── GENERATE ── */}
         <button
           onClick={runGeneration}
@@ -1290,6 +1394,26 @@ export default function Studio() {
               )}
             </div>
           )}
+          {/* ── 5. SAVE TO LIBRARY ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              onClick={saveProjectToLibrary}
+              disabled={savingProject || !htmlTemplate}
+              style={{
+                width: '100%', background: savingProject ? 'rgba(41,144,250,0.25)' : BLUE, border: 'none',
+                borderRadius: 12, color: '#fff', padding: '15px 0',
+                fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+                cursor: savingProject ? 'wait' : 'pointer',
+              }}
+            >
+              {savingProject ? 'Saving…' : '💾 Save to Library'}
+            </button>
+            {savedMsg && (
+              <div style={{ textAlign: 'center', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', color: GREEN, letterSpacing: '0.04em' }}>
+                ✓ {savedMsg} — reload it anytime from the Library at the top
+              </div>
+            )}
+          </div>
         </div>
       )}
       </div>

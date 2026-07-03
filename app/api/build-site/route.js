@@ -73,7 +73,7 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
   * CTAs and cards go FULL-WIDTH on mobile (100% width, generous tap height ≥ 52px); grids collapse to single column with zero horizontal gutter.
   * Absolutely no horizontal scroll at 390px — test every oversized/overlapping element with max-width: 100% and overflow-x guards.
 - LEGIBILITY: any text over a photo sits on a dark scrim. Headlines constrained and wrapping — never overflowing.
-- IMAGE PLACEHOLDERS — CRITICAL: for every image use the EXACT placeholder token as the src, e.g. <img src="%%IMG:img_1%%"> or a CSS background-image url('%%IMG:img_1%%'). Use each provided slot id exactly once or more. NEVER invent an image URL, never use data URIs, never leave a src empty. The logo slot (if provided) goes in the nav; if there is no logo slot, render the business name as a clean text wordmark.
+- IMAGE PLACEHOLDERS — CRITICAL: for every image use the EXACT placeholder token as the src, e.g. <img src="%%IMG:img_1%%"> or a CSS background-image url('%%IMG:img_1%%'). Use each provided slot id exactly once or more. NEVER invent an image URL, never use data URIs, never leave a src empty. The logo slot (if provided) goes in the nav AND MUST RENDER PROMINENTLY: give the logo img an explicit height of 52-64px on desktop (44-52px on mobile) with width:auto and object-fit:contain so it fills the nav bar's height to the maximum — never a tiny 20-30px speck. Repeat the logo larger (80-120px) in the footer brand column. If there is no logo slot, render the business name as a clean text wordmark.
 - CONTENT: use only the copy and facts provided. Do NOT invent hours, addresses, phone numbers, emails, reviews, awards, or claims. Omit what you don't have.`
 
 export async function POST(request) {

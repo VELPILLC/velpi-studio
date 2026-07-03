@@ -28,14 +28,24 @@ export async function POST(request) {
     const mod = await import('openai')
     const openai = new mod.default({ apiKey: process.env.OPENAI_API_KEY })
 
-    // Resolve the source image into an editable file.
-    let file = null
+    // Resolve the source image into an editable file. Keep the raw bytes so a
+    // retry can rebuild a fresh file handle.
+    let srcBuf = null
+    let srcType = 'image/png'
+    let srcName = 'logo.png'
     if (b64) {
-      file = await mod.toFile(Buffer.from(b64, 'base64'), 'logo.png', { type: 'image/png' })
+      srcBuf = Buffer.from(b64, 'base64')
     } else {
       let fetched
       try {
-        fetched = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (VelpiStudio logo fetch)' } })
+        const origin = (() => { try { return new URL(url).origin } catch (_) { return undefined } })()
+        fetched = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+            Accept: 'image/*,*/*;q=0.8',
+            ...(origin ? { Referer: origin } : {}),
+          },
+        })
       } catch (e) {
         return Response.json({ b64: null, src: url, refined: false })
       }
@@ -47,19 +57,22 @@ export async function POST(request) {
       if (!EDITABLE_TYPES.includes(type) && !/\.(png|jpe?g|webp)(\?|$)/i.test(url)) {
         return Response.json({ b64: null, src: url, refined: false })
       }
-      const ext = type.includes('webp') ? 'webp' : type.includes('jpe') ? 'jpg' : 'png'
-      file = await mod.toFile(buf, `logo.${ext}`, { type: EDITABLE_TYPES.includes(type) ? type : 'image/png' })
+      srcBuf = buf
+      srcType = EDITABLE_TYPES.includes(type) ? type : 'image/png'
+      srcName = `logo.${type.includes('webp') ? 'webp' : type.includes('jpe') ? 'jpg' : 'png'}`
     }
+    const mkFile = () => mod.toFile(srcBuf, srcName, { type: srcType })
+    const file = await mkFile()
 
-    const prompt = `Recreate this exact brand logo as a flawless, production-ready icon asset.
+    const prompt = `Recreate this exact brand logo as a flawless, production-ready brand asset.
 CRITICAL — this is a refinement, NOT a redesign. Preserve with total fidelity:
-- the exact mark: identical shapes, letterforms inside the icon, colors, and proportions
-- the complete visual identity — it must read as the SAME logo, just perfect
-ISOLATE THE ICON: if the source contains a wordmark or company-name text AROUND or BESIDE the icon, output ONLY the icon mark itself — no surrounding text. (Text that is an integral part of the mark itself, like a monogram letter, stays.)
-COMPOSITION: 1:1 square canvas. The mark fills the frame edge-to-edge as large as possible with only a minimal safe margin, perfectly centered. Fully TRANSPARENT background.
-QUALITY: premium 4K-grade cleanliness — razor-sharp edges, no compression artifacts, no noise, no shadows, no background remnants, colors pure and flat where they should be flat.
+- the COMPLETE logo lockup exactly as it appears in the source: the icon/mark AND any lettermark or initials that belong to it (e.g. a monogram or short letters beside the mark). Identical shapes, letterforms, colors, gradients, and proportions.
+- it must read as the SAME logo, just perfect.
+Only omit long taglines or full sentences that are clearly separate from the logo itself.
+COMPOSITION — THIS MATTERS: 1:1 square canvas. Scale the logo UP so it fills the frame to the absolute maximum — at least 92% of the canvas width or height — perfectly centered, with only a sliver of safe margin. Never output a small logo floating in empty space. Fully TRANSPARENT background.
+QUALITY: premium 4K-grade cleanliness — razor-sharp edges, no compression artifacts, no noise, no drop shadows unless they are part of the mark, no background remnants; metallic/gradient finishes preserved faithfully.
 ${instructions && instructions.trim() ? `USER REFINEMENT REQUESTS (apply these, still without redesigning): ${instructions.trim()}` : ''}
-Output: the same icon, pristine, huge in frame, on transparency.`
+Output: the same complete logo, pristine, HUGE in frame, on transparency.`
 
     let res
     try {
@@ -83,7 +96,14 @@ Output: the same icon, pristine, huge in frame, on transparency.`
       })
     }
 
-    const out = res.data?.[0]?.b64_json
+    let out = res.data?.[0]?.b64_json
+    if (!out) {
+      // One clean retry with a fresh file handle before giving up.
+      try {
+        const res2 = await openai.images.edit({ model: 'gpt-image-1', image: await mkFile(), prompt, n: 1, size: '1024x1024', quality: 'high' })
+        out = res2.data?.[0]?.b64_json
+      } catch (_) {}
+    }
     if (!out) {
       return Response.json({ b64: null, src: url || null, refined: false })
     }

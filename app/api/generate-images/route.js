@@ -78,7 +78,12 @@ export async function POST(request) {
         continue
       }
 
-      const prompt = item.prompt || `Subject: ${item.what || 'brand image'} for a ${analysis.industry || 'business'} website. Keep the same: the overall subject and intent. Change: make it a clean, modern, photorealistic, well-lit image. No text, no logos, no watermarks.`
+      // Professional retouch contract for real photos pulled from the site:
+      // authentic first — same people, same place, same composition — elevated
+      // to look professionally shot.
+      const PRO_TOUCHUP = ' Professional retouch directives: stay authentic and true to the original — same people, same place, same composition, recognizably the same photo. If people are present: cinematic, flattering professional lighting and color grade. If buildings/architecture are present: straighten and align verticals and horizontals so it looks like a professional architectural photograph. Subtly clean and even out distracting background elements. Crisp, high-end result. No added text, no logos, no watermarks.'
+      let prompt = item.prompt || `Subject: ${item.what || 'brand image'} for a ${analysis.industry || 'business'} website. Keep the same: the overall subject and intent. Change: make it a clean, modern, photorealistic, well-lit image. No text, no logos, no watermarks.`
+      if (item.action === 'enhance') prompt += PRO_TOUCHUP
       base.prompt = prompt
 
       // Up to 2 attempts per image — transient API failures were leaving

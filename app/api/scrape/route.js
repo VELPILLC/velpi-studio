@@ -45,11 +45,24 @@ function extractImages(html, baseUrl) {
   return out
 }
 
-// ICON-FIRST logo detection: the brand's square icon mark (apple-touch-icon,
-// sized favicon) beats a full logo <img> that usually carries wordmark text.
-// The refine step isolates + upscales whatever we hand it, so bigger is better.
+// Logo detection, best-source-first: the real logo <img> file (the actual
+// high-resolution brand asset — what the refiner needs to produce a premium
+// mark) beats icons; apple-touch-icon and sized favicons are fallbacks.
 function extractLogo(html, baseUrl, metadata) {
-  // 1. apple-touch-icon — square, icon-only, usually 180x180+
+  // 1. the site's real logo file — an <img> whose src/alt/class says "logo".
+  //    Prefer PNG/SVG/WebP sources (crisp brand files) over jpg banners.
+  const imgBlocks = [...html.matchAll(/<img[^>]+>/gi)].map(m => m[0])
+    .filter(b => /(?:src|alt|class|id)=["'][^"']*logo[^"']*["']/i.test(b))
+  const imgSrcs = imgBlocks
+    .map(b => (b.match(/(?:data-src|src)=["']([^"']+)["']/i) || [])[1])
+    .filter(Boolean)
+    .filter(s => !s.startsWith('data:'))
+  const crisp = imgSrcs.find(s => /\.(png|svg|webp)(\?|$)/i.test(s)) || imgSrcs[0]
+  if (crisp) {
+    const abs = absolutize(crisp, baseUrl)
+    if (abs) return abs
+  }
+  // 2. apple-touch-icon — square, icon-only, usually 180x180+
   const touch = [...html.matchAll(/<link[^>]+rel=["'][^"']*apple-touch-icon[^"']*["'][^>]*>/gi)]
     .map(m => (m[0].match(/href=["']([^"']+)["']/i) || [])[1])
     .filter(Boolean)
@@ -57,7 +70,7 @@ function extractLogo(html, baseUrl, metadata) {
     const abs = absolutize(touch[touch.length - 1], baseUrl)
     if (abs) return abs
   }
-  // 2. <link rel="icon"> — pick the largest declared size, skip tiny .ico
+  // 3. <link rel="icon"> — largest declared size, prefer non-.ico
   const icons = [...html.matchAll(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]*>/gi)]
     .map(m => {
       const href = (m[0].match(/href=["']([^"']+)["']/i) || [])[1]
@@ -65,22 +78,7 @@ function extractLogo(html, baseUrl, metadata) {
       return href ? { href, size: Number(sizes) || 0 } : null
     })
     .filter(Boolean)
-    .filter(i => !/\.ico(\?|$)/i.test(i.href))
-    .sort((a, b) => b.size - a.size)
-  if (icons.length && (icons[0].size >= 96 || icons.length === 1)) {
-    const abs = absolutize(icons[0].href, baseUrl)
-    if (abs) return abs
-  }
-  // 3. fallback — a logo <img> (may include wordmark; the refiner isolates the icon)
-  const block = html.match(/<img[^>]+(?:src|alt|class)=["'][^"']*logo[^"']*["'][^>]*>/i)
-  if (block) {
-    const srcMatch = block[0].match(/src=["']([^"']+)["']/i)
-    if (srcMatch) {
-      const abs = absolutize(srcMatch[1], baseUrl)
-      if (abs) return abs
-    }
-  }
-  // 4. any icon at all (even .ico — the client still shows it, refine skips it)
+    .sort((a, b) => (/\.ico(\?|$)/i.test(a.href) ? 1 : 0) - (/\.ico(\?|$)/i.test(b.href) ? 1 : 0) || b.size - a.size)
   if (icons.length) {
     const abs = absolutize(icons[0].href, baseUrl)
     if (abs) return abs
