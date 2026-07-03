@@ -19,8 +19,8 @@ const BORDER = '#152840'
 const GREEN = '#39d98a'
 
 const STEP_DEFS = [
-  { id: 'logo', label: 'Refining logo' },
   { id: 'crawl', label: 'Crawling website' },
+  { id: 'logo', label: 'Fetching & refining logo' },
   { id: 'analyze', label: 'Analyzing brand' },
   { id: 'brief', label: 'Writing design brief' },
   { id: 'copy', label: 'Writing copy' },
@@ -259,8 +259,10 @@ export default function Studio() {
     fetch('/api/styles').then(r => r.json()).then(d => setStyles(d.styles || [])).catch(() => {})
   }, [])
 
-  const readyToGenerate = !!input.trim() && !!logo
-  const missing = [!input.trim() && 'website URL', !logo && 'logo'].filter(Boolean)
+  // The logo is auto-detected from the website and refined automatically —
+  // uploading one is now just an optional override.
+  const readyToGenerate = !!input.trim()
+  const missing = [!input.trim() && 'website URL'].filter(Boolean)
   const vibeCount = Object.values(vibe).reduce((a, arr) => a + (arr?.length || 0), 0)
 
   function toggleVibe(qid, opt) {
@@ -426,24 +428,37 @@ export default function Studio() {
     }
 
     try {
-      // Logo refinement + crawl run in parallel — both must land before analyze.
-      mark('logo', 'active')
+      // Crawl first — the logo is auto-detected from the site itself.
       mark('crawl', 'active')
-      const refineP = callRoute('/api/refine-logo', { b64: logo.data, instructions: logoNotes.trim() })
-        .then(({ b64 }) => {
-          const uri = `data:image/png;base64,${b64}`
-          setRefinedLogo(uri)
-          setAssetsById(prev => ({ ...prev, logo: uri }))
-          mark('logo', 'complete')
-        })
-        .catch(() => {
-          // Refinement is best-effort — fall back to the original upload untouched.
-          setAssetsById(prev => ({ ...prev, logo: logo.preview }))
-          mark('logo', 'complete')
-        })
-      const crawlP = callRoute('/api/scrape', { input: input.trim() })
-      const [{ scrapedData }] = await Promise.all([crawlP, refineP])
+      const { scrapedData } = await callRoute('/api/scrape', { input: input.trim() })
       mark('crawl', 'complete')
+
+      // Logo: uploaded override wins; otherwise the icon detected on the site.
+      // Refinement (isolate icon, 1:1, fill frame, transparent, premium) runs in
+      // parallel with everything else — it never blocks the build.
+      mark('logo', 'active')
+      const refinePayload = logo
+        ? { b64: logo.data, instructions: logoNotes.trim() }
+        : (scrapedData.logo ? { url: scrapedData.logo, instructions: logoNotes.trim() } : null)
+      const refineP = refinePayload
+        ? callRoute('/api/refine-logo', refinePayload)
+            .then(res => {
+              if (res.b64) {
+                const uri = `data:image/png;base64,${res.b64}`
+                setRefinedLogo(uri)
+                setAssetsById(prev => ({ ...prev, logo: uri }))
+              } else if (res.src || logo?.preview) {
+                // Unsupported format or refine failure — use the raw source.
+                setAssetsById(prev => ({ ...prev, logo: res.src || logo.preview }))
+              }
+              mark('logo', 'complete')
+            })
+            .catch(() => {
+              const fallback = logo?.preview || scrapedData.logo
+              if (fallback) setAssetsById(prev => ({ ...prev, logo: fallback }))
+              mark('logo', 'complete')
+            })
+        : Promise.resolve().then(() => mark('logo', 'complete')) // no logo found — build uses a text wordmark
 
       mark('analyze', 'active')
       const vibeText = vibeSummary()
@@ -542,7 +557,7 @@ export default function Studio() {
       // Build report — everything the generator thought and used, copyable.
       setBuildReport(composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief))
 
-      await imagesPromise
+      await Promise.all([imagesPromise, refineP])
     } catch (e) {
       const activeId = Object.keys(statuses).find(k => statuses[k] === 'active')
       if (activeId) mark(activeId, 'error')
@@ -699,12 +714,12 @@ export default function Studio() {
           />
         </div>
 
-        {/* ── STEP 2 — Logo (required) ── */}
+        {/* ── STEP 2 — Logo (auto-detected; upload = optional override) ── */}
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={stepBadge(!!logo)}>{logo ? '✓' : '2'}</span>
-            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Business logo</span>
-            <span style={{ ...label, fontSize: '0.55rem', color: '#e5c07b' }}>required</span>
+            <span style={stepBadge(true)}>✓</span>
+            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Logo — automatic</span>
+            <span style={{ ...label, fontSize: '0.55rem', color: GREEN }}>auto-detected from the site</span>
           </div>
           <div
             onClick={() => !generating && logoInputRef.current?.click()}
@@ -712,27 +727,29 @@ export default function Studio() {
             onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 14, cursor: generating ? 'default' : 'pointer',
-              background: BG, border: `1.5px dashed ${logo ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 14,
+              background: BG, border: `1.5px dashed ${logo || refinedLogo ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 14,
             }}
           >
             <div style={{ width: 74, height: 74, borderRadius: 10, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {(refinedLogo || logo) ? (
-                <img src={refinedLogo || logo.preview} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              {(refinedLogo || logo || assetsById.logo) ? (
+                <img src={refinedLogo || logo?.preview || assetsById.logo} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               ) : (
-                <span style={{ fontSize: '1.5rem', opacity: 0.3 }}>🖼</span>
+                <span style={{ fontSize: '1.5rem', opacity: 0.3 }}>✦</span>
               )}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#fff' }}>
-                {logo ? (refinedLogo ? 'Logo refined ✓ — tap to replace' : `${logo.name} — tap to replace`) : 'Upload the logo (PNG, SVG, or a screenshot)'}
+                {refinedLogo ? 'Logo refined ✓ — tap to override with your own'
+                  : logo ? `${logo.name} — will be refined (tap to replace)`
+                  : 'Found automatically from the website — icon isolated, refined to premium 1:1'}
               </div>
               <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.5 }}>
-                It gets automatically refined — identical branding, production quality, transparent background.
+                Icon-only mark, transparent background, fills the frame, identical branding. Upload only if you want to override it.
               </div>
             </div>
             <input ref={logoInputRef} type="file" accept="image/*,.svg" onChange={e => { onLogoFile(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
           </div>
-          {logo && (
+          {(
             <input
               value={logoNotes}
               onChange={e => setLogoNotes(e.target.value)}

@@ -45,7 +45,33 @@ function extractImages(html, baseUrl) {
   return out
 }
 
+// ICON-FIRST logo detection: the brand's square icon mark (apple-touch-icon,
+// sized favicon) beats a full logo <img> that usually carries wordmark text.
+// The refine step isolates + upscales whatever we hand it, so bigger is better.
 function extractLogo(html, baseUrl, metadata) {
+  // 1. apple-touch-icon — square, icon-only, usually 180x180+
+  const touch = [...html.matchAll(/<link[^>]+rel=["'][^"']*apple-touch-icon[^"']*["'][^>]*>/gi)]
+    .map(m => (m[0].match(/href=["']([^"']+)["']/i) || [])[1])
+    .filter(Boolean)
+  if (touch.length) {
+    const abs = absolutize(touch[touch.length - 1], baseUrl)
+    if (abs) return abs
+  }
+  // 2. <link rel="icon"> — pick the largest declared size, skip tiny .ico
+  const icons = [...html.matchAll(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]*>/gi)]
+    .map(m => {
+      const href = (m[0].match(/href=["']([^"']+)["']/i) || [])[1]
+      const sizes = (m[0].match(/sizes=["'](\d+)x\d+["']/i) || [])[1]
+      return href ? { href, size: Number(sizes) || 0 } : null
+    })
+    .filter(Boolean)
+    .filter(i => !/\.ico(\?|$)/i.test(i.href))
+    .sort((a, b) => b.size - a.size)
+  if (icons.length && (icons[0].size >= 96 || icons.length === 1)) {
+    const abs = absolutize(icons[0].href, baseUrl)
+    if (abs) return abs
+  }
+  // 3. fallback — a logo <img> (may include wordmark; the refiner isolates the icon)
   const block = html.match(/<img[^>]+(?:src|alt|class)=["'][^"']*logo[^"']*["'][^>]*>/i)
   if (block) {
     const srcMatch = block[0].match(/src=["']([^"']+)["']/i)
@@ -53,6 +79,11 @@ function extractLogo(html, baseUrl, metadata) {
       const abs = absolutize(srcMatch[1], baseUrl)
       if (abs) return abs
     }
+  }
+  // 4. any icon at all (even .ico — the client still shows it, refine skips it)
+  if (icons.length) {
+    const abs = absolutize(icons[0].href, baseUrl)
+    if (abs) return abs
   }
   if (metadata?.ogImage) return absolutize(metadata.ogImage, baseUrl)
   return null
