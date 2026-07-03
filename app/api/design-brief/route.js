@@ -9,9 +9,17 @@ import { callClaude, stripFences } from '../../../lib/claude'
 // decision, not a pile of references. The brief also surfaces in the Build
 // Report so the creator can critique the thinking.
 
-const SYSTEM = `You are the creative director of a high-end web agency. You are given: the business's brand analysis, the creator's vibe selections, the conversion strategy, and up to three reference design systems. Your job: fuse them into ONE committed design brief for this specific business. Commit hard — no options, no hedging, no "could".
+const SYSTEM = `You are the creative director of a high-end web agency, and you OWN this outcome. You are given: the business's brand analysis, the creator's vibe selections, the conversion strategy, and up to three reference design systems. Fuse them into ONE committed design brief. Commit hard — no options, no hedging, no "could". Make the judgment calls yourself and state your assumptions inline; never pose questions.
+
+AUTONOMY RULES:
+- Form your own point of view BEFORE specifying anything: what makes this business genuinely interesting, what the generic AI-built site for this niche would look like, and what you will do differently.
+- The reference systems and vibe selections are INPUTS, not orders. Mix them, invert them, or overrule them when the brand calls for it — and say why. A boring-but-correct direction is a failure; bias toward the interesting choice and take the stylistic risk without asking permission.
+- Justify each risk in one line so the creator can read your reasoning.
 
 Write the brief as plain text (no markdown headers needed, no code) in EXACTLY these labeled parts:
+
+POV: 2-3 sentences — what makes this business interesting, what the generic version of this site would be, and the stance you're taking instead.
+THE GAMBLE: the single boldest deliberate choice in this design and the one-line justification for it.
 
 CONCEPT: a name + two sentences capturing the big idea (e.g. "Golden Hour Authority — warm editorial luxury with clinical precision...").
 PALETTE MAP: every color with its exact hex and role — page background, section alternates, headline ink, body text, primary CTA, accents. Only the brand's real palette plus tints/shades, white, and one near-black.
@@ -21,7 +29,7 @@ SECTION TREATMENTS: for each section in the persuasion flow, one line — its ba
 SIGNATURE DETAILS: 3-5 specific touches that make this site unmistakable (oversized numerals, pull-quotes, border treatments, image crops, hover behaviors).
 MOBILE BEHAVIOR: how the design lands on a 390px phone — edge-to-edge moments, full-width CTAs, type scale floor.
 
-Steal the STRONGEST ideas from the reference systems and fuse them so the result feels like one intentional brand, never a collage. The brand's real identity always wins conflicts. Keep the whole brief under 600 words.`
+Steal the STRONGEST ideas from the reference systems and fuse them so the result feels like one intentional brand, never a collage. The brand's real identity always wins conflicts. Keep the whole brief under 700 words.`
 
 export async function POST(request) {
   try {
