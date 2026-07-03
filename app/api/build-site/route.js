@@ -35,7 +35,18 @@ DENSITY & CRAFT — THIS IS A PREMIUM DELIVERABLE, NOT A SKELETON:
 - Populate sections richly with the real extracted facts: full services/menu list with prices when provided, every real review with attribution, real hours, real address, real phone and email in the contact section and footer.
 - Micro-details that signal quality: consistent 8px spacing system, letterspaced uppercase labels above headings, oversized section numerals or stat numerals where fitting, a real footer with columns (brand, links, hours, contact).
 
+PREMIUM TECHNIQUES — make the page feel ALIVE, like a high-end agency built it (all CSS-only):
+- Layered composition: overlapping elements, images breaking section boundaries, offset cards over photos, tasteful depth.
+- Elevated cards with modern layered shadows (e.g. 0 1px 2px + 0 12px 32px of a palette-tinted shadow), never flat gray boxes.
+- Subtle on-brand gradients: soft tints/shades of the THEME colors for section backdrops, scrims, and button sheens — always subtle, never rainbow, never off-palette hues.
+- Tasteful CSS animations: a gentle keyframe entrance on the hero (fade/rise once on load), smooth 150-250ms transitions on every hover (buttons lift, cards elevate, images scale 1.02-1.05 inside overflow-hidden frames), animated underlines on nav links. Respect prefers-reduced-motion with a media query that disables them.
+- Section transitions: alternating background tones, soft curved or angled section edges where the style fits, generous rhythm changes between dense and airy sections.
+- Strong focal points: each section has ONE clear focal element; oversized display type where fitting; deliberate asymmetry.
+- Conversion focus survives all polish: primary CTA repeated, unmistakable, and the most visually weighted element in its section.
+
 DESIGN SYSTEM ADHERENCE: when a DESIGN.md system is provided below, follow it precisely — its colors (mapping the brand's palette into its accent slots), typography, spacing, component treatments, and its "Never" rules override your defaults.
+
+BRAND CONTINUITY: a BRAND ANALYSIS of the business's existing site may be provided. The new site must read as an ELEVATED version of that same brand — same colors, same personality, same design language matured to premium quality. Never ship something that feels like a different company.
 
 OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 - Return ONLY the HTML. Start with <!DOCTYPE html>. No markdown, no commentary.
@@ -92,6 +103,7 @@ LAYOUT NOTE: ${analysis.layout?.notes || ''}
 
 ${factsBlock}
 
+${analysis.brand ? `BRAND ANALYSIS (elevate THIS brand — do not invent a new one):\n${JSON.stringify(analysis.brand, null, 2)}\n` : ''}
 ${styleMds.length === 1 ? `DESIGN SYSTEM TO FOLLOW PRECISELY:\n${styleMds[0]}\n` : ''}${styleMds.length > 1 ? `DESIGN SYSTEMS TO MIX & MATCH (${styleMds.length}) — you are a smart design agent: take the strongest ideas from each (a hero treatment from one, a menu/list pattern from another, typography pairing from a third), fuse them into ONE cohesive direction perfectly niched to THIS business, and map every color decision onto the brand theme colors above. Never produce a franken-page — the blend must feel like a single intentional system.\n\n${styleMds.map((s, i) => `--- SYSTEM ${i + 1} ---\n${s}`).join('\n\n')}\n` : ''}
 COPY (JSON — use exactly, never invent):
 ${JSON.stringify(copy.sections, null, 2)}

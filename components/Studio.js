@@ -1,18 +1,20 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { matchStyleToIndustry, matchTopStyles } from '../lib/designStyles'
+import { useState, useEffect, useRef } from 'react'
+import { matchTopStyles } from '../lib/designStyles'
 
 const BLUE = '#2990fa'
 const BG = '#060d1f'
 const PANEL = '#0a1628'
 const BORDER = '#152840'
+const GREEN = '#39d98a'
 
 const STEP_DEFS = [
+  { id: 'logo', label: 'Refining logo' },
   { id: 'crawl', label: 'Crawling website' },
-  { id: 'analyze', label: 'Analyzing content' },
+  { id: 'analyze', label: 'Analyzing brand' },
   { id: 'copy', label: 'Writing copy' },
-  { id: 'build', label: 'Building HTML' },
-  { id: 'images', label: 'Generating 5 images' },
+  { id: 'build', label: 'Building website' },
+  { id: 'images', label: 'Generating images' },
 ]
 
 function VelpiLogo({ size = 34 }) {
@@ -41,6 +43,32 @@ function safeName(s) {
   return (s || 'velpi').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'velpi'
 }
 
+// Rasterize any uploaded image (PNG/JPG/SVG/screenshot) to PNG base64,
+// preserving transparency. Returns { data (raw b64), preview (data uri) }.
+function fileToPng(file, maxW = 1024) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, maxW / Math.max(img.width, 1))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        const dataUrl = canvas.toDataURL('image/png')
+        resolve({ data: dataUrl.split(',')[1], preview: dataUrl, name: file.name })
+      }
+      img.onerror = () => reject(new Error('Could not read that image file.'))
+      img.src = reader.result
+    }
+    reader.onerror = () => reject(new Error('Could not read that file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 async function downloadImage(src, filename) {
   try {
     if (src.startsWith('data:')) {
@@ -63,19 +91,16 @@ async function downloadImage(src, filename) {
   }
 }
 
-// Same slot-id rule the image API uses, so template tokens and assets line up.
 function slotIdFor(item, i) {
   if (/logo/i.test(item.what || '') || item.section === 'header') return 'logo'
   return `img_${item.slot != null ? item.slot : i}`
 }
 
-// Labeled gray placeholder for slots with no image yet.
 function placeholderSvg(text) {
   const t = encodeURIComponent((text || 'image').slice(0, 40))
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='100%25' height='100%25' fill='%23233248'/%3E%3Ctext x='50%25' y='50%25' fill='%237d8aa0' font-family='monospace' font-size='36' text-anchor='middle'%3E${t}%3C/text%3E%3C/svg%3E`
 }
 
-// Parse bulk style paste: blocks separated by a line of ===== (5+).
 function parseBulkStyles(text) {
   const blocks = text.split(/\n={5,}\n?/).map(b => b.trim()).filter(Boolean)
   const out = []
@@ -93,31 +118,34 @@ function parseBulkStyles(text) {
 }
 
 export default function Studio() {
+  // ── Setup inputs ──
   const [input, setInput] = useState('')
+  const [logo, setLogo] = useState(null)            // { data, preview, name } original upload
+  const [logoNotes, setLogoNotes] = useState('')
+  const [refinedLogo, setRefinedLogo] = useState(null) // data uri after refinement
+  const logoInputRef = useRef(null)
+
+  // ── Pipeline ──
   const [generating, setGenerating] = useState(false)
   const [steps, setSteps] = useState(STEP_DEFS.map(s => ({ ...s, status: 'pending' })))
   const [error, setError] = useState(null)
-
-  // Pipeline results
   const [bizName, setBizName] = useState('')
   const [analysisData, setAnalysisData] = useState(null)
-  const [siteText, setSiteText] = useState('')
-  const [slots, setSlots] = useState([])            // photo slots: {id, name, section, prompt}
-  const [assetsById, setAssetsById] = useState({})  // generated images (data URIs) by slot id
-  const [logoUrl, setLogoUrl] = useState(null)
-  const [ghlUrls, setGhlUrls] = useState({})        // pasted GoHighLevel links by slot id
+  const [slots, setSlots] = useState([])
+  const [assetsById, setAssetsById] = useState({})
+  const [logoUrl, setLogoUrl] = useState(null)      // scraped logo url (fallback)
+  const [ghlUrls, setGhlUrls] = useState({})
   const [htmlTemplate, setHtmlTemplate] = useState(null)
   const [built, setBuilt] = useState(false)
   const [imagesReady, setImagesReady] = useState(false)
   const [frameH, setFrameH] = useState(900)
-  const [showCode, setShowCode] = useState(false)
+  const [regenIds, setRegenIds] = useState({})
 
-  // Styles library
+  // ── Styles library ──
   const [styles, setStyles] = useState([])
   const [styleId, setStyleId] = useState('auto')
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [styleOpen, setStyleOpen] = useState(false)
   const [matchedStyleName, setMatchedStyleName] = useState('')
-  const [showAddStyle, setShowAddStyle] = useState(false)
   const [bulkMode, setBulkMode] = useState(false)
   const [newStyleName, setNewStyleName] = useState('')
   const [newStyleNiches, setNewStyleNiches] = useState('')
@@ -126,26 +154,29 @@ export default function Studio() {
   const [bulkStatus, setBulkStatus] = useState(null)
   const [savingStyle, setSavingStyle] = useState(false)
 
-  // Info panel
-  const [copiedInfo, setCopiedInfo] = useState(false)
-
-  // Refine chat
+  // ── Results UI ──
+  const [showCode, setShowCode] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [editing, setEditing] = useState(false)
   const [copiedHtml, setCopiedHtml] = useState(false)
   const [copiedPrompt, setCopiedPrompt] = useState(null)
+  const [copiedInfo, setCopiedInfo] = useState(false)
 
   useEffect(() => {
     fetch('/api/styles').then(r => r.json()).then(d => setStyles(d.styles || [])).catch(() => {})
   }, [])
 
-  // ── HTML rendering: swap tokens for preview / final export ──────────────────
+  const readyToGenerate = !!input.trim() && !!logo
+  const missing = [!input.trim() && 'website URL', !logo && 'logo'].filter(Boolean)
+
+  // ── HTML rendering ──
   function previewHtml() {
     if (!htmlTemplate) return ''
     return htmlTemplate.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
-      if (ghlUrls[id]) return ghlUrls[id]
+      if (ghlUrls[id]?.trim()) return ghlUrls[id].trim()
       if (assetsById[id]) return assetsById[id]
-      if (id === 'logo') return logoUrl || placeholderSvg('logo')
+      if (id === 'logo') return refinedLogo || logo?.preview || logoUrl || placeholderSvg('logo')
       const slot = slots.find(s => s.id === id)
       return placeholderSvg(slot ? slot.name : id)
     })
@@ -154,14 +185,13 @@ export default function Studio() {
   function finalHtml() {
     if (!htmlTemplate) return ''
     return htmlTemplate.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
-      if (ghlUrls[id]) return ghlUrls[id]
+      if (ghlUrls[id]?.trim()) return ghlUrls[id].trim()
       if (id === 'logo') return logoUrl || 'https://PASTE-LOGO-URL-HERE'
       const n = slots.findIndex(s => s.id === id) + 1
       return `https://PASTE-IMAGE-${n || 'X'}-URL-HERE`
     })
   }
 
-  // Claude-artifact-style: click → the mockup opens full-page in a new tab.
   function openPreview() {
     const out = previewHtml()
     if (!out) return
@@ -171,9 +201,24 @@ export default function Studio() {
     setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
-  const missingLinks = slots.filter(s => !ghlUrls[s.id]).length
+  const linkedCount = slots.filter(s => ghlUrls[s.id]?.trim()).length
+  const allLinked = slots.length > 0 && linkedCount === slots.length
 
-  // ── Styles ──────────────────────────────────────────────────────────────────
+  // ── Logo upload ──
+  async function onLogoFile(fileList) {
+    const file = Array.from(fileList || []).find(f => f.type.startsWith('image/') || /\.svg$/i.test(f.name))
+    if (!file) return
+    setError(null)
+    try {
+      const png = await fileToPng(file)
+      setLogo(png)
+      setRefinedLogo(null)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  // ── Styles save ──
   async function saveNewStyle() {
     if (savingStyle) return
     setSavingStyle(true)
@@ -182,14 +227,13 @@ export default function Studio() {
     try {
       if (bulkMode) {
         const parsed = parseBulkStyles(bulkText)
-        if (!parsed.length) throw new Error('No styles found. Separate each style with a line of ===== — first line is the name, optional "Niches: a, b" line, then the DESIGN.md content.')
+        if (!parsed.length) throw new Error('No styles found. Separate each with a line of ===== — first line is the name, optional "Niches: a, b" line, then the DESIGN.md content.')
         let ok = 0
         const added = []
         for (const p of parsed) {
           try {
             const { style } = await callRoute('/api/styles', p)
-            added.push(style)
-            ok++
+            added.push(style); ok++
           } catch (e) {
             setBulkStatus(`Imported ${ok}/${parsed.length} — stopped on "${p.name}": ${e.message}`)
             break
@@ -203,7 +247,6 @@ export default function Studio() {
         setStyles(prev => [...prev.filter(s => s.builtIn), style, ...prev.filter(s => !s.builtIn)])
         setStyleId(style.id)
         setNewStyleName(''); setNewStyleNiches(''); setNewStyleContent('')
-        setShowAddStyle(false)
       }
     } catch (e) {
       setError(e.message)
@@ -212,15 +255,14 @@ export default function Studio() {
     }
   }
 
-  // ── Generation pipeline ─────────────────────────────────────────────────────
+  // ── Generation ──
   async function runGeneration() {
-    if (!input.trim() || generating) return
+    if (!readyToGenerate || generating) return
     setError(null)
     setBuilt(false)
     setImagesReady(false)
     setHtmlTemplate(null)
     setAnalysisData(null)
-    setSiteText('')
     setSlots([])
     setAssetsById({})
     setGhlUrls({})
@@ -228,6 +270,7 @@ export default function Studio() {
     setBizName('')
     setMatchedStyleName('')
     setShowCode(false)
+    setDetailsOpen(false)
     setGenerating(true)
 
     const statuses = {}
@@ -238,9 +281,23 @@ export default function Studio() {
     }
 
     try {
+      // Logo refinement + crawl run in parallel — both must land before analyze.
+      mark('logo', 'active')
       mark('crawl', 'active')
-      const { scrapedData } = await callRoute('/api/scrape', { input: input.trim() })
-      setSiteText(scrapedData.content || '')
+      const refineP = callRoute('/api/refine-logo', { b64: logo.data, instructions: logoNotes.trim() })
+        .then(({ b64 }) => {
+          const uri = `data:image/png;base64,${b64}`
+          setRefinedLogo(uri)
+          setAssetsById(prev => ({ ...prev, logo: uri }))
+          mark('logo', 'complete')
+        })
+        .catch(() => {
+          // Refinement is best-effort — fall back to the original upload untouched.
+          setAssetsById(prev => ({ ...prev, logo: logo.preview }))
+          mark('logo', 'complete')
+        })
+      const crawlP = callRoute('/api/scrape', { input: input.trim() })
+      const [{ scrapedData }] = await Promise.all([crawlP, refineP])
       mark('crawl', 'complete')
 
       mark('analyze', 'active')
@@ -249,8 +306,6 @@ export default function Studio() {
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
 
-      // Named photo slots (same ids the image generator will use) + the LOGO as
-      // slot #6 — the user downloads the logo themselves and pastes its link.
       const inv = analysis.image_inventory || []
       const photoSlots = inv
         .map((item, i) => ({ item, id: slotIdFor(item, i) }))
@@ -258,34 +313,30 @@ export default function Studio() {
         .map(x => ({ id: x.id, name: x.item.what || x.id, section: x.item.section || '', prompt: x.item.prompt || '' }))
       setSlots([...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }])
 
-      // Smart agent: manual pick = follow that one system precisely.
-      // Auto-Match = top 3 niche matches, mixed & matched by the builder.
       let chosenStyles = []
       const manual = styles.find(s => s.id === styleId)
-      if (manual) {
-        chosenStyles = [manual]
-      } else if (styleId === 'auto') {
+      if (manual) chosenStyles = [manual]
+      else if (styleId === 'auto') {
         chosenStyles = matchTopStyles(styles, `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`, 3)
       }
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
 
-      // IMAGES run in the background while copy + HTML build proceed —
-      // the HTML is usable immediately; images land when ready.
       mark('images', 'active')
       const imagesPromise = callRoute('/api/generate-images', { analysis })
         .then(({ images }) => {
           const map = {}
           for (const a of images?.assets || []) {
-            if (a.src) map[a.id] = a.src // includes the scraped logo when found
+            if (a.src) map[a.id] = a.src
           }
-          setAssetsById(map)
+          // Never let a scraped logo overwrite the refined upload.
+          setAssetsById(prev => ({ ...map, ...(prev.logo ? { logo: prev.logo } : {}) }))
           setImagesReady(true)
           mark('images', 'complete')
         })
         .catch(e => {
           mark('images', 'error')
-          setError(`Image generation: ${e.message} (the HTML is still usable — slots show placeholders)`)
+          setError(`Image generation: ${e.message} (the website is still usable — slots show placeholders)`)
         })
 
       mark('copy', 'active')
@@ -315,6 +366,34 @@ export default function Studio() {
     }
   }
 
+  // ── Per-asset actions ──
+  async function replaceAsset(slotId, fileList) {
+    const file = Array.from(fileList || []).find(f => f.type.startsWith('image/') || /\.svg$/i.test(f.name))
+    if (!file) return
+    try {
+      const png = await fileToPng(file, 1600)
+      setAssetsById(prev => ({ ...prev, [slotId]: png.preview }))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function regenerateSlot(slot) {
+    if (!analysisData || regenIds[slot.id]) return
+    setRegenIds(prev => ({ ...prev, [slot.id]: true }))
+    try {
+      const n = Number(String(slot.id).replace('img_', '')) || 0
+      const item = { slot: n, what: slot.name, section: slot.section, source: 'none', action: 'generate', url: null, prompt: slot.prompt || '' }
+      const { images } = await callRoute('/api/generate-images', { analysis: { ...analysisData, image_inventory: [item] } })
+      const asset = (images?.assets || []).find(a => a.id === slot.id)
+      if (asset?.src) setAssetsById(prev => ({ ...prev, [slot.id]: asset.src }))
+    } catch (e) {
+      setError(`Regenerate failed: ${e.message}`)
+    } finally {
+      setRegenIds(prev => ({ ...prev, [slot.id]: false }))
+    }
+  }
+
   async function sendEdit() {
     const instruction = chatInput.trim()
     if (!instruction || editing || !htmlTemplate) return
@@ -322,9 +401,8 @@ export default function Studio() {
     setError(null)
     try {
       const { html: updated } = await callRoute('/api/edit-site', {
-        html: htmlTemplate,
-        instruction,
-        palette: analysisData?.color_palette || [], // theme lock on refinements
+        html: htmlTemplate, instruction,
+        palette: analysisData?.color_palette || [],
       })
       setHtmlTemplate(updated)
       setChatInput('')
@@ -350,7 +428,7 @@ export default function Studio() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${safeName(bizName)}-mockup.html`
+    a.download = `${safeName(bizName)}-website.html`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 5000)
   }
@@ -364,14 +442,14 @@ export default function Studio() {
   async function downloadAll() {
     for (let i = 0; i < slots.length; i++) {
       const s = slots[i]
-      if (assetsById[s.id]) {
-        await downloadImage(assetsById[s.id], `${i + 1}-${safeName(s.name)}.png`)
+      const src = s.id === 'logo' ? (refinedLogo || assetsById.logo || logo?.preview) : assetsById[s.id]
+      if (src) {
+        await downloadImage(src, `${i + 1}-${safeName(s.name)}.png`)
         await new Promise(r => setTimeout(r, 400))
       }
     }
   }
 
-  // Copies the front-view card (what a customer would see on Google).
   function copyAllInfo() {
     if (!analysisData) return
     const f = analysisData.facts || {}
@@ -397,211 +475,205 @@ export default function Studio() {
     } catch (_) {}
   }
 
-  const label = { fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase' }
+  // ── Shared styles ──
+  const label = { fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase' }
   const monoBtn = {
     background: 'transparent', border: `1px solid ${BLUE}`, color: BLUE, borderRadius: 8,
-    padding: '8px 16px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.74rem', letterSpacing: '0.05em',
+    padding: '9px 16px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', letterSpacing: '0.05em',
   }
-  const infoLabel = { ...label, fontSize: '0.58rem', color: BLUE, marginBottom: 3 }
-  const infoValue = { fontFamily: 'var(--font-inter)', fontSize: '0.8rem', color: '#fff', lineHeight: 1.55, wordBreak: 'break-word' }
+  const card = { width: '100%', background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 18 }
+  const stepBadge = (done) => ({
+    width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.7rem',
+    background: done ? GREEN : 'rgba(41,144,250,0.15)',
+    color: done ? '#04240f' : BLUE,
+    border: `1px solid ${done ? GREEN : 'rgba(41,144,250,0.4)'}`,
+  })
+  const infoLabel = { ...label, fontSize: '0.56rem', color: BLUE, marginBottom: 3 }
+  const infoValue = { fontFamily: 'var(--font-inter)', fontSize: '0.82rem', color: '#fff', lineHeight: 1.55, wordBreak: 'break-word' }
 
   const facts = analysisData?.facts || {}
 
   return (
-    <div style={{ minHeight: '100vh', background: BG, color: '#fff', padding: '40px 20px 80px' }}>
-      <div style={{ maxWidth: 1240, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ minHeight: '100vh', background: BG, color: '#fff', padding: '28px 14px 90px' }}>
+      <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
 
         {/* ── Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-          <VelpiLogo />
-          <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '2rem', letterSpacing: '0.12em' }}>VELPI STUDIO</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 0 }}>
+          <VelpiLogo size={30} />
+          <span style={{ fontFamily: 'var(--font-bebas-neue)', fontSize: '1.7rem', letterSpacing: '0.12em' }}>VELPI STUDIO</span>
         </div>
-        <div style={{ ...label, color: 'rgba(255,255,255,0.45)', marginBottom: 28 }}>Website Mockup Generator</div>
+        <div style={{ ...label, color: 'rgba(255,255,255,0.4)', marginTop: -8, marginBottom: 8 }}>Website Mockup Generator</div>
 
-        {/* ── Input row ── */}
-        <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 720 }}>
+        {/* ── STEP 1 — URL ── */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={stepBadge(!!input.trim())}>{input.trim() ? '✓' : '1'}</span>
+            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Website</span>
+          </div>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') runGeneration() }}
             disabled={generating}
-            placeholder="Enter a website URL or business name"
-            style={{ flex: 1, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '14px 16px', fontSize: '0.95rem', fontFamily: 'var(--font-inter)', opacity: generating ? 0.6 : 1 }}
+            placeholder="Paste the business website URL"
+            style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '14px 16px', fontSize: '1rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', opacity: generating ? 0.6 : 1 }}
           />
-          <button
-            onClick={runGeneration}
-            disabled={generating || !input.trim()}
-            style={{
-              background: BLUE, border: 'none', borderRadius: 10, color: '#fff', padding: '0 26px',
-              fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.06em', textTransform: 'uppercase',
-              opacity: generating || !input.trim() ? 0.5 : 1, cursor: generating || !input.trim() ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {generating ? 'Working' : 'Generate'}
-          </button>
         </div>
 
-        {/* ── Style picker ── */}
-        <div style={{ width: '100%', maxWidth: 720, marginTop: 10 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span style={{ ...label, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>Design style</span>
-            <button
-              onClick={() => setPickerOpen(v => !v)}
-              disabled={generating}
-              style={{
-                flex: 1, background: PANEL, border: `1px solid ${pickerOpen ? BLUE : BORDER}`, borderRadius: 8,
-                color: '#fff', padding: '9px 12px', fontSize: '0.82rem', fontFamily: 'var(--font-inter)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left',
-              }}
-            >
-              <span>
-                {styleId === 'auto'
-                  ? '✦ Auto-Match — detects the niche and applies the right preset'
-                  : (styles.find(s => s.id === styleId)?.name || 'Pick a style')}
-              </span>
-              <span style={{ color: BLUE, fontSize: '0.65rem' }}>{pickerOpen ? '▲' : '▼ Change'}</span>
-            </button>
-            <button onClick={() => setShowAddStyle(v => !v)} disabled={generating} style={{ ...monoBtn, flexShrink: 0 }}>
-              {showAddStyle ? 'Close' : '+ Add Style'}
-            </button>
+        {/* ── STEP 2 — Logo (required) ── */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={stepBadge(!!logo)}>{logo ? '✓' : '2'}</span>
+            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Business logo</span>
+            <span style={{ ...label, fontSize: '0.55rem', color: '#e5c07b' }}>required</span>
           </div>
+          <div
+            onClick={() => !generating && logoInputRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 14, cursor: generating ? 'default' : 'pointer',
+              background: BG, border: `1.5px dashed ${logo ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 14,
+            }}
+          >
+            <div style={{ width: 74, height: 74, borderRadius: 10, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {(refinedLogo || logo) ? (
+                <img src={refinedLogo || logo.preview} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              ) : (
+                <span style={{ fontSize: '1.5rem', opacity: 0.3 }}>🖼</span>
+              )}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#fff' }}>
+                {logo ? (refinedLogo ? 'Logo refined ✓ — tap to replace' : `${logo.name} — tap to replace`) : 'Upload the logo (PNG, SVG, or a screenshot)'}
+              </div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.5 }}>
+                It gets automatically refined — identical branding, production quality, transparent background.
+              </div>
+            </div>
+            <input ref={logoInputRef} type="file" accept="image/*,.svg" onChange={e => { onLogoFile(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+          </div>
+          {logo && (
+            <input
+              value={logoNotes}
+              onChange={e => setLogoNotes(e.target.value)}
+              disabled={generating}
+              placeholder='Optional refinement notes — e.g. "remove the white background, keep everything else identical"'
+              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '11px 14px', fontSize: '0.85rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 10 }}
+            />
+          )}
+        </div>
 
-          {pickerOpen && (
-            <div style={{ marginTop: 8, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
+        {/* ── Design style (collapsed) ── */}
+        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+          <button
+            onClick={() => setStyleOpen(v => !v)}
+            style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+          >
+            <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
+              Design style: <span style={{ color: '#fff', fontWeight: 600 }}>{styleId === 'auto' ? '✦ Auto-Match' : (styles.find(s => s.id === styleId)?.name || 'Custom')}</span>
+            </span>
+            <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{styleOpen ? '▲' : '▼'}</span>
+          </button>
+          {styleOpen && (
+            <div style={{ padding: '0 14px 14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8, marginBottom: 12 }}>
                 <div
-                  onClick={() => { setStyleId('auto'); setPickerOpen(false) }}
-                  style={{
-                    background: styleId === 'auto' ? 'rgba(41,144,250,0.12)' : BG,
-                    border: `1px solid ${styleId === 'auto' ? BLUE : BORDER}`,
-                    borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
-                  }}
+                  onClick={() => setStyleId('auto')}
+                  style={{ background: styleId === 'auto' ? 'rgba(41,144,250,0.12)' : BG, border: `1px solid ${styleId === 'auto' ? BLUE : BORDER}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }}
                 >
-                  <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.82rem', color: '#fff', marginBottom: 3 }}>✦ Auto-Match</div>
-                  <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
-                    Detects the business niche and applies the matching preset automatically
+                  <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.8rem', marginBottom: 3 }}>✦ Auto-Match</div>
+                  <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.66rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+                    Detects the niche, mixes the best matching systems
                   </div>
                 </div>
                 {styles.map(s => {
                   const tags = Array.isArray(s.niches) ? s.niches : String(s.niches || '').split(',').map(t => t.trim()).filter(Boolean)
                   const active = styleId === s.id
                   return (
-                    <div
-                      key={s.id}
-                      onClick={() => { setStyleId(s.id); setPickerOpen(false) }}
-                      style={{
-                        background: active ? 'rgba(41,144,250,0.12)' : BG,
-                        border: `1px solid ${active ? BLUE : BORDER}`,
-                        borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.82rem', color: '#fff', marginBottom: 4 }}>
-                        {s.builtIn ? '' : '◆ '}{s.name}
-                      </div>
+                    <div key={s.id} onClick={() => setStyleId(s.id)} style={{ background: active ? 'rgba(41,144,250,0.12)' : BG, border: `1px solid ${active ? BLUE : BORDER}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }}>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.8rem', marginBottom: 4 }}>{s.builtIn ? '' : '◆ '}{s.name}</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                        {tags.slice(0, 4).map(t => (
-                          <span key={t} style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem', color: BLUE, background: 'rgba(41,144,250,0.1)', border: '1px solid rgba(41,144,250,0.3)', borderRadius: 4, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            {t}
-                          </span>
+                        {tags.slice(0, 3).map(t => (
+                          <span key={t} style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.52rem', color: BLUE, background: 'rgba(41,144,250,0.1)', border: '1px solid rgba(41,144,250,0.3)', borderRadius: 4, padding: '1px 5px', textTransform: 'uppercase' }}>{t}</span>
                         ))}
-                        {tags.length > 4 && (
-                          <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)', padding: '1px 2px' }}>+{tags.length - 4}</span>
-                        )}
+                        {tags.length > 3 && <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.52rem', color: 'rgba(255,255,255,0.35)' }}>+{tags.length - 3}</span>}
                       </div>
                     </div>
                   )
                 })}
               </div>
+              {/* Add styles */}
+              <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ ...label, color: BLUE }}>Add design system{bulkMode ? 's (bulk)' : ''}</span>
+                  <button onClick={() => { setBulkMode(v => !v); setBulkStatus(null) }} style={{ ...monoBtn, padding: '3px 10px', fontSize: '0.58rem' }}>
+                    {bulkMode ? 'Single' : 'Bulk import'}
+                  </button>
+                </div>
+                {bulkMode ? (
+                  <>
+                    <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6}
+                      placeholder={'Name\nNiches: restaurant, cafe\n# DESIGN.md content...\n=====\nNext style...'}
+                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.74rem', fontFamily: 'var(--font-ibm-plex-mono)', resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
+                    {bulkStatus && <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: bulkStatus.startsWith('Imported all') ? GREEN : '#e5c07b', marginBottom: 8 }}>{bulkStatus}</div>}
+                    <button onClick={saveNewStyle} disabled={savingStyle || !bulkText.trim()} style={{ ...monoBtn, background: BLUE, color: '#fff', opacity: savingStyle || !bulkText.trim() ? 0.5 : 1 }}>
+                      {savingStyle ? 'Importing…' : 'Import All'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input value={newStyleName} onChange={e => setNewStyleName(e.target.value)} placeholder="Style name"
+                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginBottom: 6 }} />
+                    <input value={newStyleNiches} onChange={e => setNewStyleNiches(e.target.value)} placeholder="Niches (comma-separated) — powers Auto-Match"
+                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginBottom: 6 }} />
+                    <textarea value={newStyleContent} onChange={e => setNewStyleContent(e.target.value)} rows={5} placeholder="Paste the DESIGN.md content…"
+                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.74rem', fontFamily: 'var(--font-ibm-plex-mono)', resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
+                    <button onClick={saveNewStyle} disabled={savingStyle || !newStyleName.trim() || !newStyleContent.trim()} style={{ ...monoBtn, background: BLUE, color: '#fff', opacity: savingStyle || !newStyleName.trim() || !newStyleContent.trim() ? 0.5 : 1 }}>
+                      {savingStyle ? 'Saving…' : 'Save Style'}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* ── Add style panel ── */}
-        {showAddStyle && (
-          <div style={{ width: '100%', maxWidth: 720, marginTop: 10, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ ...label, color: BLUE }}>Add design system{bulkMode ? 's — bulk import' : ''}</div>
-              <button onClick={() => { setBulkMode(v => !v); setBulkStatus(null) }} style={{ ...monoBtn, padding: '4px 12px', fontSize: '0.62rem' }}>
-                {bulkMode ? 'Single mode' : 'Bulk import'}
-              </button>
-            </div>
-
-            {bulkMode ? (
-              <>
-                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, marginBottom: 10 }}>
-                  Paste MANY styles at once. Separate each with a line of <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', color: BLUE }}>=====</span> — first line is the name, optional <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', color: BLUE }}>Niches: restaurant, cafe</span> line, then the DESIGN.md content.
-                </div>
-                <textarea
-                  value={bulkText}
-                  onChange={e => setBulkText(e.target.value)}
-                  placeholder={'Linear Midnight\nNiches: tech, saas\n# DESIGN.md\n...content...\n=====\nWarm Bistro\nNiches: restaurant, cafe\n# DESIGN.md\n...content...'}
-                  rows={10}
-                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.78rem', fontFamily: 'var(--font-ibm-plex-mono)', resize: 'vertical', marginBottom: 8 }}
-                />
-                {bulkStatus && (
-                  <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', color: bulkStatus.startsWith('Imported all') ? '#39d98a' : '#e5c07b', marginBottom: 8 }}>
-                    {bulkStatus}
-                  </div>
-                )}
-                <button
-                  onClick={saveNewStyle}
-                  disabled={savingStyle || !bulkText.trim()}
-                  style={{ background: BLUE, border: 'none', borderRadius: 8, color: '#fff', padding: '10px 22px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.05em', opacity: savingStyle || !bulkText.trim() ? 0.5 : 1 }}
-                >
-                  {savingStyle ? 'Importing…' : 'Import All'}
-                </button>
-              </>
-            ) : (
-              <>
-                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, marginBottom: 10 }}>
-                  Browse styles.refero.design, copy a DESIGN.md, paste it here with niche tags. Saved permanently and used by Auto-Match.
-                </div>
-                <input
-                  value={newStyleName}
-                  onChange={e => setNewStyleName(e.target.value)}
-                  placeholder="Style name (e.g. Linear — midnight command deck)"
-                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.85rem', fontFamily: 'var(--font-inter)', marginBottom: 8 }}
-                />
-                <input
-                  value={newStyleNiches}
-                  onChange={e => setNewStyleNiches(e.target.value)}
-                  placeholder="Niches it fits, comma-separated (e.g. restaurant, cafe, bar) — powers Auto-Match"
-                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.85rem', fontFamily: 'var(--font-inter)', marginBottom: 8 }}
-                />
-                <textarea
-                  value={newStyleContent}
-                  onChange={e => setNewStyleContent(e.target.value)}
-                  placeholder="Paste the DESIGN.md content here..."
-                  rows={8}
-                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-ibm-plex-mono)', resize: 'vertical', marginBottom: 8 }}
-                />
-                <button
-                  onClick={saveNewStyle}
-                  disabled={savingStyle || !newStyleName.trim() || !newStyleContent.trim()}
-                  style={{ background: BLUE, border: 'none', borderRadius: 8, color: '#fff', padding: '10px 22px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.05em', opacity: savingStyle || !newStyleName.trim() || !newStyleContent.trim() ? 0.5 : 1 }}
-                >
-                  {savingStyle ? 'Saving…' : 'Save Style'}
-                </button>
-              </>
-            )}
+        {/* ── GENERATE ── */}
+        <button
+          onClick={runGeneration}
+          disabled={!readyToGenerate || generating}
+          style={{
+            width: '100%', background: readyToGenerate && !generating ? BLUE : '#0d1e33',
+            border: `1px solid ${readyToGenerate ? BLUE : BORDER}`, borderRadius: 12, color: readyToGenerate ? '#fff' : 'rgba(255,255,255,0.35)',
+            padding: '16px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.9rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+            cursor: readyToGenerate && !generating ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {generating ? 'Generating…' : 'Generate Website'}
+        </button>
+        {!readyToGenerate && !generating && (
+          <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.45)', marginTop: -6 }}>
+            Add the {missing.join(' and ')} to continue
           </div>
         )}
 
         {/* ── Error ── */}
         {error && (
-          <div style={{ width: '100%', maxWidth: 720, marginTop: 18, background: '#2a0d12', border: '1px solid #ff4455', borderRadius: 10, padding: '12px 16px', color: '#ffb3bd', fontFamily: 'var(--font-inter)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+          <div style={{ width: '100%', background: '#2a0d12', border: '1px solid #ff4455', borderRadius: 12, padding: '12px 16px', color: '#ffb3bd', fontFamily: 'var(--font-inter)', fontSize: '0.84rem', lineHeight: 1.5 }}>
             {error}
           </div>
         )}
 
         {/* ── Progress ── */}
         {(generating || steps.some(s => s.status !== 'pending')) && (
-          <div style={{ width: '100%', maxWidth: 720, marginTop: 26, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {steps.map(step => (
-              <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 4px' }}>
+              <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 2px' }}>
                 <StatusDot status={step.status} />
                 <span style={{
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', letterSpacing: '0.03em',
+                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.03em',
                   color: step.status === 'active' ? BLUE : step.status === 'complete' ? '#fff' : step.status === 'error' ? '#ff6675' : 'rgba(255,255,255,0.4)',
                 }}>
                   {step.label}
@@ -609,185 +681,206 @@ export default function Studio() {
               </div>
             ))}
             {matchedStyleName && (
-              <div style={{ marginTop: 6, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', color: BLUE, letterSpacing: '0.04em' }}>
-                ✦ Style preset: {matchedStyleName}
+              <div style={{ marginTop: 6, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: BLUE, letterSpacing: '0.04em', lineHeight: 1.6 }}>
+                ✦ Style: {matchedStyleName}
               </div>
             )}
           </div>
         )}
+      </div>
 
-        {/* ── Results: main column + extracted-info sidebar ── */}
-        {analysisData && (
-          <div style={{ width: '100%', marginTop: 30, display: 'flex', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      {/* ══ RESULTS — preview first, everything else follows ══ */}
+      {built && (
+        <div style={{ maxWidth: 1140, margin: '26px auto 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* MAIN */}
-            <div style={{ flex: '1 1 640px', minWidth: 0 }}>
+          {/* ── 1. WEBSITE PREVIEW (the hero) ── */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>Your new website{bizName ? ` — ${bizName}` : ''}</span>
+              <button onClick={openPreview} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>↗ Open Full Preview</button>
+            </div>
+            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 16, overflow: 'hidden', background: '#fff', boxShadow: '0 18px 60px rgba(0,0,0,0.5)' }}>
+              <iframe
+                title="Website preview"
+                srcDoc={previewHtml()}
+                sandbox="allow-same-origin"
+                onLoad={onFrameLoad}
+                style={{ width: '100%', height: frameH, border: 'none', display: 'block', background: '#fff' }}
+              />
+            </div>
+            {/* Refine chat */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') sendEdit() }}
+                disabled={editing}
+                placeholder='Refine anything — e.g. "make the hero taller"'
+                style={{ flex: 1, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '13px 16px', fontSize: '0.92rem', fontFamily: 'var(--font-inter)', opacity: editing ? 0.6 : 1 }}
+              />
+              <button
+                onClick={sendEdit}
+                disabled={editing || !chatInput.trim()}
+                style={{ background: BLUE, border: 'none', borderRadius: 10, color: '#fff', padding: '0 20px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.05em', textTransform: 'uppercase', opacity: editing || !chatInput.trim() ? 0.5 : 1, cursor: editing || !chatInput.trim() ? 'not-allowed' : 'pointer' }}
+              >
+                {editing ? '…' : 'Send'}
+              </button>
+            </div>
+          </div>
 
-              {/* ── Mockup (appears first — usable before images finish) ── */}
-              {built && (
-                <div style={{ marginBottom: 30 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-                    <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>
-                      Mockup — GoHighLevel-ready
-                      {missingLinks > 0 && slots.length > 0 && (
-                        <span style={{ color: '#e5c07b', marginLeft: 10 }}>{missingLinks} image link{missingLinks > 1 ? 's' : ''} pending</span>
+          {/* ── 2. ASSETS ── */}
+          <div style={{ ...card, maxWidth: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>
+                Assets ({slots.length}){!imagesReady && generating ? ' — generating…' : ''}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: allLinked ? GREEN : '#e5c07b' }}>
+                  {linkedCount}/{slots.length} linked
+                </span>
+                {imagesReady && <button onClick={downloadAll} style={{ ...monoBtn, padding: '5px 12px', fontSize: '0.62rem' }}>⬇ Download All</button>}
+              </div>
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, marginBottom: 12 }}>
+              Download each asset → upload to your GoHighLevel media library → paste the GHL link back here. The website updates itself.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {slots.map((s, i) => {
+                const src = s.id === 'logo' ? (refinedLogo || assetsById.logo || logo?.preview || null) : assetsById[s.id]
+                const linked = !!ghlUrls[s.id]?.trim()
+                return (
+                  <div key={s.id} style={{ background: BG, border: `1px solid ${linked ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ width: 86, height: 62, borderRadius: 8, overflow: 'hidden', background: '#101c30', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={src || placeholderSvg(s.name)} alt={s.name} style={{ width: '100%', height: '100%', objectFit: s.id === 'logo' ? 'contain' : 'cover', display: 'block' }} />
+                      {((!src && !imagesReady && generating) || regenIds[s.id]) && (
+                        <span className="velpi-loading" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: 'rgba(6,13,31,0.6)' }}>
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE }} />
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE }} />
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE }} />
+                        </span>
                       )}
-                    </span>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button onClick={openPreview} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>↗ Open Preview</button>
-                      <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> View code'}</button>
-                      <button onClick={downloadHtml} style={monoBtn}>⬇ Download HTML</button>
-                      <button onClick={copyHtml} style={monoBtn}>{copiedHtml ? 'Copied' : 'Copy HTML'}</button>
                     </div>
-                  </div>
-
-                  {showCode && (
-                    <pre style={{ background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflowY: 'auto', marginBottom: 12 }}>
-                      {finalHtml()}
-                    </pre>
-                  )}
-
-                  <div style={{ border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-                    <iframe
-                      title="Mockup preview"
-                      srcDoc={previewHtml()}
-                      sandbox="allow-same-origin"
-                      onLoad={onFrameLoad}
-                      style={{ width: '100%', height: frameH, border: 'none', display: 'block', background: '#fff' }}
-                    />
-                  </div>
-
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ ...label, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Refine this mockup</div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <input
-                        value={chatInput}
-                        onChange={e => setChatInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') sendEdit() }}
-                        disabled={editing}
-                        placeholder='Describe a change — e.g. "make the hero taller" or "add a gallery section"'
-                        style={{ flex: 1, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '13px 16px', fontSize: '0.9rem', fontFamily: 'var(--font-inter)', opacity: editing ? 0.6 : 1 }}
-                      />
-                      <button
-                        onClick={sendEdit}
-                        disabled={editing || !chatInput.trim()}
-                        style={{ background: BLUE, border: 'none', borderRadius: 10, color: '#fff', padding: '0 22px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.78rem', letterSpacing: '0.05em', textTransform: 'uppercase', opacity: editing || !chatInput.trim() ? 0.5 : 1, cursor: editing || !chatInput.trim() ? 'not-allowed' : 'pointer' }}
-                      >
-                        {editing ? 'Updating' : 'Send'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Image slots: download → upload to GHL → paste links back ── */}
-              {slots.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>
-                      Images ({slots.length}){!imagesReady && generating ? ' — generating…' : ''}
-                    </span>
-                    {imagesReady && <button onClick={downloadAll} style={monoBtn}>⬇ Download All</button>}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 12 }}>
-                    Download each image → upload to your GoHighLevel media library → paste the GHL link back here. The HTML updates itself; when all links are in, Copy HTML gives the final GHL-ready code.
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {slots.map((s, i) => (
-                      <div key={s.id} style={{ background: PANEL, border: `1px solid ${ghlUrls[s.id] ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ width: 92, height: 66, borderRadius: 8, overflow: 'hidden', background: BG, flexShrink: 0, position: 'relative' }}>
-                          <img
-                            src={assetsById[s.id] || placeholderSvg(s.name)}
-                            alt={s.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          />
-                          {!assetsById[s.id] && !imagesReady && (
-                            <span className="velpi-loading" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: 'rgba(6,13,31,0.6)' }}>
-                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE }} />
-                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE }} />
-                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE }} />
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                            <span style={{ ...label, fontSize: '0.62rem', color: BLUE }}>{i + 1}. {s.name}</span>
-                            {ghlUrls[s.id] && <span style={{ color: '#39d98a', fontSize: '0.7rem' }}>✓ linked</span>}
-                          </div>
-                          <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.04em' }}>
-                            file: {i + 1}-{safeName(s.name)}.png{s.section ? ` · section: ${s.section}` : ''}
-                          </div>
-                          {s.prompt && (
-                            <button onClick={() => copyPrompt(i, s.prompt)} style={{ ...monoBtn, padding: '2px 8px', fontSize: '0.56rem', marginTop: 5 }}>
+                    <div style={{ flex: '1 1 170px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+                        <span style={{ ...label, fontSize: '0.6rem', color: BLUE }}>{i + 1}. {s.name}</span>
+                        {linked && <span style={{ color: GREEN, fontSize: '0.68rem' }}>✓ linked</span>}
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem', color: 'rgba(255,255,255,0.4)' }}>
+                        {i + 1}-{safeName(s.name)}.png{s.section ? ` · ${s.section}` : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                        {src && (
+                          <button onClick={() => downloadImage(src, `${i + 1}-${safeName(s.name)}.png`)} title="Download" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>⬇</button>
+                        )}
+                        <label style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem', cursor: 'pointer' }}>
+                          ⇧ Replace
+                          <input type="file" accept="image/*,.svg" onChange={e => { replaceAsset(s.id, e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+                        </label>
+                        {s.id !== 'logo' && s.prompt && (
+                          <>
+                            <button onClick={() => regenerateSlot(s)} disabled={!!regenIds[s.id]} style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem', opacity: regenIds[s.id] ? 0.5 : 1 }}>
+                              {regenIds[s.id] ? '…' : '↻ Regenerate'}
+                            </button>
+                            <button onClick={() => copyPrompt(i, s.prompt)} style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>
                               {copiedPrompt === i ? '✓' : '⧉ prompt'}
                             </button>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '2 1 300px', minWidth: 240 }}>
-                          {assetsById[s.id] && (
-                            <button
-                              onClick={() => downloadImage(assetsById[s.id], `${i + 1}-${safeName(s.name)}.png`)}
-                              title="Download image"
-                              style={{ ...monoBtn, padding: '8px 12px', flexShrink: 0 }}
-                            >⬇</button>
-                          )}
-                          <input
-                            value={ghlUrls[s.id] || ''}
-                            onChange={e => setGhlUrls(prev => ({ ...prev, [s.id]: e.target.value.trim() }))}
-                            placeholder="Paste GoHighLevel image URL here"
-                            style={{ flex: 1, background: BG, border: `1px solid ${ghlUrls[s.id] ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.75rem', fontFamily: 'var(--font-ibm-plex-mono)' }}
-                          />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      value={ghlUrls[s.id] || ''}
+                      onChange={e => setGhlUrls(prev => ({ ...prev, [s.id]: e.target.value }))}
+                      placeholder="Paste GoHighLevel asset URL"
+                      style={{ flex: '2 1 240px', minWidth: 200, background: '#101c30', border: `1px solid ${linked ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.74rem', fontFamily: 'var(--font-ibm-plex-mono)' }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── 3. EXPORT (gated until every asset is linked) ── */}
+          <div style={{ ...card, maxWidth: 'none', border: `1px solid ${allLinked ? 'rgba(57,217,138,0.5)' : BORDER}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 3 }}>
+                  {allLinked ? '✓ Production-ready export' : '🔒 Export'}
+                </div>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  {allLinked
+                    ? 'Every asset is linked. This HTML deploys to GoHighLevel with zero manual edits.'
+                    : `Link ${slots.length - linkedCount} more asset${slots.length - linkedCount === 1 ? '' : 's'} above to unlock the final export.`}
+                </div>
+              </div>
+              {allLinked && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={copyHtml} style={{ ...monoBtn, background: GREEN, borderColor: GREEN, color: '#04240f' }}>{copiedHtml ? 'Copied ✓' : '⧉ Copy HTML'}</button>
+                  <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
+                  <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
+                </div>
+              )}
+            </div>
+            {allLinked && showCode && (
+              <pre style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 14, fontSize: '0.66rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflowY: 'auto', marginTop: 12 }}>
+                {finalHtml()}
+              </pre>
+            )}
+          </div>
+
+          {/* ── 4. PROJECT DETAILS (collapsed) ── */}
+          {analysisData && (
+            <div style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden' }}>
+              <button
+                onClick={() => setDetailsOpen(v => !v)}
+                style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+              >
+                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>Project details</span>
+                <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{detailsOpen ? '▲' : '▼'}</span>
+              </button>
+              {detailsOpen && (
+                <div style={{ padding: '0 18px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                    <button onClick={copyAllInfo} style={{ ...monoBtn, padding: '3px 10px', fontSize: '0.58rem' }}>{copiedInfo ? '✓ Copied' : '⧉ Copy All'}</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                    <div>
+                      <div style={infoLabel}>Business</div>
+                      <div style={{ ...infoValue, fontWeight: 600 }}>{analysisData.business_name}</div>
+                      <div style={{ ...infoValue, fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>
+                        {analysisData.industry}{analysisData.niche ? ` — ${analysisData.niche}` : ''}
+                      </div>
+                    </div>
+                    {facts.phone && <div><div style={infoLabel}>Phone</div><div style={infoValue}>{facts.phone}</div></div>}
+                    {facts.emails?.length > 0 && <div><div style={infoLabel}>Email</div><div style={infoValue}>{facts.emails[0]}</div></div>}
+                    {facts.address && <div><div style={infoLabel}>Address</div><div style={infoValue}>{facts.address}</div></div>}
+                    {facts.hours && <div><div style={infoLabel}>Hours</div><div style={{ ...infoValue, whiteSpace: 'pre-wrap' }}>{facts.hours}</div></div>}
+                    {analysisData.color_palette?.length > 0 && (
+                      <div>
+                        <div style={infoLabel}>Theme Colors</div>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {analysisData.color_palette.map((c, i) => (
+                            <div key={i} title={c} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ width: 15, height: 15, borderRadius: 4, background: c, border: '1px solid rgba(255,255,255,0.2)', display: 'inline-block' }} />
+                              <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem', color: 'rgba(255,255,255,0.5)' }}>{c}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    )}
+                    {analysisData.brand?.design_language && (
+                      <div><div style={infoLabel}>Design Language</div><div style={{ ...infoValue, fontSize: '0.76rem' }}>{analysisData.brand.design_language}</div></div>
+                    )}
+                    {analysisData.brand?.brand_personality && (
+                      <div><div style={infoLabel}>Brand Personality</div><div style={{ ...infoValue, fontSize: '0.76rem' }}>{analysisData.brand.brand_personality}</div></div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
-
-            {/* SIDEBAR — extracted information */}
-            <aside style={{ width: 320, flexShrink: 0, position: 'sticky', top: 16, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ ...label, color: BLUE }}>Extracted Info</span>
-                <button onClick={copyAllInfo} style={{ ...monoBtn, padding: '3px 10px', fontSize: '0.6rem' }}>
-                  {copiedInfo ? '✓ Copied' : '⧉ Copy All'}
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <div style={infoLabel}>Business</div>
-                  <div style={{ ...infoValue, fontWeight: 600 }}>{analysisData.business_name}</div>
-                  <div style={{ ...infoValue, fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>
-                    {analysisData.industry}{analysisData.niche ? ` — ${analysisData.niche}` : ''}
-                  </div>
-                </div>
-                {facts.phone && <div><div style={infoLabel}>Phone</div><div style={infoValue}>{facts.phone}</div></div>}
-                {facts.emails?.length > 0 && (
-                  <div><div style={infoLabel}>Email</div><div style={infoValue}>{facts.emails[0]}</div></div>
-                )}
-                {facts.address && <div><div style={infoLabel}>Address</div><div style={infoValue}>{facts.address}</div></div>}
-                {facts.hours && <div><div style={infoLabel}>Hours</div><div style={{ ...infoValue, whiteSpace: 'pre-wrap' }}>{facts.hours}</div></div>}
-                {analysisData.color_palette?.length > 0 && (
-                  <div>
-                    <div style={infoLabel}>Theme Colors</div>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                      {analysisData.color_palette.map((c, i) => (
-                        <div key={i} title={c} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ width: 16, height: 16, borderRadius: 4, background: c, border: '1px solid rgba(255,255,255,0.2)', display: 'inline-block' }} />
-                          <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem', color: 'rgba(255,255,255,0.5)' }}>{c}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Everything else (services, reviews, socials, full site text) stays
-                    backend-only — it feeds analysis, copy, and the build. */}
-              </div>
-            </aside>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

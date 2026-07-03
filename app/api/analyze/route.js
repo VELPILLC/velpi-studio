@@ -48,6 +48,22 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
     "services": ["every service or menu item found, with price if shown"],
     "reviews": ["every real quote found, with attribution if shown"]
   },
+  "brand": {
+    "primary_colors": ["#hex"],
+    "secondary_colors": ["#hex"],
+    "accent_colors": ["#hex"],
+    "typography": "what the brand's type feels like + any detected font families",
+    "button_style": "shape/weight/treatment of CTAs on the existing site",
+    "border_radius": "sharp | soft | pill — the site's corner language",
+    "spacing": "tight | balanced | airy",
+    "icon_style": "line | filled | none detected",
+    "imagery_style": "how the brand uses photos/graphics",
+    "visual_hierarchy": "how the existing site directs attention",
+    "design_language": "one line naming the overall design language",
+    "brand_personality": "3-5 adjectives",
+    "ui_patterns": ["recurring UI patterns worth keeping"],
+    "recurring_motifs": ["visual motifs that repeat across the site"]
+  },
   "image_inventory": [
     {
       "slot": 0,
@@ -65,7 +81,8 @@ Rules:
 - image_inventory must contain EXACTLY 5 photographic items (this is a hard requirement), plus ONE optional logo item FIRST (section "header", action "keep", with the logo URL) only if a logo URL was provided.
 - If a strong real photo URL from the site clearly matches a slot, you may set source:"real", action:"enhance" with that url — the prompt then describes the enhancement. Otherwise source:"none", action:"generate".
 - Never invent the business name, hours, phone, address, or reviews — only use what appears in the crawled content.
-- Keep the provided palette if present; otherwise infer a tasteful 2-4 color palette.`
+- Keep the provided palette if present; otherwise infer a tasteful 2-4 color palette.
+- BRAND CONTINUITY: if the existing website has an established palette and design language, the new site must feel like an ELEVATED version of the same brand — never a different brand. Extract the brand block as completely as the content allows.`
 
 export async function POST(request) {
   try {
