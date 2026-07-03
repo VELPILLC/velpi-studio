@@ -19,6 +19,12 @@ const SYSTEM = `You are a senior brand and web strategist analyzing a business w
 
 STEP — RECON: extract EVERY piece of real information, exhaustively — business name, every phone number, every email address, every physical address/location, hours, social media links, nav structure, every service/menu item with prices when shown, every review/quote with attribution, taglines, delivery platforms, credentials, years in business. Miss nothing — the user reads this extraction directly.
 STEP — DIRECTION: commit to ONE highest-end creative direction appropriate to THIS industry (never a generic template) and name the single feeling a visitor should have within 3 seconds.
+STEP — CONVERSION STRATEGY: think like a direct-response strategist about THIS business before any design happens:
+  1. The ONE primary action that makes this business money (call, book, quote, order, visit) and the strongest secondary action.
+  2. The top 3 objections THIS specific customer has before acting — and which REAL extracted fact answers each (a review, years in business, a credential, a guarantee, pricing). Never manufacture an answer.
+  3. A proof map: every piece of real proof (each review, credential, stat) assigned to the exact section where it converts hardest — proof belongs NEXT TO the CTA it supports, not quarantined in its own section.
+  4. The honest offer/hook: from the real facts, why act now (same-day service, free consult, seasonal relevance). If no urgency exists, use clarity of value instead — never fake scarcity.
+  5. The persuasion flow: order the sections as attention → problem/desire → proof → offer → action, and say in one line what job each section does.
 STEP — IMAGE PLAN: plan EXACTLY 5 photographic images for the new site — the hero plus the 4 most valuable supporting images for this industry. For each, write a complete, standalone image-generation prompt that specifies THREE things: the SUBJECT (what is in the image and what is happening), what STAYS THE SAME (the business's real mood, setting, industry authenticity), and what CHANGES (crisp, modern, professional, well-lit, photorealistic). Each prompt must be detailed enough to hand to any image generator on its own. No text, logos, or watermarks in any image.
 
 ${INDUSTRY_PATTERNS}
@@ -47,6 +53,20 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
     "socials": ["every social/profile/delivery-platform link found"],
     "services": ["every service or menu item found, with price if shown"],
     "reviews": ["every real quote found, with attribution if shown"]
+  },
+  "conversion_strategy": {
+    "primary_action": "the one money action, stated as the CTA label to use (e.g. 'Book Your Consultation')",
+    "secondary_action": "fallback action label",
+    "objections": [
+      { "objection": "what stops this customer", "answered_by": "the REAL extracted fact that answers it", "where": "section key where this pairing lives" }
+    ],
+    "proof_map": [
+      { "proof": "the real review/credential/stat", "placement": "section key + why it converts there" }
+    ],
+    "offer": "the honest reason to act now, built only from real facts",
+    "persuasion_flow": [
+      { "section": "section key", "job": "one line — what this section does to move the visitor toward the action" }
+    ]
   },
   "brand": {
     "primary_colors": ["#hex"],

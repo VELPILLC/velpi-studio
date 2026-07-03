@@ -39,11 +39,12 @@ BRAND PALETTE (locked): ${palette.join(', ') || '(use the draft’s existing pal
 DESIGN DIRECTION: ${analysis?.design_direction || ''}
 3-SECOND FEELING: ${analysis?.target_feeling || ''}
 ${vibe ? `CREATOR'S VIBE SELECTIONS (honor these): ${vibe}` : ''}
+${analysis?.conversion_strategy ? `CONVERSION STRATEGY (the page's brain — every elevation must serve it, and no strategic element may be weakened or dropped):\n${JSON.stringify(analysis.conversion_strategy, null, 2)}` : ''}
 
 FIRST DRAFT TO ELEVATE:
 ${html}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 32000 })
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 64000 })
     const upgraded = stripFences(raw)
 
     // Safety gates — if pass 2 mangled anything structural, ship pass 1 untouched.

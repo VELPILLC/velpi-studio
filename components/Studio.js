@@ -153,6 +153,23 @@ function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applie
   L.push(`Styles mixed: ${(chosenStyles || []).map(s => s.name).join(' + ') || '(none)'}`)
   L.push(`Second elevation pass applied: ${pass2Applied ? 'yes' : 'NO — pass 1 only'}`)
   L.push('')
+  L.push('--- CONVERSION STRATEGY (the thinking) ---')
+  const cs = a.conversion_strategy || {}
+  L.push(`Primary action: ${cs.primary_action || '?'} | Secondary: ${cs.secondary_action || '?'}`)
+  L.push(`Offer (honest urgency): ${cs.offer || '?'}`)
+  if (cs.objections?.length) {
+    L.push('Objections → answered by:')
+    cs.objections.forEach(o => L.push(`  • "${o.objection}" → ${o.answered_by} (in ${o.where})`))
+  }
+  if (cs.proof_map?.length) {
+    L.push('Proof placement:')
+    cs.proof_map.forEach(p => L.push(`  • ${p.proof} → ${p.placement}`))
+  }
+  if (cs.persuasion_flow?.length) {
+    L.push('Persuasion flow:')
+    cs.persuasion_flow.forEach(s => L.push(`  ${s.section}: ${s.job}`))
+  }
+  L.push('')
   L.push('--- BRAND DETECTED ---')
   L.push(`Palette: ${(a.color_palette || []).join(', ') || '?'}`)
   if (b.primary_colors?.length) L.push(`Primary: ${b.primary_colors.join(', ')} | Secondary: ${(b.secondary_colors || []).join(', ') || '—'} | Accent: ${(b.accent_colors || []).join(', ') || '—'}`)
@@ -207,6 +224,7 @@ export default function Studio() {
   const [buildReport, setBuildReport] = useState('')
   const [reportOpen, setReportOpen] = useState(false)
   const [copiedReport, setCopiedReport] = useState(false)
+  const [snapping, setSnapping] = useState(false)
   const [regenIds, setRegenIds] = useState({})
 
   // ── Styles library ──
@@ -286,6 +304,40 @@ export default function Studio() {
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank')
     setTimeout(() => URL.revokeObjectURL(url), 60000)
+  }
+
+  // Capture the whole rendered mockup as ONE tall PNG you can scroll through.
+  async function downloadFullImage() {
+    const out = previewHtml()
+    if (!out || snapping) return
+    setSnapping(true)
+    const frame = document.createElement('iframe')
+    try {
+      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:2000px;border:none;'
+      frame.setAttribute('sandbox', 'allow-same-origin')
+      document.body.appendChild(frame)
+      frame.srcdoc = out
+      await new Promise(res => { frame.onload = res })
+      await new Promise(res => setTimeout(res, 1200)) // let fonts/images settle
+      const doc = frame.contentDocument
+      const fullH = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
+      frame.style.height = `${Math.min(fullH + 40, 30000)}px`
+      await new Promise(res => setTimeout(res, 300))
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(doc.documentElement, {
+        useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
+        windowWidth: 1440, width: 1440, height: Math.min(fullH, 30000), scale: 1, logging: false,
+      })
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `${safeName(bizName)}-mockup-fullpage.png`
+      a.click()
+    } catch (e) {
+      setError(`Could not capture the full-page image: ${e.message}. The Open Full Preview tab + your browser's full-page screenshot works as a fallback.`)
+    } finally {
+      try { document.body.removeChild(frame) } catch (_) {}
+      setSnapping(false)
+    }
   }
 
   const linkedCount = slots.filter(s => ghlUrls[s.id]?.trim()).length
@@ -844,24 +896,41 @@ export default function Studio() {
               <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>Your new website{bizName ? ` — ${bizName}` : ''}</span>
               <button onClick={openPreview} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>↗ Open Full Preview</button>
             </div>
-            <div
-              onClick={openPreview}
-              style={{
-                border: `1px solid ${BORDER}`, borderRadius: 16, background: PANEL, cursor: 'pointer',
-                padding: '54px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-                boxShadow: '0 18px 60px rgba(0,0,0,0.5)',
-              }}
-            >
-              <span style={{ fontSize: '2.2rem' }}>🖥</span>
-              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>
-                {bizName ? `${bizName} — website ready` : 'Website ready'}
-              </span>
-              <span style={{ background: BLUE, color: '#fff', borderRadius: 10, padding: '13px 30px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                ↗ Open Full Preview
-              </span>
-              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)' }}>
-                Opens in a new tab at full size — re-open after any change to see updates
-              </span>
+            <div style={{
+              border: `1px solid ${BORDER}`, borderRadius: 16, background: PANEL,
+              padding: 18, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap',
+              boxShadow: '0 18px 60px rgba(0,0,0,0.5)',
+            }}>
+              {/* Phone-scale live mini preview */}
+              <div
+                onClick={openPreview}
+                title="Open full preview"
+                style={{ width: 208, height: 380, borderRadius: 20, overflow: 'hidden', border: `2px solid ${BORDER}`, background: '#fff', flexShrink: 0, cursor: 'pointer', position: 'relative' }}
+              >
+                <iframe
+                  title="Mini preview"
+                  srcDoc={previewHtml()}
+                  sandbox="allow-same-origin"
+                  scrolling="yes"
+                  style={{ width: 390, height: 712, border: 'none', transform: 'scale(0.5333)', transformOrigin: 'top left', background: '#fff', pointerEvents: 'none' }}
+                />
+                <div style={{ position: 'absolute', inset: 0 }} />
+              </div>
+              {/* Actions */}
+              <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 220 }}>
+                <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.02rem', color: '#fff' }}>
+                  {bizName ? `${bizName} — website ready` : 'Website ready'}
+                </span>
+                <button onClick={openPreview} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
+                  ↗ Open Full Preview
+                </button>
+                <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
+                  {snapping ? 'Capturing…' : '⬇ Download as Image (full page)'}
+                </button>
+                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
+                  The mini view is phone-scale. Full preview opens in a new tab — re-open it after any change.
+                </span>
+              </div>
             </div>
             {/* Refine chat */}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

@@ -47,6 +47,15 @@ SECTIONS (use these exact keys): ${JSON.stringify(analysis.sections || ['hero', 
 REAL FACTS (use these in copy and CTAs — never invent others):
 ${JSON.stringify(analysis.facts || {}, null, 2)}
 
+CONVERSION STRATEGY (execute this exactly — it is the thinking behind the page):
+${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}
+
+Execution rules for the strategy:
+- Use the strategy's primary_action as THE CTA label wherever the main CTA appears; secondary_action for lower-commitment moments.
+- Each section's copy does the job named in persuasion_flow for that section.
+- Answer each listed objection inside the section the strategy assigns it to — using the real fact given, woven naturally into the copy.
+- Work the offer into the hero and the closing conversion moment.
+
 Base everything on what is true for this business. Do not invent facts.`
 
     const raw = await callClaude({ system: SYSTEM, user, maxTokens: 3000 })

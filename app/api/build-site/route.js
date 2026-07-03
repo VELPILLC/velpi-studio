@@ -31,6 +31,8 @@ NEVER DO THESE (they read as cheap): dark navy as the primary page background; a
 CREATIVITY MANDATE — NEVER THE SAME SITE TWICE:
 You are a creative director, not a template engine. The creator's vibe selections + the brand's real identity drive every composition choice. Two businesses in the same industry with different vibes must get visibly different sites — different hero construction, different section rhythms, different typographic attitude. Surprise tastefully: an unexpected hero crop, an oversized numeral, an editorial pull-quote, an asymmetric split — always appropriate to the niche, never generic. Sophistication and luxury when the vibe calls for it, but NEVER at the cost of conversion.
 
+CONVERSION STRATEGY EXECUTION: a CONVERSION STRATEGY block is provided with the request — it is the page's brain, produced by a strategist who studied this exact business. It dictates the CTA labels, which proof sits beside which CTA, where each objection gets answered, the offer moment, and each section's job. Execute it precisely; aesthetics serve the strategy, never the other way around. Information completeness is part of conversion: every extracted service, review, hour, and contact detail appears on the page — a visitor who can't find the info leaves.
+
 CONVERSION ARCHITECTURE — THIS SITE MUST SELL, NOT JUST LOOK GOOD:
 - The primary action (from the creator's "what should visitors do" selection) is reachable at every scroll position: CTA in the sticky nav + hero CTA above the fold + a full conversion band at the end.
 - Every phone number rendered is a tap-to-call link (<a href="tel:...">). Every email is a mailto link.
@@ -115,6 +117,9 @@ LAYOUT NOTE: ${analysis.layout?.notes || ''}
 
 ${factsBlock}
 
+CONVERSION STRATEGY (the page's brain — execute exactly):
+${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}
+
 ${analysis.brand ? `BRAND ANALYSIS (elevate THIS brand — do not invent a new one):\n${JSON.stringify(analysis.brand, null, 2)}\n` : ''}
 ${styleMds.length === 1 ? `DESIGN SYSTEM TO FOLLOW PRECISELY:\n${styleMds[0]}\n` : ''}${styleMds.length > 1 ? `DESIGN SYSTEMS TO MIX & MATCH (${styleMds.length}) — you are a smart design agent: take the strongest ideas from each (a hero treatment from one, a menu/list pattern from another, typography pairing from a third), fuse them into ONE cohesive direction perfectly niched to THIS business, and map every color decision onto the brand theme colors above. Never produce a franken-page — the blend must feel like a single intentional system.\n\n${styleMds.map((s, i) => `--- SYSTEM ${i + 1} ---\n${s}`).join('\n\n')}\n` : ''}
 COPY (JSON — use exactly, never invent):
@@ -124,7 +129,7 @@ IMAGE SLOTS (use every token, in its noted section):
 ${slotBlock}`
 
     // No quality-limiting cap — the mockup has to be good. Streaming handles the size.
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 32000 })
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 64000 })
     const html = stripFences(raw)
     if (!/<html|<!doctype/i.test(html)) {
       return Response.json({ error: 'The mockup could not be built (invalid HTML returned). Try again.' }, { status: 502 })
