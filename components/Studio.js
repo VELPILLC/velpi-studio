@@ -6,12 +6,141 @@ import LightningBackground from './LightningBackground'
 // Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
 // answers steer style mixing + the build direction so every site is themed to
 // the brand's vibe instead of one default format per industry.
+// Vibe picker — every option is a tiny visual preview of the look, with a
+// plain-English description. `ai` is the richer phrasing sent to the agent.
 const VIBE_QUESTIONS = [
-  { id: 'vibe', q: 'What vibe should it give off?', options: ['Luxurious & refined', 'Bold & high-energy', 'Warm & welcoming', 'Minimal & modern', 'Editorial & artistic', 'Classic & trusted'] },
-  { id: 'feel', q: 'First impression in 3 seconds?', options: ['Premium — worth paying more', 'Instantly trustworthy', 'Exciting & alive', 'Calm & serene', 'Established authority', 'Friendly & local'] },
-  { id: 'layout', q: 'Visual personality?', options: ['Dramatic full-screen imagery', 'Clean structured grid', 'Asymmetric & editorial', 'Airy whitespace', 'Dark & moody', 'Rich & layered'] },
-  { id: 'convert', q: 'What should visitors do?', options: ['Call now', 'Book / schedule', 'Request a quote', 'Browse menu / products', 'Visit in person', 'Trust first, then contact'] },
+  {
+    id: 'feel', q: 'How should it feel?',
+    options: [
+      { label: 'Luxurious', desc: 'High-end, expensive look', ai: 'Luxurious & refined — premium, high-end, feels worth paying more', preview: 'lux' },
+      { label: 'Bold & loud', desc: 'Huge text, high energy', ai: 'Bold & high-energy — massive type, exciting, alive', preview: 'bold' },
+      { label: 'Warm & friendly', desc: 'Cozy, welcoming, local', ai: 'Warm & welcoming — friendly, inviting, neighborly', preview: 'warm' },
+      { label: 'Clean & modern', desc: 'Simple, crisp, minimal', ai: 'Minimal & modern — clean, calm, precise', preview: 'minimal' },
+      { label: 'Artsy magazine', desc: 'Creative editorial layouts', ai: 'Editorial & artistic — magazine-style, asymmetric, creative', preview: 'editorial' },
+      { label: 'Classic & pro', desc: 'Traditional, trustworthy', ai: 'Classic & trusted — established, professional authority', preview: 'classic' },
+    ],
+  },
+  {
+    id: 'look', q: 'How should it look?',
+    options: [
+      { label: 'Big photos', desc: 'Photos fill the screen', ai: 'Dramatic full-screen imagery-led design', preview: 'photos' },
+      { label: 'Light & airy', desc: 'Lots of open space', ai: 'Airy whitespace — light, generous breathing room', preview: 'airy' },
+      { label: 'Dark & moody', desc: 'Deep colors, dramatic', ai: 'Dark & moody — deep tones, dramatic contrast', preview: 'dark' },
+      { label: 'Color blocks', desc: 'Bold bands of color', ai: 'Bold color-blocked sections in the brand palette', preview: 'blocks' },
+      { label: 'Neat grid', desc: 'Tidy rows & columns', ai: 'Clean structured grid layouts', preview: 'grid' },
+      { label: 'Layered', desc: 'Overlapping, rich, deep', ai: 'Rich & layered — overlapping elements, tasteful depth', preview: 'layered' },
+    ],
+  },
+  {
+    id: 'convert', q: 'What should visitors do?',
+    options: [
+      { label: 'Call now', desc: 'Phone rings today', ai: 'Primary action: call now', icon: '📞' },
+      { label: 'Book online', desc: 'Schedule an appointment', ai: 'Primary action: book / schedule online', icon: '📅' },
+      { label: 'Get a quote', desc: 'Fill a quick form', ai: 'Primary action: request a quote', icon: '📋' },
+      { label: 'Browse & order', desc: 'See menu or products', ai: 'Primary action: browse the menu / products', icon: '🛍' },
+      { label: 'Come visit', desc: 'Walk in the door', ai: 'Primary action: visit in person', icon: '📍' },
+      { label: 'Build trust', desc: 'Get known, then contacted', ai: 'Primary action: build trust first, then contact', icon: '⭐' },
+    ],
+  },
 ]
+
+// Hand-drawn mini website previews (pure CSS) so every vibe option is SEEN,
+// not decoded from marketing words.
+function MiniPreview({ kind }) {
+  const box = { width: '100%', aspectRatio: '16/10', borderRadius: 8, overflow: 'hidden', position: 'relative', display: 'block' }
+  const bar = (w, h, bg, extra = {}) => <div style={{ width: w, height: h, background: bg, borderRadius: 2, ...extra }} />
+  switch (kind) {
+    case 'lux': return (
+      <div style={{ ...box, background: '#161210', padding: '8px 10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          {bar(14, 3, '#c9a35f')}{bar(30, 2, 'rgba(255,255,255,0.25)')}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginTop: 8 }}>
+          {bar('55%', 5, '#e9dfd0')}{bar('35%', 3, '#c9a35f')}{bar(26, 8, 'transparent', { border: '1px solid #c9a35f', marginTop: 5 })}
+        </div>
+      </div>)
+    case 'bold': return (
+      <div style={{ ...box, background: '#f2f0eb', padding: '7px 9px' }}>
+        {bar('88%', 11, '#111', { marginBottom: 4 })}
+        {bar('66%', 11, '#111', { marginBottom: 7 })}
+        <div style={{ display: 'flex', gap: 4 }}>{bar(34, 10, '#e8442e')}{bar(20, 10, 'transparent', { border: '1.5px solid #111' })}</div>
+      </div>)
+    case 'warm': return (
+      <div style={{ ...box, background: '#f7eede', padding: '8px 10px' }}>
+        <div style={{ position: 'absolute', top: 8, right: 10, width: 18, height: 18, borderRadius: '50%', background: '#e8a75d' }} />
+        <div style={{ marginTop: 14 }}>
+          {bar('52%', 6, '#7a4a2b', { borderRadius: 4, marginBottom: 4 })}
+          {bar('40%', 4, 'rgba(122,74,43,0.5)', { borderRadius: 4, marginBottom: 8 })}
+          {bar(38, 11, '#c96f3b', { borderRadius: 7 })}
+        </div>
+      </div>)
+    case 'minimal': return (
+      <div style={{ ...box, background: '#ffffff', padding: '10px 12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>{bar(12, 3, '#111')}{bar(26, 2, '#ccc')}</div>
+        {bar('44%', 4, '#111', { marginBottom: 4 })}
+        {bar('30%', 2.5, '#bbb', { marginBottom: 10 })}
+        {bar(26, 8, '#111')}
+      </div>)
+    case 'editorial': return (
+      <div style={{ ...box, background: '#f4f2ec', padding: 0 }}>
+        <div style={{ position: 'absolute', left: 8, top: 9, zIndex: 2 }}>
+          {bar(52, 7, '#191919', { marginBottom: 3 })}{bar(36, 7, '#191919')}
+        </div>
+        <div style={{ position: 'absolute', right: 6, top: 20, width: '46%', height: '58%', background: 'linear-gradient(140deg,#8d9aa8,#5b6673)', borderRadius: 3 }} />
+        <div style={{ position: 'absolute', left: 10, bottom: 8 }}>{bar(30, 2.5, '#999', { marginBottom: 2 })}{bar(40, 2.5, '#999')}</div>
+      </div>)
+    case 'classic': return (
+      <div style={{ ...box, background: '#fff' }}>
+        <div style={{ height: '26%', background: '#1d3557', display: 'flex', alignItems: 'center', padding: '0 9px', gap: 5 }}>
+          {bar(10, 4, '#d4af6a')}{bar(22, 2.5, 'rgba(255,255,255,0.6)')}
+        </div>
+        <div style={{ display: 'flex', gap: 5, padding: '9px 9px 0' }}>
+          {[0, 1, 2].map(i => <div key={i} style={{ flex: 1, height: 26, background: '#eef1f5', borderRadius: 2, borderTop: '2px solid #1d3557' }} />)}
+        </div>
+      </div>)
+    case 'photos': return (
+      <div style={{ ...box, background: 'linear-gradient(150deg,#3d6b8f 0%,#27476b 55%,#152a45 100%)' }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '52%', background: 'linear-gradient(to top, rgba(0,0,0,0.72), transparent)' }} />
+        <div style={{ position: 'absolute', bottom: 8, left: 9 }}>
+          {bar(58, 6, '#fff', { marginBottom: 3 })}{bar(30, 8, '#e8b23a', { marginTop: 3 })}
+        </div>
+      </div>)
+    case 'airy': return (
+      <div style={{ ...box, background: '#fdfdfc', padding: '16px 12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, marginTop: 6 }}>
+          {bar('36%', 4, '#2a2a2a')}{bar('24%', 2.5, '#c8c8c4')}{bar(22, 7, 'transparent', { border: '1px solid #2a2a2a', marginTop: 6 })}
+        </div>
+      </div>)
+    case 'dark': return (
+      <div style={{ ...box, background: '#0b0e14', padding: '10px 11px' }}>
+        {bar('50%', 6, '#e8ecf4', { marginBottom: 4 })}
+        {bar('34%', 3, '#4f6b8f', { marginBottom: 9 })}
+        {bar(32, 9, '#2990fa', { boxShadow: '0 0 10px rgba(41,144,250,0.7)' })}
+        <div style={{ position: 'absolute', right: 8, top: 10, width: 26, height: 26, borderRadius: '50%', background: 'radial-gradient(circle,#22344f 0%,transparent 70%)' }} />
+      </div>)
+    case 'blocks': return (
+      <div style={{ ...box }}>
+        <div style={{ height: '34%', background: '#264653', padding: '6px 8px' }}>{bar(38, 4, '#fff')}</div>
+        <div style={{ height: '33%', background: '#e9c46a', padding: '6px 8px' }}>{bar(30, 4, '#264653')}</div>
+        <div style={{ height: '33%', background: '#e76f51', padding: '6px 8px' }}>{bar(34, 4, '#fff')}</div>
+      </div>)
+    case 'grid': return (
+      <div style={{ ...box, background: '#fafafa', padding: '8px 9px' }}>
+        {bar('34%', 4, '#222', { marginBottom: 6 })}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+          {[...Array(6)].map((_, i) => <div key={i} style={{ height: 15, background: '#e7e9ee', borderRadius: 2 }} />)}
+        </div>
+      </div>)
+    case 'layered': return (
+      <div style={{ ...box, background: '#e9e4dc' }}>
+        <div style={{ position: 'absolute', left: 7, top: 7, width: '58%', height: '68%', background: 'linear-gradient(150deg,#7d8a99,#4c5866)', borderRadius: 4 }} />
+        <div style={{ position: 'absolute', right: 7, bottom: 7, width: '52%', height: '56%', background: '#fff', borderRadius: 4, boxShadow: '0 6px 16px rgba(0,0,0,0.25)', padding: '6px 7px' }}>
+          {bar('70%', 4, '#1a1a1a', { marginBottom: 3 })}{bar('50%', 2.5, '#b5b5b0', { marginBottom: 5 })}{bar(20, 6, '#c96f3b')}
+        </div>
+      </div>)
+    default: return <div style={{ ...box, background: '#101c30' }} />
+  }
+}
 
 const BLUE = '#2990fa'
 // Translucent surfaces let the ambient lightning glow through the UI.
@@ -28,6 +157,7 @@ const STEP_DEFS = [
   { id: 'copy', label: 'Writing copy' },
   { id: 'build', label: 'Building website' },
   { id: 'elevate', label: 'Elevating design — pass 2' },
+  { id: 'perfect', label: 'Refinement loop — critique & fix (up to 3 rounds)' },
   { id: 'images', label: 'Generating images' },
 ]
 
@@ -279,7 +409,9 @@ export default function Studio() {
     const parts = []
     for (const q of VIBE_QUESTIONS) {
       const sel = vibe[q.id] || []
-      if (sel.length) parts.push(`${q.q} ${sel.join(' + ')}`)
+      if (!sel.length) continue
+      const rich = sel.map(labelSel => q.options.find(o => o.label === labelSel)?.ai || labelSel)
+      parts.push(`${q.q} ${rich.join(' + ')}`)
     }
     return parts.join(' | ')
   }
@@ -531,9 +663,11 @@ export default function Studio() {
       // response ceiling. Falls back to pass 1 untouched if anything goes wrong.
       mark('elevate', 'active')
       let pass2Applied = false
+      let workingHtml = html
       try {
         const res = await callRoute('/api/enhance-site', { html, analysis, vibe: vibeText, brief: designBrief })
         if (res.html) {
+          workingHtml = res.html
           setHtmlTemplate(res.html)
           pass2Applied = !!res.pass2
         }
@@ -542,8 +676,36 @@ export default function Studio() {
         mark('elevate', 'error') // non-fatal — pass-1 site stays usable
       }
 
+      // REFINEMENT LOOP — critique -> surgical fix, up to 3 rounds, until the
+      // QA director passes it as deliverable. Every round is non-fatal.
+      mark('perfect', 'active')
+      let loopLog = []
+      try {
+        for (let round = 1; round <= 3; round++) {
+          const crit = await callRoute('/api/critique-site', { html: workingHtml, analysis, brief: designBrief })
+          if (crit.pass || !crit.issues?.length) {
+            loopLog.push(`Round ${round}: PASSED${crit.score != null ? ` (score ${crit.score})` : ''} — deliverable.`)
+            break
+          }
+          loopLog.push(`Round ${round}: score ${crit.score ?? '?'} — fixing ${crit.issues.length} issue(s): ${crit.issues.map(i => i.issue).join(' | ').slice(0, 400)}`)
+          const fix = await callRoute('/api/enhance-site', { html: workingHtml, analysis, vibe: vibeText, brief: designBrief, issues: crit.issues })
+          if (fix.html && fix.pass2) {
+            workingHtml = fix.html
+            setHtmlTemplate(fix.html)
+          } else {
+            loopLog.push(`Round ${round}: fix failed safety gates — keeping previous version.`)
+            break
+          }
+        }
+        mark('perfect', 'complete')
+      } catch (_) {
+        mark('perfect', 'error') // non-fatal — latest good version stands
+      }
+
       // Build report — everything the generator thought and used, copyable.
-      setBuildReport(composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief))
+      const report = composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief)
+        + (loopLog.length ? `\n--- REFINEMENT LOOP ---\n${loopLog.join('\n')}\n` : '')
+      setBuildReport(report)
 
       await Promise.all([imagesPromise, refineP])
     } catch (e) {
@@ -729,26 +891,35 @@ export default function Studio() {
             These steer the design — the blend of styles, mood, and what the site pushes visitors to do.
           </div>
           {VIBE_QUESTIONS.map(q => (
-            <div key={q.id} style={{ marginBottom: 12 }}>
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.82rem', fontWeight: 600, color: '#fff', marginBottom: 7 }}>{q.q}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div key={q.id} style={{ marginBottom: 16 }}>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>{q.q}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: q.id === 'convert' ? 'repeat(auto-fill, minmax(140px, 1fr))' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
                 {q.options.map(opt => {
-                  const on = (vibe[q.id] || []).includes(opt)
+                  const on = (vibe[q.id] || []).includes(opt.label)
                   return (
-                    <button
-                      key={opt}
-                      onClick={() => !generating && toggleVibe(q.id, opt)}
+                    <div
+                      key={opt.label}
+                      onClick={() => !generating && toggleVibe(q.id, opt.label)}
                       style={{
-                        background: on ? 'rgba(41,144,250,0.16)' : BG,
-                        border: `1px solid ${on ? BLUE : BORDER}`,
-                        color: on ? '#fff' : 'rgba(255,255,255,0.7)',
-                        borderRadius: 999, padding: '7px 13px',
-                        fontFamily: 'var(--font-inter)', fontSize: '0.76rem',
-                        cursor: generating ? 'default' : 'pointer',
+                        background: on ? 'rgba(41,144,250,0.14)' : BG,
+                        border: `1.5px solid ${on ? BLUE : BORDER}`,
+                        borderRadius: 12, padding: 7, cursor: generating ? 'default' : 'pointer',
+                        position: 'relative',
                       }}
                     >
-                      {on ? '✓ ' : ''}{opt}
-                    </button>
+                      {on && (
+                        <span style={{ position: 'absolute', top: 5, right: 5, zIndex: 2, width: 18, height: 18, borderRadius: '50%', background: BLUE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem' }}>✓</span>
+                      )}
+                      {opt.preview ? (
+                        <MiniPreview kind={opt.preview} />
+                      ) : (
+                        <div style={{ width: '100%', aspectRatio: '16/7', borderRadius: 8, background: 'rgba(6,13,31,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
+                          {opt.icon}
+                        </div>
+                      )}
+                      <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.78rem', color: '#fff', margin: '7px 2px 2px' }}>{opt.label}</div>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.66rem', color: 'rgba(255,255,255,0.5)', margin: '0 2px', lineHeight: 1.35 }}>{opt.desc}</div>
+                    </div>
                   )
                 })}
               </div>

@@ -27,12 +27,24 @@ HARD CONSTRAINTS (violating any of these fails the review):
 - Keep the MOBILE-FIRST contract: base CSS targets ~390px with EDGE-TO-EDGE sections (no page gutters on mobile, 12-16px text insets max, minimal padding, full-width CTAs, clamp() fluid type, zero horizontal scroll), enhanced upward via min-width media queries.
 - Return ONLY the complete rebuilt HTML document starting with <!DOCTYPE html>. No markdown, no commentary.`
 
+// Surgical mode — used by the refinement loop: fix EXACTLY the critic's issues.
+const SYSTEM_FIX = `You are a senior developer executing a QA punch list on a finished website an hour before delivery. You are given the full HTML and a list of specific issues from the design director.
+
+RULES:
+- Fix EVERY listed issue completely and precisely.
+- Change NOTHING that is not required by an issue — untouched sections stay byte-for-byte identical.
+- Preserve every %%IMG:...%% token exactly (same tokens, none added, renamed, or removed).
+- Preserve all real content (copy, services, prices, hours, contacts, reviews) unless an issue explicitly says otherwise.
+- Keep all constraints: .velpi-page scoping on every selector, ONE <style> tag with @import fonts at top, no JavaScript, no position:fixed, mobile-first edge-to-edge base styles, brand palette only.
+- Return ONLY the complete corrected HTML document starting with <!DOCTYPE html>. No markdown, no commentary.`
+
 export async function POST(request) {
   try {
-    const { html, analysis, vibe, brief } = await request.json()
+    const { html, analysis, vibe, brief, issues } = await request.json()
     if (!html) {
       return Response.json({ error: 'Missing HTML to elevate.' }, { status: 400 })
     }
+    const fixMode = Array.isArray(issues) && issues.length > 0
 
     const palette = analysis?.color_palette || []
     const user = `BRAND: ${analysis?.business_name || ''} — ${analysis?.industry || ''}${analysis?.niche ? ` (${analysis.niche})` : ''}
@@ -43,10 +55,13 @@ ${vibe ? `CREATOR'S VIBE SELECTIONS (honor these): ${vibe}` : ''}
 ${brief ? `DESIGN BRIEF (the committed creative direction — every elevation must deepen this exact direction, never drift from it):\n${brief}\n` : ''}
 ${analysis?.conversion_strategy ? `CONVERSION STRATEGY (the page's brain — every elevation must serve it, and no strategic element may be weakened or dropped):\n${JSON.stringify(analysis.conversion_strategy, null, 2)}` : ''}
 
-FIRST DRAFT TO ELEVATE:
+${fixMode ? `QA PUNCH LIST — FIX EXACTLY THESE (${issues.length}):
+${issues.map((it, i) => `${i + 1}. [${it.severity || 'issue'}] ${it.issue}${it.fix ? ` → FIX: ${it.fix}` : ''}`).join('\n')}
+` : ''}
+${fixMode ? 'HTML TO CORRECT:' : 'FIRST DRAFT TO ELEVATE:'}
 ${html}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 64000 })
+    const raw = await callClaude({ system: fixMode ? SYSTEM_FIX : SYSTEM, user, maxTokens: 64000 })
     const upgraded = stripFences(raw)
 
     // Safety gates — if pass 2 mangled anything structural, ship pass 1 untouched.
