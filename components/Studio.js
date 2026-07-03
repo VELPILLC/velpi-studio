@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { pickCreativeMix } from '../lib/designStyles'
 
 // Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
@@ -212,7 +212,6 @@ export default function Studio() {
   const [logoNotes, setLogoNotes] = useState('')
   const [vibe, setVibe] = useState({})              // question id -> up to 2 selected options
   const [refinedLogo, setRefinedLogo] = useState(null) // data uri after refinement
-  const logoInputRef = useRef(null)
 
   // ── Pipeline ──
   const [generating, setGenerating] = useState(false)
@@ -352,19 +351,6 @@ export default function Studio() {
   const allLinked = slots.length > 0 && linkedCount === slots.length
 
   // ── Logo upload ──
-  async function onLogoFile(fileList) {
-    const file = Array.from(fileList || []).find(f => f.type.startsWith('image/') || /\.svg$/i.test(f.name))
-    if (!file) return
-    setError(null)
-    try {
-      const png = await fileToPng(file)
-      setLogo(png)
-      setRefinedLogo(null)
-    } catch (e) {
-      setError(e.message)
-    }
-  }
-
   // ── Styles save ──
   async function saveNewStyle() {
     if (savingStyle) return
@@ -714,56 +700,13 @@ export default function Studio() {
           />
         </div>
 
-        {/* ── STEP 2 — Logo (auto-detected; upload = optional override) ── */}
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={stepBadge(true)}>✓</span>
-            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Logo — automatic</span>
-            <span style={{ ...label, fontSize: '0.55rem', color: GREEN }}>auto-detected from the site</span>
-          </div>
-          <div
-            onClick={() => !generating && logoInputRef.current?.click()}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 14, cursor: generating ? 'default' : 'pointer',
-              background: BG, border: `1.5px dashed ${logo || refinedLogo ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 14,
-            }}
-          >
-            <div style={{ width: 74, height: 74, borderRadius: 10, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {(refinedLogo || logo || assetsById.logo) ? (
-                <img src={refinedLogo || logo?.preview || assetsById.logo} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-              ) : (
-                <span style={{ fontSize: '1.5rem', opacity: 0.3 }}>✦</span>
-              )}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.9rem', color: '#fff' }}>
-                {refinedLogo ? 'Logo refined ✓ — tap to override with your own'
-                  : logo ? `${logo.name} — will be refined (tap to replace)`
-                  : 'Found automatically from the website — icon isolated, refined to premium 1:1'}
-              </div>
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.5 }}>
-                Icon-only mark, transparent background, fills the frame, identical branding. Upload only if you want to override it.
-              </div>
-            </div>
-            <input ref={logoInputRef} type="file" accept="image/*,.svg" onChange={e => { onLogoFile(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
-          </div>
-          {(
-            <input
-              value={logoNotes}
-              onChange={e => setLogoNotes(e.target.value)}
-              disabled={generating}
-              placeholder='Optional refinement notes — e.g. "remove the white background, keep everything else identical"'
-              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '11px 14px', fontSize: '0.85rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 10 }}
-            />
-          )}
-        </div>
+        {/* Logo is fully automatic now — detected from the site, refined, and it
+            populates in the Assets section below with the other images. */}
 
-        {/* ── STEP 3 — Vibe (multiple choice, up to 2 per question) ── */}
+        {/* ── STEP 2 — Vibe (multiple choice, up to 2 per question) ── */}
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span style={stepBadge(vibeCount > 0)}>{vibeCount > 0 ? '✓' : '3'}</span>
+            <span style={stepBadge(vibeCount > 0)}>{vibeCount > 0 ? '✓' : '2'}</span>
             <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Set the vibe</span>
             <span style={{ ...label, fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>tap up to 2 each</span>
           </div>
