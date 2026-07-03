@@ -24,6 +24,7 @@ const STEP_DEFS = [
   { id: 'analyze', label: 'Analyzing brand' },
   { id: 'copy', label: 'Writing copy' },
   { id: 'build', label: 'Building website' },
+  { id: 'elevate', label: 'Elevating design — pass 2' },
   { id: 'images', label: 'Generating images' },
 ]
 
@@ -127,6 +128,60 @@ function parseBulkStyles(text) {
   return out
 }
 
+// Plain-text report of everything the generator extracted, decided, and used —
+// made to be copy-pasted into a chat so the "thinking" can be critiqued.
+function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied) {
+  const a = analysis || {}
+  const f = a.facts || {}
+  const b = a.brand || {}
+  const L = []
+  L.push('===== VELPI BUILD REPORT =====')
+  L.push(`Business: ${a.business_name || '?'}`)
+  L.push(`Industry: ${a.industry || '?'}${a.niche ? ` — ${a.niche}` : ''}`)
+  L.push(`Primary service: ${a.primary_service || '?'}`)
+  L.push(`Target customer: ${a.target_customer || '?'}`)
+  L.push(`Tone: ${a.tone || '?'}`)
+  L.push('')
+  L.push('--- CREATOR VIBE SELECTIONS ---')
+  L.push(vibeText || '(none selected — generator chose freely)')
+  L.push('')
+  L.push('--- CREATIVE DIRECTION ---')
+  L.push(`Design direction: ${a.design_direction || '?'}`)
+  L.push(`3-second feeling: ${a.target_feeling || '?'}`)
+  L.push(`Section order: ${(a.layout?.section_order || a.sections || []).join(' → ')}`)
+  if (a.layout?.notes) L.push(`Layout notes: ${a.layout.notes}`)
+  L.push(`Styles mixed: ${(chosenStyles || []).map(s => s.name).join(' + ') || '(none)'}`)
+  L.push(`Second elevation pass applied: ${pass2Applied ? 'yes' : 'NO — pass 1 only'}`)
+  L.push('')
+  L.push('--- BRAND DETECTED ---')
+  L.push(`Palette: ${(a.color_palette || []).join(', ') || '?'}`)
+  if (b.primary_colors?.length) L.push(`Primary: ${b.primary_colors.join(', ')} | Secondary: ${(b.secondary_colors || []).join(', ') || '—'} | Accent: ${(b.accent_colors || []).join(', ') || '—'}`)
+  if (b.typography) L.push(`Typography: ${b.typography}`)
+  if (b.button_style) L.push(`Buttons: ${b.button_style} | Radius: ${b.border_radius || '?'} | Spacing: ${b.spacing || '?'}`)
+  if (b.design_language) L.push(`Design language: ${b.design_language}`)
+  if (b.brand_personality) L.push(`Personality: ${b.brand_personality}`)
+  L.push('')
+  L.push('--- INFORMATION EXTRACTED ---')
+  L.push(`Phone: ${f.phone || 'NOT FOUND'}`)
+  L.push(`Emails: ${f.emails?.length ? f.emails.join(', ') : 'NOT FOUND'}`)
+  L.push(`Address: ${f.address || 'NOT FOUND'}`)
+  L.push(`Hours: ${f.hours || 'NOT FOUND'}`)
+  L.push(`Socials: ${f.socials?.length ? f.socials.join(', ') : 'NOT FOUND'}`)
+  L.push(`Services (${f.services?.length || 0}): ${(f.services || []).join(' | ') || 'NOT FOUND'}`)
+  L.push(`Reviews (${f.reviews?.length || 0}):`)
+  if (f.reviews?.length) f.reviews.forEach(r => L.push(`  • "${r}"`))
+  else L.push('  NOT FOUND — likely rendered by a JS review widget the crawler cannot see')
+  L.push('')
+  L.push('--- IMAGE PLAN ---')
+  ;(photoSlots || []).forEach((s, i) => {
+    L.push(`${i + 1}. [${s.section || '?'}] ${s.name}`)
+    if (s.prompt) L.push(`   prompt: ${s.prompt}`)
+  })
+  L.push('')
+  L.push('===== END REPORT =====')
+  return L.join('\n')
+}
+
 export default function Studio() {
   // ── Setup inputs ──
   const [input, setInput] = useState('')
@@ -149,7 +204,9 @@ export default function Studio() {
   const [htmlTemplate, setHtmlTemplate] = useState(null)
   const [built, setBuilt] = useState(false)
   const [imagesReady, setImagesReady] = useState(false)
-  const [frameH, setFrameH] = useState(900)
+  const [buildReport, setBuildReport] = useState('')
+  const [reportOpen, setReportOpen] = useState(false)
+  const [copiedReport, setCopiedReport] = useState(false)
   const [regenIds, setRegenIds] = useState({})
 
   // ── Styles library ──
@@ -395,6 +452,25 @@ export default function Studio() {
       setBuilt(true)
       mark('build', 'complete')
 
+      // PASS 2 — art-director elevation: the first draft is re-prompted against
+      // itself to push composition, density, and premium detail past the single-
+      // response ceiling. Falls back to pass 1 untouched if anything goes wrong.
+      mark('elevate', 'active')
+      let pass2Applied = false
+      try {
+        const res = await callRoute('/api/enhance-site', { html, analysis, vibe: vibeText })
+        if (res.html) {
+          setHtmlTemplate(res.html)
+          pass2Applied = !!res.pass2
+        }
+        mark('elevate', 'complete')
+      } catch (_) {
+        mark('elevate', 'error') // non-fatal — pass-1 site stays usable
+      }
+
+      // Build report — everything the generator thought and used, copyable.
+      setBuildReport(composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied))
+
       await imagesPromise
     } catch (e) {
       const activeId = Object.keys(statuses).find(k => statuses[k] === 'active')
@@ -504,14 +580,6 @@ export default function Studio() {
     try { navigator.clipboard?.writeText(lines.join('\n')) } catch (_) {}
     setCopiedInfo(true)
     setTimeout(() => setCopiedInfo(false), 1500)
-  }
-
-  function onFrameLoad(e) {
-    try {
-      const doc = e.target.contentDocument
-      const h = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
-      if (h > 100) setFrameH(Math.min(h + 24, 30000))
-    } catch (_) {}
   }
 
   // ── Shared styles ──
@@ -776,14 +844,24 @@ export default function Studio() {
               <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>Your new website{bizName ? ` — ${bizName}` : ''}</span>
               <button onClick={openPreview} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>↗ Open Full Preview</button>
             </div>
-            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 16, overflow: 'hidden', background: '#fff', boxShadow: '0 18px 60px rgba(0,0,0,0.5)' }}>
-              <iframe
-                title="Website preview"
-                srcDoc={previewHtml()}
-                sandbox="allow-same-origin"
-                onLoad={onFrameLoad}
-                style={{ width: '100%', height: frameH, border: 'none', display: 'block', background: '#fff' }}
-              />
+            <div
+              onClick={openPreview}
+              style={{
+                border: `1px solid ${BORDER}`, borderRadius: 16, background: PANEL, cursor: 'pointer',
+                padding: '54px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+                boxShadow: '0 18px 60px rgba(0,0,0,0.5)',
+              }}
+            >
+              <span style={{ fontSize: '2.2rem' }}>🖥</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>
+                {bizName ? `${bizName} — website ready` : 'Website ready'}
+              </span>
+              <span style={{ background: BLUE, color: '#fff', borderRadius: 10, padding: '13px 30px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.82rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                ↗ Open Full Preview
+              </span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)' }}>
+                Opens in a new tab at full size — re-open after any change to see updates
+              </span>
             </div>
             {/* Refine chat */}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -804,6 +882,28 @@ export default function Studio() {
               </button>
             </div>
           </div>
+
+          {/* ── 1b. BUILD REPORT — copyable thinking ── */}
+          {buildReport && (
+            <div style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}>
+                <button onClick={() => setReportOpen(v => !v)} style={{ background: 'transparent', border: 'none', color: '#fff', fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📋 Build Report <span style={{ color: BLUE, fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{reportOpen ? '▲' : '▼'}</span>
+                </button>
+                <button
+                  onClick={() => { try { navigator.clipboard?.writeText(buildReport) } catch (_) {}; setCopiedReport(true); setTimeout(() => setCopiedReport(false), 1500) }}
+                  style={{ ...monoBtn, padding: '5px 14px', fontSize: '0.62rem' }}
+                >
+                  {copiedReport ? '✓ Copied' : '⧉ Copy report'}
+                </button>
+              </div>
+              {reportOpen && (
+                <pre style={{ margin: 0, padding: '0 16px 16px', fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflowY: 'auto', lineHeight: 1.6 }}>
+                  {buildReport}
+                </pre>
+              )}
+            </div>
+          )}
 
           {/* ── 2. ASSETS ── */}
           <div style={{ ...card, maxWidth: 'none' }}>

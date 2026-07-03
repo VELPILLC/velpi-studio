@@ -79,7 +79,7 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
 
 Rules:
 - image_inventory must contain EXACTLY 5 photographic items (this is a hard requirement), plus ONE optional logo item FIRST (section "header", action "keep", with the logo URL) only if a logo URL was provided.
-- If a strong real photo URL from the site clearly matches a slot, you may set source:"real", action:"enhance" with that url — the prompt then describes the enhancement. Otherwise source:"none", action:"generate".
+- REUSE REAL PHOTOS AGGRESSIVELY: when an image URL or its alt text clearly indicates a real photograph of the business (team, owner, storefront, interior, work examples, food, community events — e.g. uploads paths, descriptive alts), assign it to the matching slot with source:"real", action:"enhance" (the prompt describes the cleanup: sharpen, correct lighting, keep everything identical). Real photos of the actual business ALWAYS beat generated stand-ins for authenticity. Use source:"none", action:"generate" only when no plausible real photo fits the slot.
 - Never invent the business name, hours, phone, address, or reviews — only use what appears in the crawled content.
 - Keep the provided palette if present; otherwise infer a tasteful 2-4 color palette.
 - BRAND CONTINUITY: if the existing website has an established palette and design language, the new site must feel like an ELEVATED version of the same brand — never a different brand. Extract the brand block as completely as the content allows.`
@@ -99,8 +99,8 @@ DOMAIN: ${scrapedData.domain || '(none)'}
 EXISTING PALETTE: ${(scrapedData.palette || []).join(', ') || '(none — infer one)'}
 LOGO URL: ${scrapedData.logo || '(none)'}
 
-IMAGES FOUND ON SITE (${(scrapedData.images || []).length}):
-${(scrapedData.images || []).slice(0, 25).map((u, i) => `${i + 1}. ${u}`).join('\n') || '(none)'}
+IMAGES FOUND ON SITE (${(scrapedData.images || []).length}) — url plus alt text when the site provided one:
+${(scrapedData.images || []).slice(0, 30).map((im, i) => typeof im === 'string' ? `${i + 1}. ${im}` : `${i + 1}. ${im.url}${im.alt ? ` — alt: "${im.alt}"` : ''}`).join('\n') || '(none)'}
 
 FULL CRAWLED CONTENT:
 ${(scrapedData.content || '').slice(0, 20000)}`

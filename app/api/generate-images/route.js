@@ -81,23 +81,29 @@ export async function POST(request) {
       const prompt = item.prompt || `Subject: ${item.what || 'brand image'} for a ${analysis.industry || 'business'} website. Keep the same: the overall subject and intent. Change: make it a clean, modern, photorealistic, well-lit image. No text, no logos, no watermarks.`
       base.prompt = prompt
 
-      try {
-        if (item.action === 'enhance' && item.url) {
-          aiOps++
-          const file = await fetchAsFile(item.url, toFile)
-          const res = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, n: 1, size: '1024x1024' })
-          const b64 = res.data?.[0]?.b64_json
-          assets.push({ ...base, kind: 'enhanced', src: b64 ? `data:image/png;base64,${b64}` : item.url })
-        } else {
-          aiOps++
-          const res = await openai.images.generate({ model: 'gpt-image-1', prompt, n: 1, size: '1024x1024', quality: 'medium' })
-          const b64 = res.data?.[0]?.b64_json
-          if (b64) assets.push({ ...base, kind: 'generated', src: `data:image/png;base64,${b64}` })
-          else if (item.url) assets.push({ ...base, kind: 'photo', src: item.url })
+      // Up to 2 attempts per image — transient API failures were leaving
+      // placeholder holes in otherwise-finished sites.
+      let done = false
+      for (let attempt = 1; attempt <= 2 && !done; attempt++) {
+        try {
+          if (item.action === 'enhance' && item.url) {
+            if (attempt === 1) aiOps++
+            const file = await fetchAsFile(item.url, toFile)
+            const res = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, n: 1, size: '1024x1024' })
+            const b64 = res.data?.[0]?.b64_json
+            assets.push({ ...base, kind: 'enhanced', src: b64 ? `data:image/png;base64,${b64}` : item.url })
+            done = true
+          } else {
+            if (attempt === 1) aiOps++
+            const res = await openai.images.generate({ model: 'gpt-image-1', prompt, n: 1, size: '1024x1024', quality: 'medium' })
+            const b64 = res.data?.[0]?.b64_json
+            if (b64) { assets.push({ ...base, kind: 'generated', src: `data:image/png;base64,${b64}` }); done = true }
+            else if (attempt === 2 && item.url) { assets.push({ ...base, kind: 'photo', src: item.url }); done = true }
+          }
+        } catch (e) {
+          console.error(`image op failed (slot ${item.slot}, attempt ${attempt}):`, e.message)
+          if (attempt === 2 && item.url) assets.push({ ...base, kind: 'photo', src: item.url }) // graceful fallback
         }
-      } catch (e) {
-        console.error(`image op failed (slot ${item.slot}):`, e.message)
-        if (item.url) assets.push({ ...base, kind: 'photo', src: item.url }) // graceful fallback
       }
     }
 

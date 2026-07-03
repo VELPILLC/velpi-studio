@@ -162,8 +162,23 @@ export async function POST(request) {
       if (content.length > 24000) { content = content.slice(0, 24000); break }
     }
 
-    // 5. Images / logo / palette from the home page. Palette cached per domain.
-    const images = extractImages(homeHtml, targetUrl)
+    // 5. Images from the home page HTML plus every crawled page's markdown
+    //    (![alt](url)), with alt text so the analyzer can judge what each is.
+    const htmlImages = extractImages(homeHtml, targetUrl).map(u => ({ url: u, alt: '' }))
+    const mdImages = []
+    for (const p of pages) {
+      const re = /!\[([^\]]*)\]\((https?:[^)\s]+)/g
+      let m
+      while ((m = re.exec(p.markdown || '')) && mdImages.length < 60) {
+        mdImages.push({ url: m[2], alt: (m[1] || '').trim() })
+      }
+    }
+    const seenImg = new Set()
+    const images = [...mdImages, ...htmlImages].filter(im => {
+      if (!im.url || im.url.startsWith('data:') || seenImg.has(im.url)) return false
+      seenImg.add(im.url)
+      return true
+    }).slice(0, 40)
     const logo = extractLogo(homeHtml, targetUrl, metadata)
     let palette = await getSavedPalette(domain)
     const paletteFromCache = !!palette
