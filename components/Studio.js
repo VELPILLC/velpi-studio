@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { pickCreativeMix } from '../lib/designStyles'
 import { pickSignatureMotion } from '../lib/motionPresets'
 import LightningBackground from './LightningBackground'
@@ -341,8 +341,10 @@ function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applie
 export default function Studio() {
   // ── Setup inputs ──
   const [input, setInput] = useState('')
-  const [logo, setLogo] = useState(null)            // { data, preview, name } original upload
+  const [logo, setLogo] = useState(null)            // { data, preview, name } manual upload override
   const [logoNotes, setLogoNotes] = useState('')
+  const [logoPalette, setLogoPalette] = useState([]) // dominant colors from uploaded logo
+  const logoInputRef = useRef(null)
   const [vibe, setVibe] = useState({})              // question id -> up to 2 selected options
   const [refinedLogo, setRefinedLogo] = useState(null) // data uri after refinement
 
@@ -517,7 +519,40 @@ export default function Studio() {
     setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
-  // Small gallery thumbnail: render the top of the site off-screen, capture,
+  // Dominant brand colors from an uploaded logo (canvas sampling, grays skipped) —
+// feeds theming so an uploaded logo drives the palette like a crawled one does.
+function extractLogoColors(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const s = 48
+        const c = document.createElement('canvas')
+        c.width = s; c.height = s
+        const ctx = c.getContext('2d')
+        ctx.drawImage(img, 0, 0, s, s)
+        const d = ctx.getImageData(0, 0, s, s).data
+        const buckets = {}
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 128) continue
+          const r = d[i], g = d[i + 1], b = d[i + 2]
+          const max = Math.max(r, g, b), min = Math.min(r, g, b)
+          if (max - min < 18 && (max > 235 || max < 25)) continue // near-white/black
+          const key = `${r >> 5},${g >> 5},${b >> 5}`
+          const bk = (buckets[key] = buckets[key] || { n: 0, r: 0, g: 0, b: 0 })
+          bk.n++; bk.r += r; bk.g += g; bk.b += b
+        }
+        const hex = v => Math.round(v).toString(16).padStart(2, '0')
+        resolve(Object.values(buckets).sort((a, b) => b.n - a.n).slice(0, 3)
+          .map(bk => `#${hex(bk.r / bk.n)}${hex(bk.g / bk.n)}${hex(bk.b / bk.n)}`))
+      } catch (_) { resolve([]) }
+    }
+    img.onerror = () => resolve([])
+    img.src = dataUrl
+  })
+}
+
+// Small gallery thumbnail: render the top of the site off-screen, capture,
   // downscale to a compact JPEG data URI. Returns null on any failure.
   async function captureThumb(substitutedHtml) {
     const frame = document.createElement('iframe')
@@ -579,6 +614,22 @@ export default function Studio() {
   const allLinked = slots.length > 0 && linkedCount === slots.length
 
   // ── Logo upload ──
+  // Manual logo override: skip crawl detection entirely; the upload becomes the
+  // source logo and its dominant colors feed theming, same as a crawled logo.
+  async function onLogoFile(fileList) {
+    const file = Array.from(fileList || []).find(f => f.type.startsWith('image/') || /\.svg$/i.test(f.name))
+    if (!file) return
+    setError(null)
+    try {
+      const png = await fileToPng(file)
+      setLogo(png)
+      setRefinedLogo(null)
+      setLogoPalette(await extractLogoColors(png.preview))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   // ── Styles save ──
   async function saveNewStyle() {
     if (savingStyle) return
@@ -680,6 +731,11 @@ export default function Studio() {
             })
         : Promise.resolve().then(() => mark('logo', 'complete')) // no logo found — build uses a text wordmark
 
+      // Uploaded-logo colors lead the theme, exactly like crawled brand colors.
+      if (logo && logoPalette.length) {
+        scrapedData.palette = [...new Set([...logoPalette, ...(scrapedData.palette || [])])].slice(0, 6)
+      }
+
       mark('analyze', 'active')
       const manualVibe = vibeSummary()
       const { analysis } = await callRoute('/api/analyze', { scrapedData, vibe: manualVibe })
@@ -704,6 +760,13 @@ export default function Studio() {
         .map(x => ({ id: x.id, name: x.item.what || x.id, section: x.item.section || '', prompt: x.item.prompt || '' }))
       setSlots([...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }])
 
+      // Anti-repetition memory: the key choices of the last 5 generations force
+      // variation — a combination can't repeat inside that window.
+      let genHistory = []
+      try { genHistory = JSON.parse(localStorage.getItem('velpi_gen_history') || '[]') } catch (_) {}
+      const avoidMotionIds = genHistory.map(h => h.motionId).filter(Boolean)
+      const avoidMixSigs = genHistory.map(h => h.mixSig).filter(Boolean)
+
       let chosenStyles = []
       const manual = styles.find(s => s.id === styleId)
       if (manual) chosenStyles = [manual]
@@ -715,14 +778,16 @@ export default function Studio() {
           `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`,
           `${vibeText} ${analysis.tone || ''} ${analysis.brand?.brand_personality || ''} ${analysis.brand?.design_language || ''}`,
           3,
+          avoidMixSigs,
         )
       }
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
 
       // Signature motion — its own selection pass, separate from styles:
-      // ONE background/motion treatment, intensity matched to the niche + vibe.
-      const motionPreset = pickSignatureMotion(analysis, vibeText)
+      // ONE background/motion treatment, intensity matched to the niche + vibe,
+      // never repeating a recent generation's effect.
+      const motionPreset = pickSignatureMotion(analysis, vibeText, avoidMotionIds)
 
       // Design brief — a creative director fuses brand + vibe + the matched
       // systems into ONE committed spec before any HTML is written.
@@ -831,6 +896,19 @@ export default function Studio() {
       setBuildReport(report)
 
       await Promise.all([imagesPromise, refineP])
+
+      // Record this generation's key choices in the anti-repetition memory.
+      try {
+        const entry = {
+          motionId: motionPreset?.id || null,
+          mixSig: chosenStyles.map(s => s.id).sort().join('+') || null,
+          palette0: (analysis.color_palette || [])[0] || null,
+          hero: (analysis.layout?.section_order || [])[0] || null,
+          at: new Date().toISOString(),
+        }
+        const nextHistory = [entry, ...genHistory].slice(0, 5)
+        localStorage.setItem('velpi_gen_history', JSON.stringify(nextHistory))
+      } catch (_) {}
 
       // AUTO-SAVE — every generation lands in the library automatically with a
       // thumbnail and a shareable /preview/{id} URL. Best-effort: never blocks.
@@ -941,6 +1019,38 @@ export default function Studio() {
     const a = document.createElement('a')
     a.href = url
     a.download = `${safeName(bizName)}-website.html`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
+  // Per-generation artifacts: the decision log and the asset manifest,
+  // downloadable as files (also persisted inside the saved project data).
+  function downloadDecisions() {
+    if (!buildReport) return
+    const blob = new Blob([buildReport], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeName(bizName)}-decisions.md`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
+  function downloadAssetsJson() {
+    const manifest = {
+      business: bizName || null,
+      generatedAt: new Date().toISOString(),
+      logo: { detected: logoUrl || null, refined: !!refinedLogo, ghlUrl: ghlUrls.logo || null },
+      images: slots.filter(s => s.id !== 'logo').map((s, i) => ({
+        slot: i + 1, id: s.id, name: s.name, section: s.section || null,
+        prompt: s.prompt || null, generated: !!assetsById[s.id], ghlUrl: ghlUrls[s.id] || null,
+      })),
+    }
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeName(bizName)}-assets.json`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 5000)
   }
@@ -1060,6 +1170,46 @@ export default function Studio() {
           <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 12 }}>
             Leave everything untouched and the agent reads the business itself — copy tone → feel, imagery → look, business type → call-to-action. Anything you tap here overrides the inference.
           </div>
+
+          {/* Logo override — upload skips crawl detection entirely */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+              Logo <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: '0.74rem' }}>— auto-detected from the site unless you upload one</span>
+            </div>
+            <div
+              onClick={() => !generating && logoInputRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: generating ? 'default' : 'pointer', background: BG, border: `1.5px dashed ${logo ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 10, padding: 10 }}
+            >
+              <div style={{ width: 54, height: 54, borderRadius: 8, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {logo ? <img src={logo.preview} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ opacity: 0.3 }}>✦</span>}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.8rem', color: '#fff' }}>
+                  {logo ? `${logo.name} — this replaces detection (tap to change)` : 'Upload a logo to override detection (PNG, SVG, screenshot)'}
+                </div>
+                {logoPalette.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, marginTop: 5, alignItems: 'center' }}>
+                    <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)' }}>theme colors:</span>
+                    {logoPalette.map(c => <span key={c} title={c} style={{ width: 13, height: 13, borderRadius: 3, background: c, border: '1px solid rgba(255,255,255,0.25)' }} />)}
+                  </div>
+                )}
+              </div>
+              {logo && (
+                <button onClick={e => { e.stopPropagation(); setLogo(null); setLogoPalette([]); setRefinedLogo(null) }} style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 7, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0 }}>✕</button>
+              )}
+              <input ref={logoInputRef} type="file" accept="image/*,.svg" onChange={e => { onLogoFile(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+            </div>
+            <input
+              value={logoNotes}
+              onChange={e => setLogoNotes(e.target.value)}
+              disabled={generating}
+              placeholder='Optional refinement notes — e.g. "remove the white background"'
+              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '10px 13px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8 }}
+            />
+          </div>
+
           {VIBE_QUESTIONS.map(q => (
             <div key={q.id} style={{ marginBottom: 16 }}>
               <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>{q.q}</div>
@@ -1336,12 +1486,16 @@ export default function Studio() {
                 <button onClick={() => setReportOpen(v => !v)} style={{ background: 'transparent', border: 'none', color: '#fff', fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
                   📋 Build Report <span style={{ color: BLUE, fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{reportOpen ? '▲' : '▼'}</span>
                 </button>
-                <button
-                  onClick={() => { try { navigator.clipboard?.writeText(buildReport) } catch (_) {}; setCopiedReport(true); setTimeout(() => setCopiedReport(false), 1500) }}
-                  style={{ ...monoBtn, padding: '5px 14px', fontSize: '0.62rem' }}
-                >
-                  {copiedReport ? '✓ Copied' : '⧉ Copy report'}
-                </button>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button onClick={downloadDecisions} style={{ ...monoBtn, padding: '5px 12px', fontSize: '0.62rem' }}>⬇ decisions.md</button>
+                  <button onClick={downloadAssetsJson} style={{ ...monoBtn, padding: '5px 12px', fontSize: '0.62rem' }}>⬇ assets.json</button>
+                  <button
+                    onClick={() => { try { navigator.clipboard?.writeText(buildReport) } catch (_) {}; setCopiedReport(true); setTimeout(() => setCopiedReport(false), 1500) }}
+                    style={{ ...monoBtn, padding: '5px 14px', fontSize: '0.62rem' }}
+                  >
+                    {copiedReport ? '✓ Copied' : '⧉ Copy'}
+                  </button>
+                </div>
               </div>
               {reportOpen && (
                 <pre style={{ margin: 0, padding: '0 16px 16px', fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflowY: 'auto', lineHeight: 1.6 }}>
