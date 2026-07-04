@@ -1,0 +1,42 @@
+/*
+ * Daniela and Moe Wedding 2019 — design tokens
+ * Source: https://styles.refero.design/style/0f1b3cd0-de5a-4418-8711-0e1afe04707c
+ * Fetched: 2026-07-04T19:30:32.233Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-blush-canvas: #fef1ec; /* Primary page background, section backgrounds, hero canvas — the warm paper tone that carries every… */
+  --color-ink-navy: #11223f; /* Primary text, headings, nav links, body copy, input borders — the only dark anchor in the system */
+  --color-coral-vermillion: #ff5734; /* Outlined link/action borders, active nav underline, button borders — the single warm accent that gi… */
+  --color-dusty-peach: #f6bba4; /* Secondary surface tint, card accents, illustration fills — the softer sibling of the canvas */
+  --color-forest-ink: #193c35; /* Botanical illustration dark foliage — the deepest green in the artwork palette */
+  --color-olive-grove: #7e813c; /* Botanical illustration mid-tone leaves and stems */
+  --color-mustard-bloom: #e5ba2b; /* Botanical illustration flower accents — warm yellow punctuation in the foliage */
+  --color-ember-orange: #ec4f22; /* Botanical illustration bright flower highlights — the vividest warm note in the artwork */
+  --color-sage-mist: #c6d7d0; /* Botanical illustration soft greenery, dot patterns — the coolest note in the foliage */
+  --color-deep-indigo: #092a49; /* Botanical illustration line work, fine stroke details */
+  --color-pure-white: #ffffff; /* Neutral form states, badge text, and quiet UI feedback where color should stay understated. Do not… */
+  /* spacing */
+  --space-section-gap: 80px; /* gap between page sections */
+  --space-element-gap: 20px; /* gap between sibling elements */
+  --space-card-padding: 32px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-tags: 200px; /* tags */
+  --radius-cards: 0px; /* cards */
+  --radius-inputs: 0px; /* inputs */
+  --radius-buttons: 200px; /* buttons */
+  /* font families */
+  --font-canela-web: 'Canela Web'; /* Display and headings — ultra-light 100 weight at 120px for the couple's names creates a h… */
+  --font-calibre: 'Calibre'; /* Body, UI, labels, and secondary headings. The 0.2em letter-spacing transforms body text i… */
+  /* type scale */
+  --text-caption: 12px; /* line-height 1.6, letter-spacing 2.4px */
+  --text-body-sm: 16px; /* line-height 2 */
+  --text-body: 20px; /* line-height 1.6 */
+  --text-subheading: 24px; /* line-height 1.4 */
+  --text-heading-sm: 28px; /* line-height 1.3 */
+  --text-heading: 36px; /* line-height 1.4 */
+  --text-heading-lg: 48px; /* line-height 1.2 */
+  --text-display: 120px; /* line-height 0.85 */
+}

@@ -1,0 +1,47 @@
+/*
+ * Assembly Coffee London — design tokens
+ * Source: https://styles.refero.design/style/8288950a-2731-44fd-85ef-211aecd8091d
+ * Fetched: 2026-07-04T19:30:06.341Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-obsidian: #0e1311; /* Primary canvas — page backgrounds, hero sections, card surfaces. The near-black with a faint green… */
+  --color-pure-black: #000000; /* Deepest surface, borders, and type. Used for maximum-contrast outlines, product box photography bac… */
+  --color-ash-charcoal: #1a1a1a; /* Secondary surface and border tone — slightly lifted from black for subtle layering on nav, dividers… */
+  --color-graphite: #333333; /* Mid-neutral for secondary text, input borders, and card outlines where pure black is too heavy */
+  --color-stone-gray: #808080; /* Image placeholder and muted background tone — holds space where product photography is loading or a… */
+  --color-silver: #b3b3b3; /* De-emphasized borders and helper text on light surfaces */
+  --color-bone: #ffffff; /* Primary text on dark canvases, price-chip fills, inverted button surfaces. The brightest accent in… */
+  --color-linen: #f6f7f2; /* Warm off-white surface for inverted sections, price pill backgrounds, and soft button fills. Sits b… */
+  --color-sand-khaki: #dfdbca; /* Hairline borders, dividers, input outlines, and card edges on light surfaces. */
+  --color-lichen-green: #cadcac; /* Green state accent for badges, validation surfaces, and short status labels. */
+  --color-citron: #faf080; /* Yellow state accent for badges, validation surfaces, and short status labels. */
+  --color-antique-gold: #cfa53b; /* Accent stroke and border for promotional or limited-availability badges. Reads as aged brass — neve… */
+  --color-olive-bark: #4d4a31; /* Dark olive link/announcement background — the deep green-brown of the top bar, grounded and earthy */
+  /* spacing */
+  --space-section-gap: 80px; /* gap between page sections */
+  --space-element-gap: 16px; /* gap between sibling elements */
+  --space-card-padding: 20px; /* internal card padding */
+  --space-page-max-width: 1400px; /* max content width */
+  /* radius */
+  --radius-nav: 4px; /* nav */
+  --radius-cards: 4px; /* cards */
+  --radius-badges: 4px; /* badges */
+  --radius-inputs: 4px; /* inputs */
+  --radius-buttons: 4px; /* buttons */
+  --radius-pricepills: 60px; /* pricepills */
+  /* font families */
+  --font-gt-america-standard: 'GT America Standard'; /* The UI workhorse: navigation labels, body copy, button text, metadata, footer text, cart… */
+  --font-id00-serif: 'ID00 Serif'; /* The editorial voice: product names, section headings, the 'Shop Now' and 'Limited Time Of… */
+  --font-helvetica: 'Helvetica'; /* Fallback / system substitute for small tertiary text and icons where GT America is not lo… */
+  --font-reviewsio-font: 'reviewsio-font'; /* reviewsio-font — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-caption: 11px; /* line-height 1.5 */
+  --text-body: 16px; /* line-height 1.5 */
+  --text-subheading: 18px; /* line-height 1.4 */
+  --text-heading-sm: 21px; /* line-height 1.25 */
+  --text-heading: 30px; /* line-height 1.25 */
+  --text-heading-lg: 36px; /* line-height 1.2 */
+  --text-display: 42px; /* line-height 1.2 */
+}

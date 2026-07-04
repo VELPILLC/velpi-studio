@@ -1,0 +1,40 @@
+/*
+ * WHOOP — design tokens
+ * Source: https://styles.refero.design/style/05053a60-1964-4154-9d58-ebdf6352ed3a
+ * Fetched: 2026-07-04T19:30:08.027Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-pulse-violet: #4a53ff; /* Violet supporting accent for decorative details and low-frequency emphasis. Do not promote it to th… */
+  --color-obsidian: #000000; /* Primary text on light surfaces, dark hero/section backgrounds, filled neutral buttons, icon strokes */
+  --color-carbon: #191919; /* Secondary dark surface (footer band, alternating black sections), heading text on light surfaces */
+  --color-paper-white: #ffffff; /* Primary page canvas, card surfaces on dark sections, text on dark backgrounds, filled white pill bu… */
+  --color-lab-mist: #f3f5f9; /* Soft elevated surface for light cards and feature panels — a cool off-white that distinguishes card… */
+  --color-hairline: #e5e7eb; /* Borders, dividers, outlined button strokes, input frames — the most-used neutral in the system (256… */
+  --color-fog-gray: #808080; /* Muted body text, secondary descriptions, placeholder copy on light surfaces */
+  --color-ash: #999999; /* Tertiary text, inactive button labels, disabled icon strokes — sits one step below Fog Gray for de-… */
+  /* spacing */
+  --space-section-gap: 80-120px; /* gap between page sections */
+  --space-element-gap: 15-24px; /* gap between sibling elements */
+  --space-card-padding: 24-32px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-cards: 24px; /* cards */
+  --radius-pills: 300px; /* pills */
+  --radius-images: 24px; /* images */
+  --radius-buttons: 300px; /* buttons */
+  --radius-mediumrounded: 30px; /* mediumrounded */
+  --radius-smallelements: 8px; /* smallelements */
+  /* font families */
+  --font-proxima-nova: 'Proxima Nova'; /* Single-family system covering everything from 14px captions to 120px display headlines. T… */
+  /* type scale */
+  --text-caption: 14px; /* line-height 1.59, letter-spacing 0px */
+  --text-body-sm: 16px; /* line-height 1.33, letter-spacing -0.48px */
+  --text-body-lg: 20px; /* line-height 1.29, letter-spacing -0.6px */
+  --text-subheading: 24px; /* line-height 1.13, letter-spacing -0.72px */
+  --text-heading-sm: 32px; /* line-height 1.09, letter-spacing -0.96px */
+  --text-heading: 35px; /* line-height 1, letter-spacing -1.05px */
+  --text-heading-lg: 50px; /* line-height 0.8, letter-spacing -2px */
+  --text-display: 120px; /* line-height 0.71, letter-spacing -4.8px */
+}

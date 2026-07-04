@@ -1,0 +1,46 @@
+/*
+ * sweetgreen — design tokens
+ * Source: https://styles.refero.design/style/d91841cf-c717-43ef-97a2-400778fa6e1a
+ * Fetched: 2026-07-04T19:30:09.635Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-deep-forest: #00473c; /* Primary brand color, nav logo, dark pill buttons, text accents, badge borders, link colors — the st… */
+  --color-lime-glow: #e6ff55; /* Green action color for filled buttons, selected navigation states, and focused conversion moments. */
+  --color-sage-mist: #d8e5d6; /* Section backgrounds, card surfaces, content band alternation — soft botanical green that signals fr… */
+  --color-warm-sand: #e8dcc6; /* Accent surface for alternate section bands — warm beige that pairs with food photography and adds e… */
+  --color-cream-canvas: #f4f3e7; /* Primary page background, the warm off-white that gives the entire system its organic, non-clinical… */
+  --color-forest-shadow: #0e150e; /* Primary text color, borders, input strokes — near-black with a barely-perceptible green undertone t… */
+  --color-pure-ink: #000000; /* Maximum-contrast text, hairlines, icon strokes — used where absolute sharpness is needed */
+  --color-warm-gray: #8c8c82; /* Medium-contrast borders, control outlines, and structural separators. Do not promote it to the prim… */
+  --color-slate-gray: #555555; /* Secondary text in disabled or low-emphasis button contexts */
+  /* spacing */
+  --space-section-gap: 80px; /* gap between page sections */
+  --space-element-gap: 8px; /* gap between sibling elements */
+  --space-card-padding: 24px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-cards: 24px; /* cards */
+  --radius-small: 4px; /* small */
+  --radius-badges: 20px; /* badges */
+  --radius-images: 20px; /* images */
+  --radius-inputs: 8px; /* inputs */
+  --radius-buttons: 9999px; /* buttons */
+  /* font families */
+  --font-sweetsans: 'SweetSans'; /* Display headlines, hero text, large category labels — used at extreme sizes (70–80px) wit… */
+  --font-grenette: 'Grenette'; /* Secondary display accent — ultra-thin weight with extreme negative tracking creates a del… */
+  --font-sweetsanstext: 'SweetSansText'; /* Body text, navigation, button labels, card descriptions, footers — positive tracking (0.0… */
+  --font-sweetsanstext-regular: 'SweetSansText-Regular'; /* Small UI text, micro-labels, fine print — the regular-weight variant for the smallest rea… */
+  /* type scale */
+  --text-caption: 12px; /* line-height 1.33, letter-spacing 0.2px */
+  --text-body-sm: 14px; /* line-height 1.29, letter-spacing 0.24px */
+  --text-body: 16px; /* line-height 1.25, letter-spacing 0.27px */
+  --text-body-lg: 18px; /* line-height 1.33, letter-spacing 0.54px */
+  --text-subheading: 20px; /* line-height 1.2, letter-spacing 0.6px */
+  --text-heading-sm: 24px; /* line-height 1.21, letter-spacing 1.2px */
+  --text-heading: 40px; /* line-height 0.85, letter-spacing 0px */
+  --text-heading-lg: 48px; /* line-height 1, letter-spacing -2.26px */
+  --text-display: 70px; /* line-height 0.85, letter-spacing 0px */
+  --text-display-lg: 80px; /* line-height 1, letter-spacing 0px */
+}

@@ -1,0 +1,47 @@
+/*
+ * Cowboy — design tokens
+ * Source: https://styles.refero.design/style/00ce9181-45be-4340-b6a6-75a4d5d60cef
+ * Fetched: 2026-07-04T19:30:46.054Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-porcelain: #ffffff; /* Page canvas, card surfaces, button text on dark fills — the dominant neutral that lets photography… */
+  --color-charcoal: #1d1d1d; /* Primary text, filled primary action buttons, active nav — a soft black that reads warm rather than… */
+  --color-hairline: #e5e7eb; /* Dividers, card borders, input outlines, image frame edges — the structural skeleton of every section */
+  --color-smoke: #737373; /* Secondary body text, button borders, subtle metadata — a middle gray that recedes behind primary co… */
+  --color-ash: #a3a3a3; /* Tertiary text, disabled state, muted helper copy — the quietest text tier */
+  --color-mist: #f3f4f6; /* Soft card backgrounds, subtle alternating bands — provides the only tonal step between white surfac… */
+  --color-graphite: #5e5e5e; /* Body section background, mid-tier surface for inset panels */
+  --color-bone: #cacaca; /* Faint dividers, disabled borders, focus halos at rest */
+  --color-onyx: #000000; /* Icon fills, high-contrast graphic marks — reserved for SVG iconography only */
+  --color-slate: #6b7280; /* Input field borders at rest — the one input-state neutral */
+  --color-moss: #569d5f; /* Green wash for highlight backgrounds, decorative bands, and soft emphasis behind content. Use as a… */
+  --color-signal-blue: #2563eb; /* Info state, focused input highlight — the only chromatic functional signal in the system */
+  /* spacing */
+  --space-section-gap: 80px; /* gap between page sections */
+  --space-element-gap: 8px; /* gap between sibling elements */
+  --space-card-padding: 48px; /* internal card padding */
+  --space-page-max-width: 1440px; /* max content width */
+  /* radius */
+  --radius-tags: 9999px; /* tags */
+  --radius-cards: 8px; /* cards */
+  --radius-images: 8px; /* images */
+  --radius-inputs: 8px; /* inputs */
+  --radius-buttons: 9999px; /* buttons */
+  /* font families */
+  --font-suisseintl: 'SuisseIntl'; /* Primary typeface across every UI surface. SuisseIntl is a Swiss-geometric grotesque with… */
+  --font-ui-monospace: 'ui-monospace'; /* Oversized monospaced display mark used as a graphic element — the only departure from Sui… */
+  --font-intercom-sans: 'Intercom Sans'; /* Reserved for the Intercom chat widget — not a design system font, do not propagate */
+  --font-intercom-font: 'intercom-font'; /* intercom-font — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-caption: 12px; /* line-height 1.5 */
+  --text-body-sm: 14px; /* line-height 1.5 */
+  --text-body: 16px; /* line-height 1.5 */
+  --text-subheading: 20px; /* line-height 1.25, letter-spacing -0.3px */
+  --text-heading-sm: 24px; /* line-height 1.25, letter-spacing -0.36px */
+  --text-heading: 36px; /* line-height 1.05 */
+  --text-heading-lg: 44px; /* line-height 1.05, letter-spacing -0.88px */
+  --text-display: 72px; /* line-height 1, letter-spacing -1.8px */
+  --text-display-xl: 100px; /* line-height 0.9, letter-spacing -2.5px */
+}

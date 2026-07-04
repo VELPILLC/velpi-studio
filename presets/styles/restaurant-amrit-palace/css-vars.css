@@ -1,0 +1,39 @@
+/*
+ * Amrit Palace — design tokens
+ * Source: https://styles.refero.design/style/b753dfda-cbe1-41e4-b341-b98d69c8422f
+ * Fetched: 2026-07-04T19:31:06.767Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-parchment: #d8cbb8; /* Page canvas and primary card surfaces — the warm beige that carries the entire interface */
+  --color-linen: #bfb4a3; /* Secondary surface tone for elevated sections and subtle layering above parchment */
+  --color-warm-stone: #b6ab9c; /* Hairline borders and 1px section dividers throughout the interface */
+  --color-walnut: #978e81; /* Muted helper text, captions, and de-emphasized metadata */
+  --color-espresso: #615b53; /* Secondary body text and subhead copy — warm dark gray that softens pure black */
+  --color-onyx-warm: #2c2c2c; /* Primary text, navigation, headings, and dark surface fills */
+  --color-midnight-roast: #292622; /* Deepest dark surface for photo overlays and high-contrast hero backgrounds */
+  --color-saffron-glow: #d49653; /* Sole chromatic accent — featured tags, active states, decorative punctuation; warm spice-orange aga… */
+  /* spacing */
+  --space-section-gap: 120-160px; /* gap between page sections */
+  --space-element-gap: 12-16px; /* gap between sibling elements */
+  --space-card-padding: 28px; /* internal card padding */
+  --space-page-max-width: 1440px; /* max content width */
+  /* radius */
+  --radius-tags: 3px; /* tags */
+  --radius-cards: 0px; /* cards */
+  --radius-inputs: 3px; /* inputs */
+  --radius-buttons: 3px; /* buttons */
+  /* font families */
+  --font-tt-ramillas-variable: 'TT Ramillas Variable'; /* All display and section headings — set uppercase at extreme sizes with weight 300; the wh… */
+  --font-satoshi: 'Satoshi'; /* Navigation, buttons, body copy, labels, and the 199px hero wordmark — confident 500-weigh… */
+  /* type scale */
+  --text-caption: 13px; /* line-height 1.3, letter-spacing -0.143px */
+  --text-body: 15px; /* line-height 1.4, letter-spacing -0.15px */
+  --text-body-lg: 26px; /* line-height 1.2, letter-spacing -0.156px */
+  --text-subheading: 42px; /* line-height 1, letter-spacing -1.68px */
+  --text-heading-sm: 50px; /* line-height 0.9, letter-spacing -1.5px */
+  --text-heading: 65px; /* line-height 0.85, letter-spacing -2.6px */
+  --text-heading-lg: 69px; /* line-height 0.9, letter-spacing -2.76px */
+  --text-display: 115px; /* line-height 0.8, letter-spacing -4.6px */
+}

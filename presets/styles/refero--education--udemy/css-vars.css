@@ -1,0 +1,44 @@
+/*
+ * Udemy — design tokens
+ * Source: https://styles.refero.design/style/c03afcbd-96ed-4b7f-8d0a-277fc0042ba7
+ * Fetched: 2026-07-04T19:30:30.609Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-ink: #2a2b3f; /* Primary text, heading strokes, default icon strokes, body copy */
+  --color-obsidian: #202230; /* Card backgrounds in dark sections, inverted surfaces, footer panel */
+  --color-graphite: #33364a; /* Body-level dark surfaces, secondary panel fills */
+  --color-slate: #3d4055; /* Card borders and muted dark backgrounds */
+  --color-steel: #595c73; /* Muted text, heading accents, low-emphasis borders */
+  --color-fog: #9194ac; /* Helper text, hairline borders, disabled strokes */
+  --color-mist: #b7b9cd; /* Card outlines, subtle dividers on light surfaces */
+  --color-chalk: #d1d2e0; /* Light borders, icon strokes on white, card edges */
+  --color-porcelain: #e9eaf2; /* Page background, secondary surface, button ghost fills */
+  --color-paper: #f6f7f9; /* Off-white panel surface between white and porcelain */
+  --color-canvas: #ffffff; /* Card surface, button text on dark, primary surface */
+  --color-aubergine: #6d28d2; /* Violet accent for outlined action borders, linked labels, and lightweight interactive emphasis. Do… */
+  --color-lavender-haze: #c0c4fc; /* Tinted link hover, soft violet highlight wash, light brand surface */
+  --color-ember: #c4710d; /* Secondary accent — badge borders, callout borders, warm icon accent */
+  /* spacing */
+  --space-section-gap: 48px; /* gap between page sections */
+  --space-element-gap: 16px; /* gap between sibling elements */
+  --space-card-padding: 24px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-cards: 8px; /* cards */
+  --radius-pills: 1000px; /* pills */
+  --radius-inputs: 4px; /* inputs */
+  --radius-buttons: 8px; /* buttons */
+  --radius-largecards: 16px; /* largecards */
+  --radius-featurecards: 24px; /* featurecards */
+  /* font families */
+  --font-udemy-sans: 'Udemy Sans'; /* Single-family system: weight 700 for display headlines, 500 for subheadings and nav label… */
+  /* type scale */
+  --text-caption: 12px; /* line-height 1.5 */
+  --text-body-sm: 14px; /* line-height 1.5 */
+  --text-body: 16px; /* line-height 1.6 */
+  --text-subheading: 18px; /* line-height 1.5 */
+  --text-heading-sm: 24px; /* line-height 1.4 */
+  --text-heading: 32px; /* line-height 1.2 */
+}

@@ -1,0 +1,47 @@
+/*
+ * Dollar Shave Club — design tokens
+ * Source: https://styles.refero.design/style/6d72f05e-dce6-43ad-9532-f61bf211ed46
+ * Fetched: 2026-07-04T19:30:20.695Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-midnight-navy: #142978; /* Violet text accent for links, tags, and emphasized short phrases. Do not promote it to the primary… */
+  --color-flame-orange: #fe5000; /* Filled CTA buttons, icon strokes, decorative accents — the single chromatic action color that comma… */
+  --color-wine-burgundy: #82163f; /* Secondary section background, hero display text, promotional bands — adds warmth and depth against… */
+  --color-deep-ink: #001233; /* Outlined/ghost button borders, dark text on light surfaces, deep button variant background */
+  --color-abyss-navy: #0a153c; /* Pressed/secondary button fill — a near-black navy for dark button variants on the navy canvas */
+  --color-powder-blue: #dbebf5; /* Card surfaces and light-blue panel backgrounds within dark sections — breaks up the navy with breat… */
+  --color-warm-cream: #f3e0c8; /* Hero left-panel background, soft warm neutral — used in only the highest-impact first-screen block */
+  --color-snow-white: #ffffff; /* Primary text on dark surfaces, button borders, input fills, card text — the dominant foreground col… */
+  --color-graphite: #404040; /* Heavy-use border and text color on light sections, structural dividers */
+  --color-ash-gray: #e3e3e3; /* Badge and pill borders on light surfaces */
+  --color-fog: #eeeeee; /* Subtle dividers, muted panel backgrounds */
+  --color-stone: #949596; /* Input field borders, low-priority form chrome */
+  /* spacing */
+  --space-section-gap: 30px; /* gap between page sections */
+  --space-element-gap: 10px; /* gap between sibling elements */
+  --space-card-padding: 25px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-nav: 4px; /* nav */
+  --radius-cards: 4px; /* cards */
+  --radius-badges: 4px; /* badges */
+  --radius-inputs: 4px; /* inputs */
+  --radius-buttons: 4px; /* buttons */
+  /* font families */
+  --font-dsc-specter: 'DSC Specter'; /* Primary display and body family — condensed heavy sans with extreme weight range, used up… */
+  --font-gelica: 'Gelica'; /* Secondary utility family for navigation, fine print, and body micro-copy — a serif counte… */
+  --font-gtstandard-m: 'GTStandard-M'; /* GTStandard-M — detected in extracted data but not described by AI */
+  --font-font-awesome-5-pro: 'Font Awesome 5 Pro'; /* Font Awesome 5 Pro — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-caption: 12px; /* line-height 1.2, letter-spacing 0.04px */
+  --text-body-sm: 14px; /* line-height 1.4, letter-spacing 0.025px */
+  --text-body: 16px; /* line-height 1.5, letter-spacing 0.015px */
+  --text-subheading: 18px; /* line-height 1.3, letter-spacing 0.012px */
+  --text-heading-sm: 20px; /* line-height 1.29, letter-spacing 0.025px */
+  --text-heading: 24px; /* line-height 1.25, letter-spacing 0.031px */
+  --text-heading-lg: 32px; /* line-height 1.19, letter-spacing 0.038px */
+  --text-display: 40px; /* line-height 1.2, letter-spacing 0.043px */
+  --text-hero: 52px; /* line-height 0.8, letter-spacing 0.05px */
+}

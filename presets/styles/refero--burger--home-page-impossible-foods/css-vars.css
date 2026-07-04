@@ -1,0 +1,37 @@
+/*
+ * Home page | Impossible Foods — design tokens
+ * Source: https://styles.refero.design/style/04961c7d-8ca6-4e87-ba88-6ad7ffa3b245
+ * Fetched: 2026-07-04T19:30:25.475Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-velvet-wine: #260212; /* Page canvas and deepest section background — the floor everything sits on */
+  --color-burgundy-stage: #4f0423; /* Section and card surfaces, slightly lifted from the canvas to separate bands of content */
+  --color-impossible-red: #e10600; /* Primary action buttons, active toggles, headline accents, icon emphasis — the single chromatic sign… */
+  --color-blush-highlight: #ffc7c6; /* Soft secondary text, pill toggles in default state, link hover, tonal counterpoint to the aggressiv… */
+  --color-butcher-black: #000000; /* Top navigation background, hairline borders, card outlines, deep contrast strokes */
+  --color-bone-white: #ffffff; /* Navigation and button text, body copy on dark surfaces, inverted toggle text */
+  /* spacing */
+  --space-section-gap: 40-64px; /* gap between page sections */
+  --space-element-gap: 6-16px; /* gap between sibling elements */
+  --space-card-padding: 16-24px; /* internal card padding */
+  --space-page-max-width: 1280px; /* max content width */
+  /* radius */
+  --radius-nav: 15px; /* nav */
+  --radius-cards: 12px; /* cards */
+  --radius-buttons: 15px; /* buttons */
+  --radius-toggles: 15px; /* toggles */
+  --radius-feature-cards: 38px; /* feature-cards */
+  /* font families */
+  --font-sans-meat: 'sans-meat'; /* The only typeface on the site. Carries everything from 10px micro-labels to 231px hero st… */
+  /* type scale */
+  --text-caption: 10px; /* line-height 1.4, letter-spacing 0.02px */
+  --text-body-sm: 14px; /* line-height 1.4, letter-spacing 0.02px */
+  --text-body: 18px; /* line-height 1.4, letter-spacing 0.02px */
+  --text-subheading: 24px; /* line-height 1.15, letter-spacing 0.02px */
+  --text-heading-sm: 32px; /* line-height 1.1, letter-spacing 0.02px */
+  --text-heading: 48px; /* line-height 0.9, letter-spacing 0.02px */
+  --text-heading-lg: 103px; /* line-height 0.75, letter-spacing 0.03px */
+  --text-display: 160px; /* line-height 0.73, letter-spacing 0.06px */
+}

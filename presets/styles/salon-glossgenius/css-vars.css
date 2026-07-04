@@ -1,0 +1,27 @@
+/*
+ * ONE — design tokens
+ * Source: https://styles.refero.design/style/71745af1-2e53-4925-992e-82773e55ccd6
+ * Fetched: 2026-07-04T19:31:10.198Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-ink: #000000; /* Primary text, hairline borders, video frame outlines, pill button stroke — the only chromatic event… */
+  --color-paper: #fbfbfa; /* Soft icon strokes, subtle dividers, and low-emphasis decorative details. Do not promote it to the p… */
+  --color-ash: #bec0c5; /* Muted text in the cycling manifesto, list dividers, inactive link tone — desaturated gray stays qui… */
+  /* spacing */
+  --space-section-gap: 96px; /* gap between page sections */
+  --space-element-gap: 16px; /* gap between sibling elements */
+  --space-card-padding: 32px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-cards: 12px; /* cards */
+  --radius-buttons: 999px; /* buttons */
+  --radius-videoframes: 12px; /* videoframes */
+  /* font families */
+  --font-magicuipro: 'MagicUiPro'; /* Single-family system: body text and micro-headlines both sit in the 18–24px range at medi… */
+  /* type scale */
+  --text-body: 18px; /* line-height 1.4, letter-spacing -0.18px */
+  --text-subheading: 20px; /* line-height 1.2, letter-spacing -0.2px */
+  --text-heading-sm: 24px; /* line-height 1, letter-spacing -0.24px */
+}

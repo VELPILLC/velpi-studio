@@ -1,0 +1,38 @@
+/*
+ * Sigmaphoto — design tokens
+ * Source: https://styles.refero.design/style/67c60ee4-ac38-41ee-834e-ed2a92146417
+ * Fetched: 2026-07-04T19:30:52.915Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-slate-ink: #333333; /* Primary text, dominant borders, nav links — the workhorse dark that replaces pure black everywhere… */
+  --color-pure-white: #ffffff; /* Neutral form states, badge text, and quiet UI feedback where color should stay understated. Do not… */
+  --color-onyx-black: #000000; /* Icon strokes, input borders, and hard-edge accents where maximum contrast is required */
+  --color-warm-bone: #faf7ef; /* Secondary surface — a barely-warm cream that lifts cards off pure white without introducing visible… */
+  --color-ash-gray: #707070; /* Muted helper text, secondary borders, disabled states — quieter than Slate Ink by two stops */
+  --color-cobalt-signal: #0048ff; /* Primary action fill — the only chromatic color in the system, reserved for CTA buttons and live act… */
+  --color-stone-gray: #999999; /* Tertiary borders and inactive icon strokes — the quietest neutral, used only when Ash is still too… */
+  /* spacing */
+  --space-section-gap: 80px; /* gap between page sections */
+  --space-element-gap: 16px; /* gap between sibling elements */
+  --space-card-padding: 16px; /* internal card padding */
+  --space-page-max-width: 1440px; /* max content width */
+  /* radius */
+  --radius-tags: 0px; /* tags */
+  --radius-cards: 0px; /* cards */
+  --radius-images: 0px; /* images */
+  --radius-inputs: 1px; /* inputs */
+  --radius-buttons: 0px; /* buttons */
+  /* font families */
+  --font-sigma-sans: 'Sigma Sans'; /* Navigation links, buttons, form labels, and utility micro-copy — the functional voice, co… */
+  --font-sigma-serif-head: 'Sigma Serif Head'; /* Display and hero headlines — a high-contrast didone-style serif at regular weight only, c… */
+  --font-sigma-serif: 'Sigma Serif'; /* Subheadings, body paragraphs, and mid-size editorial text — the reading voice of the site… */
+  --font-metropolis: 'Metropolis'; /* Rare medium-weight sans for emphasized micro-labels — the only weight above 400 in the sy… */
+  --font-arial: 'Arial'; /* Arial — detected in extracted data but not described by AI */
+  --font-times: 'Times'; /* Times — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-heading-sm: 24px; /* line-height 1.25, letter-spacing 0px */
+  --text-heading: 48px; /* line-height 1.25, letter-spacing -0.3px */
+  --text-display: 88px; /* line-height 1.1, letter-spacing -0.5px */
+}

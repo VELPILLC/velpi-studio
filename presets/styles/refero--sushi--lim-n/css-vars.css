@@ -1,0 +1,43 @@
+/*
+ * Limón — design tokens
+ * Source: https://styles.refero.design/style/f1b6a7d6-1ecb-4f1c-95b0-e03323363999
+ * Fetched: 2026-07-04T19:30:59.810Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-black-olive: #1d0b0d; /* Page background, hero canvas, primary text on light sections — the dominant surface that makes the… */
+  --color-forest-ink: #103b15; /* Headings, body text, list dividers, link color — the deep green gives the dark-mode typography a bo… */
+  --color-lemon-zest: #f7ea48; /* Filled CTA buttons, large display headlines, accent links, highlight washes — the only chromatic no… */
+  --color-warm-cream: #fcf9f0; /* Light section backgrounds, card surfaces, off-white content panels — a paper-stock warmth that soft… */
+  --color-sage-mist: #dbe2dc; /* Hairline dividers, subtle borders, muted accents — a desaturated green-gray that holds the system t… */
+  --color-pure-white: #ffffff; /* Icon strokes, button borders, negative-space punctuation inside the dark canvas */
+  /* spacing */
+  --space-section-gap: 60px; /* gap between page sections */
+  --space-element-gap: 15-20px; /* gap between sibling elements */
+  --space-card-padding: 30px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-cards: 0px; /* cards */
+  --radius-badges: 1px; /* badges */
+  --radius-inputs: 1px; /* inputs */
+  --radius-buttons: 1px; /* buttons */
+  --radius-circular: 40px; /* circular */
+  /* font families */
+  --font-venuscom: 'VenusCom'; /* Primary typeface across all UI — the signature choice is positive tracking that scales wi… */
+  --font-font-awesome-6-free: 'Font Awesome 6 Free'; /* Icon system — solid-fill glyphs inheriting the wide letter-spacing for UI micro-elements… */
+  --font-font-awesome-6-brands: 'Font Awesome 6 Brands'; /* Brand/social icons rendered larger for footer or badge contexts */
+  --font-times: 'Times'; /* Times — detected in extracted data but not described by AI */
+  --font-helvetica: 'Helvetica'; /* Helvetica — detected in extracted data but not described by AI */
+  --font-freesans: 'FreeSans'; /* FreeSans — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-caption: 14px; /* line-height 1.45, letter-spacing 0.84px */
+  --text-body-sm: 16px; /* line-height 1.37, letter-spacing 0.64px */
+  --text-body-lg: 20px; /* line-height 1.25, letter-spacing 0.4px */
+  --text-subheading: 26px; /* line-height 1.2, letter-spacing 0.52px */
+  --text-heading-sm: 30px; /* line-height 1.15, letter-spacing 0.9px */
+  --text-heading: 36px; /* line-height 1.15, letter-spacing 1.08px */
+  --text-heading-lg: 46px; /* line-height 1.1, letter-spacing 1.84px */
+  --text-display: 68px; /* line-height 1.01, letter-spacing 4.08px */
+  --text-display-xl: 75px; /* line-height 1, letter-spacing 4.5px */
+}

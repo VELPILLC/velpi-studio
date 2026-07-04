@@ -1,0 +1,44 @@
+/*
+ * Ghia — design tokens
+ * Source: https://styles.refero.design/style/156462ab-7b11-4029-be45-c2dba853e894
+ * Fetched: 2026-07-04T19:30:26.974Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-ghia-burgundy: #651c32; /* Primary brand color, header bar, statement sections, marquee bands, footer — the deep wine that gro… */
+  --color-coral-cta: #ef6079; /* Filled pill buttons (Shop Bestsellers, Add to Cart, Our Story), active tab indicators, small accent… */
+  --color-aperitivo-cream: #f2e2d5; /* Primary page canvas and warm card surfaces */
+  --color-bone-white: #fef6ee; /* Lightest surface, header text on dark, soft secondary card backgrounds */
+  --color-smoke-gray: #e5e7eb; /* Hairline borders, dividers, subtle structural separators */
+  --color-charcoal: #000000; /* Icons, fine details, logo strokes on light surfaces */
+  --color-olive-grove: #3e4938; /* Supporting neutral for secondary UI, dividers, and muted labels. Do not promote it to the primary C… */
+  --color-dusty-rose: #dfcac8; /* Soft accent border, tag backgrounds, muted product label echo */
+  --color-riviera-blue: #abd2eb; /* Blue supporting accent for decorative details and low-frequency emphasis */
+  --color-limoncello-yellow: #f0e87b; /* Highlight tags, sticker accents, energetic punctuation — the spark of citrus in the system */
+  --color-sage-mist: #b6cfd0; /* Muted surface accent, cool-toned badge or chip background */
+  /* spacing */
+  --space-section-gap: 64px; /* gap between page sections */
+  --space-element-gap: 16px; /* gap between sibling elements */
+  --space-card-padding: 24px; /* internal card padding */
+  --space-page-max-width: 1280px; /* max content width */
+  /* radius */
+  --radius-tags: 9999px; /* tags */
+  --radius-cards: 16px; /* cards */
+  --radius-buttons: 9999px; /* buttons */
+  --radius-productframes: 9999px; /* productframes */
+  --radius-largecontainers: 24px; /* largecontainers */
+  /* font families */
+  --font-vivey-22-positive: 'Vivey 22 Positive'; /* Primary text face — body copy, nav links, buttons, product cards, footer. The humanist se… */
+  --font-fha-condensed-french-nc: 'FHA Condensed French NC'; /* Display headlines, section titles, large statements — always set in all-caps with tight l… */
+  /* type scale */
+  --text-caption: 10px; /* line-height 1.3 */
+  --text-body: 14px; /* line-height 1.43 */
+  --text-body-lg: 16px; /* line-height 1.5 */
+  --text-subheading: 18px; /* line-height 1.56 */
+  --text-heading-sm: 24px; /* line-height 1.33 */
+  --text-heading: 32px; /* line-height 1.2 */
+  --text-heading-lg: 44px; /* line-height 1.15 */
+  --text-heading-xl: 52px; /* line-height 1.1 */
+  --text-display: 72px; /* line-height 1 */
+}

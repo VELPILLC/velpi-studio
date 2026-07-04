@@ -1,0 +1,35 @@
+/*
+ * Roberta's Pizza — design tokens
+ * Source: https://styles.refero.design/style/3e497155-bd96-4134-a4a5-855bd885a25c
+ * Fetched: 2026-07-04T19:30:54.693Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-roberta-red: #ed2023; /* Primary filled CTAs, full-bleed social section background, logo wordmark, and any place the brand m… */
+  --color-charcoal: #2b2f36; /* Primary text, body copy, dark CTA fill, hairline borders, icon strokes, image borders — the structu… */
+  --color-pure-white: #ffffff; /* Page canvas, card surfaces, text on dark backgrounds, button text, badge backgrounds — the dominant… */
+  --color-pure-black: #000000; /* Input field borders and the deepest surface accent — used sparingly for the hardest possible contra… */
+  --color-shadow-gray: #bfbfbf; /* Supporting neutral for secondary UI, dividers, and muted labels. */
+  /* spacing */
+  --space-section-gap: 64-80px; /* gap between page sections */
+  --space-element-gap: 20-30px; /* gap between sibling elements */
+  --space-card-padding: 20-30px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-pills: 9999px (from 16000px raw value); /* pills */
+  --radius-buttons: 7.2px; /* buttons */
+  --radius-asymmetric: 80px (for shapes that round two corners and square the other two); /* asymmetric */
+  /* font families */
+  --font-offset-tm: 'Offset TM'; /* Workhorse sans for body, UI labels, buttons, navigation, and most headings up to 80px — a… */
+  --font-borensa: 'Borensa'; /* Condensed display face for oversized posters and the most aggressive headlines — sits at… */
+  /* type scale */
+  --text-caption: 14px; /* line-height 1.5, letter-spacing 0.56px */
+  --text-body-sm: 16px; /* line-height 1.5 */
+  --text-body: 20px; /* line-height 1.5, letter-spacing 0.8px */
+  --text-subheading: 24px; /* line-height 1.3, letter-spacing 0.96px */
+  --text-heading-sm: 34px; /* line-height 1.25, letter-spacing 1.36px */
+  --text-heading: 54px; /* line-height 1.25, letter-spacing 2.16px */
+  --text-heading-lg: 80px; /* line-height 1.1, letter-spacing 3.2px */
+  --text-display: 120px; /* line-height 0.88, letter-spacing -2.4px */
+}

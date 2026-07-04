@@ -1,0 +1,34 @@
+/*
+ * TWOMUCH.STUDIO — design tokens
+ * Source: https://styles.refero.design/style/12b3e1b6-31b9-4843-9b3b-8f39c9dd1474
+ * Fetched: 2026-07-04T19:30:47.199Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-gallery-plate: #e5e7eb; /* Primary canvas and hairline dividers — the infinite gray field that hosts floating objects and bord… */
+  --color-carbon: #000000; /* Primary text, icon strokes, and the dark pill in the nav bar — the only true black in the system, u… */
+  --color-chalk: #f4f4f4; /* Elevated surface above the canvas — cards, panels, and lighter button fills that need to lift off t… */
+  --color-paper-white: #ffffff; /* Inset surfaces and inverse text on dark fills — the cleanest white available for maximum contrast p… */
+  --color-concrete: #dedede; /* Tertiary surface and muted button fill — one step darker than Chalk, used where a surface needs wei… */
+  --color-voltage-lime: #e2ff70; /* Primary action fill and highlight accent — the only chromatic button/link background in the system,… */
+  --color-oxide-brown: #68340e; /* Decorative content accent — appears inside imagery and printed artifacts (labels, type on objects);… */
+  /* spacing */
+  --space-section-gap: 48-64px; /* gap between page sections */
+  --space-element-gap: 8px; /* gap between sibling elements */
+  --space-card-padding: 16-24px; /* internal card padding */
+  /* radius */
+  --radius-tags: 9999px; /* tags */
+  --radius-pills: 9999px; /* pills */
+  --radius-small: 4px; /* small */
+  --radius-buttons: 9999px; /* buttons */
+  /* font families */
+  --font-abcmonumentgrotesk: 'ABCMonumentGrotesk'; /* Sole typeface across all UI — body, labels, nav, headings, buttons, icons, links. The sin… */
+  /* type scale */
+  --text-caption: 12px; /* line-height 0.9, letter-spacing -0.48px */
+  --text-body-sm: 14px; /* line-height 1, letter-spacing -0.476px */
+  --text-body: 16px; /* line-height 1.05, letter-spacing -0.48px */
+  --text-subheading: 18px; /* line-height 1.33, letter-spacing -0.486px */
+  --text-heading-sm: 20px; /* line-height 1.33, letter-spacing -0.48px */
+  --text-heading: 22px; /* line-height 1.43, letter-spacing -0.528px */
+}

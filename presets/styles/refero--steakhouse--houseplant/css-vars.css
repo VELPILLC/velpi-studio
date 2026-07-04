@@ -1,0 +1,39 @@
+/*
+ * HOUSEPLANT — design tokens
+ * Source: https://styles.refero.design/style/7fdd9506-0a85-41a5-b2a7-c5ce1f31d863
+ * Fetched: 2026-07-04T19:30:58.202Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-walnut: #321e1e; /* Primary text color, filled action buttons, dark hero sections, footer wordmark. Deep warm brown tha… */
+  --color-linen: #f4f1e0; /* Page canvas, card surfaces, light text on dark backgrounds. Warm aged-cream that gives the entire s… */
+  --color-graphite: #464545; /* Secondary borders, muted helper text, subtle dividers. Neutral medium gray providing quiet separati… */
+  --color-espresso: #463938; /* Button text on light surfaces, alternate dark fill. Slightly lighter brown variant for typographic… */
+  --color-onyx: #000000; /* Icon strokes, true-black accents on borders. Used sparingly where absolute contrast is needed */
+  --color-soft-sand: #f4f4f4; /* Alternate light surface, hover-state wash. Neutral off-white for slight tonal shifts away from the… */
+  /* spacing */
+  --space-section-gap: 80-120px; /* gap between page sections */
+  --space-element-gap: 20px; /* gap between sibling elements */
+  --space-card-padding: 20px; /* internal card padding */
+  --space-page-max-width: 1200px; /* max content width */
+  /* radius */
+  --radius-tags: 4px; /* tags */
+  --radius-cards: 8px; /* cards */
+  --radius-inputs: 4px; /* inputs */
+  --radius-buttons: 4px; /* buttons */
+  /* font families */
+  --font-houseplant: 'Houseplant'; /* Custom display and body typeface used for all UI text — headlines at 30-70px with tight n… */
+  --font-roboto: 'Roboto'; /* Fallback body text — minimal usage, system-safe default */
+  --font-neuehelvetica55roman: 'NeueHelvetica55Roman'; /* NeueHelvetica55Roman — detected in extracted data but not described by AI */
+  --font-gtstandard-m: 'GTStandard-M'; /* GTStandard-M — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-caption: 14px; /* line-height 1.71, letter-spacing -0.02px */
+  --text-body-sm: 16px; /* line-height 1.5, letter-spacing -0.02px */
+  --text-body: 18px; /* line-height 1.44, letter-spacing -0.02px */
+  --text-subheading: 21px; /* line-height 1.33, letter-spacing -0.02px */
+  --text-heading-sm: 28px; /* line-height 1.3, letter-spacing -0.02px */
+  --text-heading: 32px; /* line-height 1.3, letter-spacing -0.021px */
+  --text-heading-lg: 45px; /* line-height 1.15, letter-spacing -0.047px */
+  --text-display: 70px; /* line-height 1, letter-spacing -0.05px */
+}

@@ -57,6 +57,7 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
     "address": "string or null",
     "hours": "string or null",
     "socials": ["every social/profile/delivery-platform link found"],
+    "credibility": ["every credibility element found: delivery platforms (Uber Eats, DoorDash, Grubhub), review platforms (Google Reviews, Yelp, TripAdvisor), certifications, licenses, association memberships (BBB, ADA, chamber of commerce), awards, payment/security badges — name each exactly as found"],
     "services": ["every service or menu item found, with price if shown"],
     "reviews": ["every real quote found, with attribution if shown"]
   },

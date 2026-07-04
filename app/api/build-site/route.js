@@ -91,7 +91,7 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { analysis, copy, slots, brief, motion, sectionRefs } = body
+    const { analysis, copy, slots, brief, motion, sectionRefs, forcedLayout } = body
     // Accept one style (styleMd) or several (styleMds) — several = smart mix & match.
     const styleMds = Array.isArray(body.styleMds) && body.styleMds.length
       ? body.styleMds.filter(Boolean)
@@ -101,9 +101,13 @@ export async function POST(request) {
     }
     const slotList = Array.isArray(slots) ? slots : []
     const palette = analysis.color_palette || ['#2990fa', '#0a1628', '#ffffff']
-    const sectionOrder = analysis.layout?.section_order?.length
-      ? analysis.layout.section_order
-      : (analysis.sections || Object.keys(copy.sections || {}))
+    // forcedLayout: an alternate structure the user chose post-generation —
+    // overrides the analysis's section order and carries its structural intent.
+    const sectionOrder = forcedLayout?.section_order?.length
+      ? forcedLayout.section_order
+      : analysis.layout?.section_order?.length
+        ? analysis.layout.section_order
+        : (analysis.sections || Object.keys(copy.sections || {}))
 
     const slotBlock = slotList.length
       ? slotList.map(s => `- token %%IMG:${s.id}%% — ${s.name}${s.section ? ` (place in section: ${s.section})` : ''}`).join('\n')
@@ -116,6 +120,7 @@ Emails: ${Array.isArray(facts.emails) && facts.emails.length ? facts.emails.join
 Address: ${facts.address || '(none — omit)'}
 Hours: ${facts.hours || '(none — omit)'}
 Socials/platforms: ${Array.isArray(facts.socials) && facts.socials.length ? facts.socials.join(', ') : '(none — omit)'}
+Credibility elements (NEVER drop these — render as a clean, on-brand trust strip near the primary CTA or in the footer; simple styled text-mark chips are correct, do not invent badge artwork): ${Array.isArray(facts.credibility) && facts.credibility.length ? facts.credibility.join(', ') : '(none found)'}
 Services/menu: ${Array.isArray(facts.services) && facts.services.length ? facts.services.join(' | ') : '(none)'}
 Real reviews: ${Array.isArray(facts.reviews) && facts.reviews.length ? facts.reviews.map(r => `"${r}"`).join(' | ') : '(none — omit the reviews section quotes)'}`
 
@@ -131,7 +136,7 @@ TARGET 3-SECOND FEELING: ${analysis.target_feeling || '(decide it, then build to
 BRAND THEME COLORS — THEME LOCK: ${palette.join(', ')}
 Every color on the page must come from this palette (plus white and one near-black for text). This is the business's real theme — never drift off it.
 SECTION ORDER (arrest -> build desire -> convert): ${JSON.stringify(sectionOrder)}
-LAYOUT NOTE: ${analysis.layout?.notes || ''}
+LAYOUT NOTE: ${forcedLayout ? `THE CREATOR CHOSE THE "${forcedLayout.name}" ALTERNATE STRUCTURE — ${forcedLayout.hook || ''}. Structural intent: ${forcedLayout.structure_notes || ''}. Execute THIS architecture.` : (analysis.layout?.notes || '')}
 
 ${factsBlock}
 

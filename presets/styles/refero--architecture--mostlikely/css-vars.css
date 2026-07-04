@@ -1,0 +1,25 @@
+/*
+ * mostlikely — design tokens
+ * Source: https://styles.refero.design/style/4040f97b-42cf-49ef-ab2d-a77c00fe8285
+ * Fetched: 2026-07-04T19:30:15.777Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-ink-black: #000000; /* Page text, all border rules, signature arch fills — the entire graphical language. The 21:1 contras… */
+  --color-bone-white: #ffffff; /* Canvas, card surfaces, and all negative space — the field against which ink shapes register as arch… */
+  /* spacing */
+  --space-section-gap: 55-70px; /* gap between page sections */
+  --space-element-gap: 10px; /* gap between sibling elements */
+  --space-card-padding: 20px; /* internal card padding */
+  /* radius */
+  --radius-tags: 0px; /* tags */
+  --radius-cards: 0px; /* cards */
+  --radius-arches: 50% (full semicircle on tall vertical forms); /* arches */
+  --radius-buttons: 0px; /* buttons */
+  /* font families */
+  --font-rondelle: 'Rondelle'; /* Sole typeface for navigation links, body copy, and headings. Used at exactly one weight (… */
+  /* type scale */
+  --text-body-sm: 14px; /* line-height 19.6, letter-spacing 0px */
+  --text-heading: 30px; /* line-height 42, letter-spacing 0px */
+}

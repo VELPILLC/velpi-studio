@@ -1,0 +1,29 @@
+/*
+ * BUTT STUDIO — design tokens
+ * Source: https://styles.refero.design/style/c6e55968-fa2d-47c9-b833-2c4ad1e74906
+ * Fetched: 2026-07-04T19:31:01.648Z
+ * License: harvested from styles.refero.design — free library built for AI agents
+ */
+:root {
+  /* colors */
+  --color-ink-black: #000000; /* Primary text, borders, button outlines, structural strokes — the only color that ever carries infor… */
+  --color-paper: #ffffff; /* Card surfaces, thumbnail covers, inverted text on dark blocks */
+  --color-carbon: #131313; /* Dark project tile backgrounds, near-black surface for video panels */
+  --color-bone-gray: #e0e0e0; /* Page canvas, neutral button fills — the warm gray the whole composition sits on */
+  --color-studio-indigo: #31338e; /* Sole chromatic accent — STUDIO pill badge, and any deep brand punctuation. The only saturated color… */
+  /* spacing */
+  --space-element-gap: 20px; /* gap between sibling elements */
+  --space-card-padding: 20px; /* internal card padding */
+  /* radius */
+  --radius-cards: 0px (sharp, like printed paper); /* cards */
+  --radius-badges: 50px-68px (rounded pill, almost stadium); /* badges */
+  --radius-buttons: 50px (pill-shaped); /* buttons */
+  /* font families */
+  --font-helvetica: 'helvetica'; /* Every utility, body, list, button, and link on the site. Stays at one weight — no bold, n… */
+  --font-caslon: 'Caslon'; /* The hero wordmark and any serif accent. A single weight of a custom display serif — chose… */
+  --font-sometimes-times: 'Sometimes Times'; /* Sometimes Times — detected in extracted data but not described by AI */
+  /* type scale */
+  --text-body: 20px; /* line-height 1.2, letter-spacing -0.6px */
+  --text-heading: 42px; /* line-height 1, letter-spacing -0.84px */
+  --text-display: 200px; /* line-height 1, letter-spacing -4px */
+}

@@ -10,6 +10,7 @@ RULES:
 - Lead with the customer's problem or desire, then the solution.
 - Every section that needs action gets a clear, specific CTA (e.g. "Call Now", "Book Online", "Get a Free Quote").
 - Cater the language to the specific industry and target customer.
+- Use only verifiable facts from the crawled source; never invent claims, credentials, or numbers.
 - NEVER invent facts, numbers, names, awards, or claims that are not supported by the original content. If a fact is unknown, write benefit-driven copy without specifics.
 - Keep the brand's real business name.
 

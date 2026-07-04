@@ -367,6 +367,11 @@ export default function Studio() {
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
 
+  // ── Alternate layouts (post-generation option) ──
+  const [altLayouts, setAltLayouts] = useState([])
+  const [rebuilding, setRebuilding] = useState(null) // alternate name while rebuilding
+  const lastRunRef = useRef(null) // { analysis, copy, brief, motion, sectionRefs, slots }
+
   // ── Project library ──
   const [projects, setProjects] = useState([])
   const [libraryOpen, setLibraryOpen] = useState(false)
@@ -834,21 +839,31 @@ function extractLogoColors(dataUrl) {
       mark('copy', 'complete')
 
       mark('build', 'active')
-      const { html } = await callRoute('/api/build-site', {
+      const buildSlots = [
+        { id: 'logo', name: 'Logo', section: 'header' },
+        ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
+      ]
+      const buildPayload = {
         analysis, copy,
         vibe: vibeText,
-        slots: [
-          { id: 'logo', name: 'Logo', section: 'header' },
-          ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
-        ],
+        slots: buildSlots,
         styleMds: chosenStyles.map(s => s.content),
         brief: designBrief,
         motion: motionPreset,
         sectionRefs,
-      })
+      }
+      lastRunRef.current = buildPayload // kept for alternate-layout rebuilds
+      const { html } = await callRoute('/api/build-site', buildPayload)
       setHtmlTemplate(html)
       setBuilt(true)
       mark('build', 'complete')
+
+      // Alternate layout outlines — fetched in the background; a post-generation
+      // option, never an upfront decision.
+      setAltLayouts([])
+      callRoute('/api/alt-layouts', { analysis, currentOrder: analysis.layout?.section_order || analysis.sections || [] })
+        .then(res => setAltLayouts(res.alternates || []))
+        .catch(() => {})
 
       // PASS 2 — art-director elevation: the first draft is re-prompted against
       // itself to push composition, density, and premium detail past the single-
@@ -903,6 +918,35 @@ function extractLogoColors(dataUrl) {
       setBuildReport(report)
 
       await Promise.all([imagesPromise, refineP])
+
+      // IMAGE COMPLETION GATE — no placeholders ship. Every photo slot must
+      // hold a real (enhanced) or freshly generated image; missing slots are
+      // resolved automatically with per-slot regeneration, up to two rounds.
+      for (let round = 1; round <= 2; round++) {
+        const missing = photoSlots.filter(s => !localAssets[s.id])
+        if (!missing.length) break
+        mark('images', 'active')
+        for (const s of missing) {
+          try {
+            const slotNum = Number(String(s.id).replace('img_', '')) || 0
+            const item = { slot: slotNum, what: s.name, section: s.section, source: 'none', action: 'generate', url: null, prompt: s.prompt || '' }
+            const { images: retry } = await callRoute('/api/generate-images', { analysis: { ...analysis, image_inventory: [item] } })
+            const asset = (retry?.assets || []).find(a => a.id === s.id && a.src)
+            if (asset) {
+              localAssets[s.id] = asset.src
+              setAssetsById(prev => ({ ...prev, [s.id]: asset.src }))
+            }
+          } catch (_) {}
+        }
+        mark('images', photoSlots.every(s => localAssets[s.id]) ? 'complete' : 'active')
+      }
+      const stillMissing = photoSlots.filter(s => !localAssets[s.id])
+      if (stillMissing.length) {
+        mark('images', 'error')
+        setError(`${stillMissing.length} image slot${stillMissing.length > 1 ? 's' : ''} could not be generated after retries (${stillMissing.map(s => s.name).join(', ')}) — use Regenerate on those slots in Assets.`)
+      } else {
+        mark('images', 'complete')
+      }
 
       // Record this generation's key choices in the anti-repetition memory.
       try {
@@ -1028,6 +1072,26 @@ function extractLogoColors(dataUrl) {
     a.download = `${safeName(bizName)}-website.html`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
+  // Rebuild the site with a chosen alternate structure — same analysis, copy,
+  // brief, styles, and assets; only the architecture changes. Single fast pass.
+  async function switchLayout(alt) {
+    if (!lastRunRef.current || rebuilding) return
+    setRebuilding(alt.name)
+    setError(null)
+    try {
+      const { html } = await callRoute('/api/build-site', { ...lastRunRef.current, forcedLayout: alt })
+      if (html) {
+        setHtmlTemplate(html)
+        setSavedMsg(`Rebuilt with the "${alt.name}" structure — open the preview to see it`)
+        setTimeout(() => setSavedMsg(null), 4000)
+      }
+    } catch (e) {
+      setError(`Could not rebuild with that layout: ${e.message}`)
+    } finally {
+      setRebuilding(null)
+    }
   }
 
   // Per-generation artifacts: the decision log and the asset manifest,
@@ -1484,33 +1548,42 @@ function extractLogoColors(dataUrl) {
                 {editing ? '…' : 'Send'}
               </button>
             </div>
-          </div>
 
-          {/* ── 1b. BUILD REPORT — copyable thinking ── */}
-          {buildReport && (
-            <div style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}>
-                <button onClick={() => setReportOpen(v => !v)} style={{ background: 'transparent', border: 'none', color: '#fff', fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  📋 Build Report <span style={{ color: BLUE, fontSize: '0.6rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{reportOpen ? '▲' : '▼'}</span>
-                </button>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button onClick={downloadDecisions} style={{ ...monoBtn, padding: '5px 12px', fontSize: '0.62rem' }}>⬇ decisions.md</button>
-                  <button onClick={downloadAssetsJson} style={{ ...monoBtn, padding: '5px 12px', fontSize: '0.62rem' }}>⬇ assets.json</button>
-                  <button
-                    onClick={() => { try { navigator.clipboard?.writeText(buildReport) } catch (_) {}; setCopiedReport(true); setTimeout(() => setCopiedReport(false), 1500) }}
-                    style={{ ...monoBtn, padding: '5px 14px', fontSize: '0.62rem' }}
-                  >
-                    {copiedReport ? '✓ Copied' : '⧉ Copy'}
-                  </button>
+            {/* Alternate structures — post-generation option, never upfront */}
+            {altLayouts.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ ...label, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+                  Same content, different architecture — optional
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
+                  {altLayouts.map(alt => (
+                    <div key={alt.name} style={{ background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '0.86rem', color: '#fff', marginBottom: 4 }}>{alt.name}</div>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, marginBottom: 8 }}>{alt.hook}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
+                        {(alt.section_order || []).map((s, i) => (
+                          <span key={i} style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: BLUE, background: 'rgba(41,144,250,0.1)', border: '1px solid rgba(41,144,250,0.3)', borderRadius: 4, padding: '1px 6px', textTransform: 'uppercase' }}>
+                            {i + 1}.{s}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => switchLayout(alt)}
+                        disabled={!!rebuilding}
+                        style={{ ...monoBtn, width: '100%', padding: '8px 0', fontSize: '0.64rem', opacity: rebuilding ? 0.5 : 1 }}
+                      >
+                        {rebuilding === alt.name ? 'Rebuilding…' : 'Rebuild with this structure'}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
-              {reportOpen && (
-                <pre style={{ margin: 0, padding: '0 16px 16px', fontSize: '0.68rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflowY: 'auto', lineHeight: 1.6 }}>
-                  {buildReport}
-                </pre>
-              )}
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Build Report UI removed by request — the decision log still exists
+              per generation (saved in project data, downloadable as decisions.md
+              from the Export row). */}
 
           {/* ── 2. ASSETS ── */}
           <div style={{ ...card, maxWidth: 'none' }}>
@@ -1584,28 +1657,28 @@ function extractLogoColors(dataUrl) {
             </div>
           </div>
 
-          {/* ── 3. EXPORT (gated until every asset is linked) ── */}
+          {/* ── 3. EXPORT — always available; link status is info, not a lock ── */}
           <div style={{ ...card, maxWidth: 'none', border: `1px solid ${allLinked ? 'rgba(57,217,138,0.5)' : BORDER}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 3 }}>
-                  {allLinked ? '✓ Production-ready export' : '🔒 Export'}
+                  {allLinked ? '✓ Production-ready export' : 'Export'}
                 </div>
                 <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                   {allLinked
                     ? 'Every asset is linked. This HTML deploys to GoHighLevel with zero manual edits.'
-                    : `Link ${slots.length - linkedCount} more asset${slots.length - linkedCount === 1 ? '' : 's'} above to unlock the final export.`}
+                    : `${slots.length - linkedCount} asset link${slots.length - linkedCount === 1 ? '' : 's'} still pending — unlinked slots export with PASTE-URL-HERE tokens you can swap later.`}
                 </div>
               </div>
-              {allLinked && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={copyHtml} style={{ ...monoBtn, background: GREEN, borderColor: GREEN, color: '#04240f' }}>{copiedHtml ? 'Copied ✓' : '⧉ Copy HTML'}</button>
-                  <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
-                  <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
-                </div>
-              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : '⧉ Copy HTML'}</button>
+                <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
+                <button onClick={downloadDecisions} style={monoBtn}>⬇ decisions.md</button>
+                <button onClick={downloadAssetsJson} style={monoBtn}>⬇ assets.json</button>
+                <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
+              </div>
             </div>
-            {allLinked && showCode && (
+            {showCode && (
               <pre style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 14, fontSize: '0.66rem', fontFamily: 'var(--font-ibm-plex-mono)', color: 'rgba(255,255,255,0.75)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 420, overflowY: 'auto', marginTop: 12 }}>
                 {finalHtml()}
               </pre>
