@@ -91,7 +91,7 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { analysis, copy, slots, brief } = body
+    const { analysis, copy, slots, brief, motion } = body
     // Accept one style (styleMd) or several (styleMds) — several = smart mix & match.
     const styleMds = Array.isArray(body.styleMds) && body.styleMds.length
       ? body.styleMds.filter(Boolean)
@@ -134,6 +134,12 @@ SECTION ORDER (arrest -> build desire -> convert): ${JSON.stringify(sectionOrder
 LAYOUT NOTE: ${analysis.layout?.notes || ''}
 
 ${factsBlock}
+
+${motion?.snippet ? `SIGNATURE MOTION TREATMENT — exactly ONE per site, never stacked with others:
+"${motion.name}" (${motion.intensity} ${motion.effect}) — ${motion.summary || ''}
+Base implementation (zero-JS CSS/HTML — adapt it, don't just paste):
+${motion.snippet}
+Rules: place it where the brief says (default: hero backdrop). Map var(--vm-c1)/var(--vm-c2) to the brand palette. Merge its <style> rules into your single style tag, keeping the .vm- class prefixes and the prefers-reduced-motion rule. Keep content above it (position:relative; z-index). Do NOT add any other ambient/background animation anywhere else on the page — this is the site's one signature motion. If the design brief overruled motion with "none", omit this entirely.` : ''}
 
 CONVERSION STRATEGY (the page's brain — execute exactly):
 ${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}

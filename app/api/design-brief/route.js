@@ -27,13 +27,14 @@ TYPE SYSTEM: the exact Google Fonts pairing (display + body), weights, and the s
 HERO CONCEPT: precisely what the hero is — image treatment, composition, headline attitude, CTA placement.
 SECTION TREATMENTS: for each section in the persuasion flow, one line — its background treatment, layout pattern, and focal element. Alternate rhythm deliberately.
 SIGNATURE DETAILS: 3-5 specific touches that make this site unmistakable (oversized numerals, pull-quotes, border treatments, image crops, hover behaviors).
+SIGNATURE MOTION: exactly ONE motion/background treatment for the whole site — you are given a pre-selected preset matched to the niche's intensity; state where it lives (hero backdrop, section interlude, headline) and how it supports the vibe. You may overrule the preset with "none — stillness serves this brand" if motion would cheapen it. Never specify more than one motion treatment.
 MOBILE BEHAVIOR: how the design lands on a 390px phone — edge-to-edge moments, full-width CTAs, type scale floor.
 
 Steal the STRONGEST ideas from the reference systems and fuse them so the result feels like one intentional brand, never a collage. The brand's real identity always wins conflicts. Keep the whole brief under 700 words.`
 
 export async function POST(request) {
   try {
-    const { analysis, vibe, styleMds } = await request.json()
+    const { analysis, vibe, styleMds, motion } = await request.json()
     if (!analysis) {
       return Response.json({ error: 'Missing analysis for the design brief.' }, { status: 400 })
     }
@@ -45,6 +46,7 @@ BRAND ANALYSIS: ${JSON.stringify(analysis.brand || {}, null, 1)}
 ${vibe ? `CREATOR'S VIBE SELECTIONS: ${vibe}` : ''}
 CONVERSION STRATEGY: ${JSON.stringify(analysis.conversion_strategy || {}, null, 1)}
 PERSUASION FLOW SECTIONS: ${JSON.stringify(analysis.layout?.section_order || analysis.sections || [])}
+${motion ? `PRE-SELECTED SIGNATURE MOTION (matched to niche intensity — place it or overrule it): "${motion.name}" — ${motion.summary || ''} (effect: ${motion.effect}, intensity: ${motion.intensity})` : ''}
 
 REFERENCE DESIGN SYSTEMS TO FUSE (${(styleMds || []).length}):
 ${(styleMds || []).map((s, i) => `--- SYSTEM ${i + 1} ---\n${String(s).slice(0, 4000)}`).join('\n\n') || '(none — derive the direction from brand + vibe alone)'}`

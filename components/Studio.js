@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { pickCreativeMix } from '../lib/designStyles'
+import { pickSignatureMotion } from '../lib/motionPresets'
 import LightningBackground from './LightningBackground'
 
 // Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
@@ -679,12 +680,20 @@ export default function Studio() {
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
 
+      // Signature motion — its own selection pass, separate from styles:
+      // ONE background/motion treatment, intensity matched to the niche + vibe.
+      const motionPreset = pickSignatureMotion(analysis, vibeText)
+
       // Design brief — a creative director fuses brand + vibe + the matched
       // systems into ONE committed spec before any HTML is written.
       mark('brief', 'active')
       let designBrief = ''
       try {
-        const res = await callRoute('/api/design-brief', { analysis, vibe: vibeText, styleMds: chosenStyles.map(s => s.content) })
+        const res = await callRoute('/api/design-brief', {
+          analysis, vibe: vibeText,
+          styleMds: chosenStyles.map(s => s.content),
+          motion: motionPreset ? { name: motionPreset.name, summary: motionPreset.summary, effect: motionPreset.effect, intensity: motionPreset.intensity } : null,
+        })
         designBrief = res.brief || ''
         mark('brief', 'complete')
       } catch (_) {
@@ -722,6 +731,7 @@ export default function Studio() {
         ],
         styleMds: chosenStyles.map(s => s.content),
         brief: designBrief,
+        motion: motionPreset,
       })
       setHtmlTemplate(html)
       setBuilt(true)
@@ -773,6 +783,7 @@ export default function Studio() {
 
       // Build report — everything the generator thought and used, copyable.
       const report = composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief)
+        + (motionPreset ? `\n--- SIGNATURE MOTION ---\n${motionPreset.name} (${motionPreset.intensity} ${motionPreset.effect}, ${motionPreset.dependency}) — ${motionPreset.summary || ''}\n` : '')
         + (loopLog.length ? `\n--- REFINEMENT LOOP ---\n${loopLog.join('\n')}\n` : '')
       setBuildReport(report)
 

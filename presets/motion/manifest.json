@@ -1,0 +1,83 @@
+{
+  "notes": "Motion & background preset library. `snippet` is a self-contained, zero-JS CSS/HTML port injected into generated single-file sites; class names are prefixed .vm-{id}- and theme colors come in through var(--vm-c1)/var(--vm-c2). Seed entries are Velpi originals; harvested entries carry their source + license.",
+  "presets": [
+    {
+      "id": "aurora-veil",
+      "file": "aurora-veil.tsx",
+      "name": "Aurora Veil",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": ["spa", "salon", "tech", "wellness", "photography", "creative", "medical"],
+      "summary": "Slow drifting aurora of soft color clouds behind the hero",
+      "snippet": "<style>.vm-aurora-veil-wrap{position:relative;overflow:hidden}.vm-aurora-veil-bg{position:absolute;inset:-20%;pointer-events:none;filter:blur(60px);opacity:.55;background:radial-gradient(38% 45% at 22% 30%, var(--vm-c1) 0%, transparent 70%),radial-gradient(42% 48% at 78% 38%, var(--vm-c2) 0%, transparent 72%),radial-gradient(50% 55% at 50% 82%, var(--vm-c1) 0%, transparent 75%);animation:vm-aurora-drift 26s ease-in-out infinite alternate}@keyframes vm-aurora-drift{0%{transform:translate3d(-4%,-2%,0) rotate(-2deg) scale(1)}50%{transform:translate3d(3%,2%,0) rotate(1.5deg) scale(1.06)}100%{transform:translate3d(-2%,3%,0) rotate(-1deg) scale(1.02)}}@media (prefers-reduced-motion: reduce){.vm-aurora-veil-bg{animation:none}}</style><div class=\"vm-aurora-veil-wrap\"><div class=\"vm-aurora-veil-bg\"></div><!-- section content here, position:relative;z-index:1 --></div>"
+    },
+    {
+      "id": "spotlight-halo",
+      "file": "spotlight-halo.tsx",
+      "name": "Spotlight Halo",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": ["law", "finance", "medical", "dental", "consulting", "real estate", "insurance"],
+      "summary": "A soft breathing spotlight glow that keeps focus on the hero message",
+      "snippet": "<style>.vm-spotlight-halo-wrap{position:relative;overflow:hidden}.vm-spotlight-halo-bg{position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 50% at 50% 32%, color-mix(in srgb, var(--vm-c1) 22%, transparent) 0%, transparent 70%);animation:vm-halo-breathe 12s ease-in-out infinite}@keyframes vm-halo-breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:.9;transform:scale(1.05)}}@media (prefers-reduced-motion: reduce){.vm-spotlight-halo-bg{animation:none;opacity:.7}}</style><div class=\"vm-spotlight-halo-wrap\"><div class=\"vm-spotlight-halo-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "beam-sweep",
+      "file": "beam-sweep.tsx",
+      "name": "Beam Sweep",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": ["auto", "gym", "tech", "contractor", "hvac", "trades"],
+      "summary": "Thin diagonal light beams sweeping slowly across a dark section",
+      "snippet": "<style>.vm-beam-sweep-wrap{position:relative;overflow:hidden}.vm-beam-sweep-bg{position:absolute;inset:0;pointer-events:none;opacity:.5}.vm-beam-sweep-bg::before,.vm-beam-sweep-bg::after{content:'';position:absolute;top:-30%;bottom:-30%;width:120px;transform:rotate(18deg);background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--vm-c1) 30%, transparent), transparent)}.vm-beam-sweep-bg::before{left:-15%;animation:vm-beam-a 18s linear infinite}.vm-beam-sweep-bg::after{left:-35%;width:60px;animation:vm-beam-a 26s linear 6s infinite}@keyframes vm-beam-a{0%{transform:translateX(0) rotate(18deg)}100%{transform:translateX(140vw) rotate(18deg)}}@media (prefers-reduced-motion: reduce){.vm-beam-sweep-bg::before,.vm-beam-sweep-bg::after{animation:none;opacity:.25}}</style><div class=\"vm-beam-sweep-wrap\"><div class=\"vm-beam-sweep-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "drifting-dots",
+      "file": "drifting-dots.tsx",
+      "name": "Drifting Dot Grid",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": ["tech", "education", "accounting", "consulting", "retail", "dental"],
+      "summary": "A faint dot grid panning almost imperceptibly — quiet texture, alive",
+      "snippet": "<style>.vm-drifting-dots-wrap{position:relative;overflow:hidden}.vm-drifting-dots-bg{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(color-mix(in srgb, var(--vm-c1) 35%, transparent) 1.5px, transparent 1.5px);background-size:26px 26px;opacity:.35;animation:vm-dots-pan 40s linear infinite}@keyframes vm-dots-pan{0%{background-position:0 0}100%{background-position:260px 130px}}@media (prefers-reduced-motion: reduce){.vm-drifting-dots-bg{animation:none}}</style><div class=\"vm-drifting-dots-wrap\"><div class=\"vm-drifting-dots-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "shiny-headline",
+      "file": "shiny-headline.tsx",
+      "name": "Shiny Headline",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "text-effect",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": ["salon", "beauty", "jewelry", "real estate", "restaurant", "wedding"],
+      "summary": "A light sheen sweeping across the hero headline every few seconds",
+      "snippet": "<style>.vm-shiny-headline{background:linear-gradient(110deg, currentColor 42%, color-mix(in srgb, var(--vm-c2) 85%, white) 50%, currentColor 58%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:vm-shine 7s ease-in-out infinite}@keyframes vm-shine{0%,70%{background-position:110% 0}100%{background-position:-40% 0}}@media (prefers-reduced-motion: reduce){.vm-shiny-headline{animation:none;-webkit-text-fill-color:currentColor}}</style><!-- apply class vm-shiny-headline to the hero h1 -->"
+    },
+    {
+      "id": "ember-drift",
+      "file": "ember-drift.tsx",
+      "name": "Ember Drift",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "bold",
+      "dependency": "css-only",
+      "niches": ["tattoo", "barber", "gym", "nightlife", "streetwear", "music", "brewery"],
+      "summary": "Glowing particles rising slowly like embers over a dark hero",
+      "snippet": "<style>.vm-ember-drift-wrap{position:relative;overflow:hidden}.vm-ember-drift-bg{position:absolute;inset:0;pointer-events:none}.vm-ember-drift-bg i{position:absolute;bottom:-12px;width:5px;height:5px;border-radius:50%;background:var(--vm-c1);box-shadow:0 0 12px 2px color-mix(in srgb, var(--vm-c1) 70%, transparent);opacity:0;animation:vm-ember-rise 11s linear infinite}.vm-ember-drift-bg i:nth-child(1){left:8%;animation-delay:0s}.vm-ember-drift-bg i:nth-child(2){left:22%;animation-delay:2.5s;width:3px;height:3px}.vm-ember-drift-bg i:nth-child(3){left:38%;animation-delay:5s}.vm-ember-drift-bg i:nth-child(4){left:55%;animation-delay:1.2s;width:4px;height:4px}.vm-ember-drift-bg i:nth-child(5){left:70%;animation-delay:6.4s}.vm-ember-drift-bg i:nth-child(6){left:84%;animation-delay:3.8s;width:3px;height:3px}.vm-ember-drift-bg i:nth-child(7){left:93%;animation-delay:8s}@keyframes vm-ember-rise{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.9}80%{opacity:.5}100%{transform:translateY(-105vh) translateX(24px);opacity:0}}@media (prefers-reduced-motion: reduce){.vm-ember-drift-bg i{animation:none;opacity:0}}</style><div class=\"vm-ember-drift-wrap\"><div class=\"vm-ember-drift-bg\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><!-- content --></div>"
+    }
+  ]
+}
