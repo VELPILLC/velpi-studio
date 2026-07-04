@@ -1,4 +1,401 @@
 {
-  "notes": "Section/layout reference library — structural patterns the site builder studies and re-expresses in its own scoped CSS (never copied verbatim; Tailwind classes are not available in the output). Populated by the harvest agent; entries carry verified source + license.",
-  "sections": []
+  "notes": "Section/layout reference library — structural patterns the site builder studies and re-expresses in its own scoped CSS (never copied verbatim; Tailwind classes are not available in the output). LICENSE VERIFICATION (2026-07-04, all eight sources, actual license text fetched): [1] React Bits (DavidHDev/react-bits) SKIPPED — LICENSE.md is 'MIT + Commons Clause License Condition v1.0', restriction verbatim: 'you do not sell, sublicense, or redistribute the components themselves-whether alone, in a bundle, or as a ported version'. NOT plain MIT. [2] Animate UI (imskyleen/animate-ui) SKIPPED — LICENSE.md is 'MIT + Commons Clause License Condition', restriction verbatim: 'you do not sell or redistribute the components themselves in their original form—whether alone or in a bundle'; GitHub SPDX detection: NOASSERTION. NOT plain MIT. [3] Aceternity UI SKIPPED — no MIT license found anywhere official; ui.aceternity.com/licence publishes a custom 'Aceternity License' with verbatim restrictions 'You cannot re-distribute the Item as a stock image or its source files' and 'You cannot sell, resell, or distribute the Item or derivative works on any marketplace'; registry.json exposes component source but carries no license field; third-party 'MIT' claims are marketing copy, not a license grant. [4] shadcn/ui (shadcn-ui/ui) INGESTED — plain MIT (LICENSE.md, Copyright (c) 2023 shadcn), 5 patterns. [5] HyperUI (markmead/hyperui) INGESTED — plain MIT (LICENSE, Copyright (c) Mark Mead), 10 sections from public/examples/marketing (note: repo currently has no marketing testimonials category; card/section patterns substituted). [6] Flowbite (themesberg/flowbite) INGESTED — core repo is plain MIT (LICENSE.md, Copyright (c) 2023 Bergside Inc.), 6 blocks extracted from the first {{< example >}} block of each content/components doc; Flowbite PRO blocks are not in the repo and were not touched. [7] Preline (htmlstreamofficial/preline) SKIPPED — LICENSE is dual 'MIT' AND 'Preline UI Fair Use License' (SPDX: NOASSERTION); the Fair Use rider adds a competing-products ban, mandatory attribution, a requirement to ship the Fair Use License with any redistribution, and a termination clause — additional restriction riders, so no markup harvested (repo is mostly the JS plugin anyway; PRO examples are paid and not in the repo). [8] DaisyUI (saadeghi/daisyui) INGESTED — plain MIT (LICENSE, Copyright (c) 2020 Pouya Saadeghi), 5 component CSS patterns from packages/daisyui/src/components.",
+  "sections": [
+    {
+      "id": "hyperui--banner-hero",
+      "file": "hyperui--banner-hero.html",
+      "name": "Centered Hero Banner",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/banners/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "hero",
+      "framework": "html-tailwind",
+      "niches": [
+        "local services",
+        "consulting",
+        "tech",
+        "law",
+        "finance"
+      ],
+      "summary": "Full-height centered hero: headline with accent word, short copy, primary + ghost CTA pair",
+      "reference": "<section class=\"bg-white lg:grid lg:h-screen lg:place-content-center\">\n <div class=\"mx-auto w-screen max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-32\">\n <div class=\"mx-auto max-w-prose text-center\">\n <h1 class=\"text-4xl font-bold text-gray-900 sm:text-5xl\">\n Understand user flow and\n <strong class=\"text-indigo-600\"> increase </strong>\n conversions\n </h1>\n <p class=\"mt-4 text-base text-pretty text-gray-700 sm:text-lg/relaxed\">\n Lorem ipsum dolor sit amet, consectetur adipisicing elit. Eaque, nisi. Natus, provident\n accusamus impedit minima harum corporis iusto.\n </p>\n <div class=\"mt-4 flex justify-center gap-4 sm:mt-6\">\n <a\n class=\"inline-block rounded border border-indigo-600 bg-indigo-600 px-5 py-3 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700\"\n href=\"#\"\n >\n Get Started\n </a>\n <a\n class=\"inline-block rounded border border-gray-200 px-5 py-3 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900\"\n href=\"#\"\n >\n Learn More\n </a>\n </div>\n </div>\n </div>\n </section>"
+    },
+    {
+      "id": "hyperui--section-simple",
+      "file": "hyperui--section-simple.html",
+      "name": "Split Text + Image Section",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/sections/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "features",
+      "framework": "html-tailwind",
+      "niches": [
+        "about sections",
+        "wellness",
+        "real estate",
+        "restaurant"
+      ],
+      "summary": "Two-column section: heading + paragraph beside a rounded image",
+      "reference": "<section>\n <div class=\"mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8\">\n <div class=\"grid grid-cols-1 gap-4 md:grid-cols-2 md:items-center md:gap-8\">\n <div>\n <div class=\"max-w-prose md:max-w-none\">\n <h2 class=\"text-2xl font-semibold text-gray-900 sm:text-3xl\">\n Lorem ipsum dolor sit amet consectetur adipisicing elit.\n </h2>\n <p class=\"mt-4 text-pretty text-gray-700\">\n Lorem ipsum dolor sit amet consectetur adipisicing elit. Tenetur doloremque saepe\n architecto maiores repudiandae amet perferendis repellendus, reprehenderit voluptas\n sequi.\n </p>\n </div>\n </div>\n <div>\n <img\n src=\"[image]\"\n class=\"rounded\"\n alt=\"\"\n />\n </div>\n </div>\n </div>\n </section>"
+    },
+    {
+      "id": "hyperui--pricing-tiers",
+      "file": "hyperui--pricing-tiers.html",
+      "name": "Highlighted Pricing Tiers",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/pricing/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "pricing",
+      "framework": "html-tailwind",
+      "niches": [
+        "saas",
+        "gym",
+        "agency",
+        "subscription services"
+      ],
+      "summary": "Side-by-side pricing cards; featured plan ringed in accent color, per-plan feature checklist with check icons",
+      "reference": "<div class=\"mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8\">\n <div class=\"grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-center md:gap-8\">\n <div\n class=\"rounded-2xl border border-indigo-600 p-6 shadow-xs ring-1 ring-indigo-600 sm:order-last sm:px-8 lg:p-12\"\n >\n <div class=\"text-center\">\n <h2 class=\"text-lg font-medium text-gray-900\">\n Pro\n <span class=\"sr-only\">Plan</span>\n </h2>\n <p class=\"mt-2 sm:mt-4\">\n <strong class=\"text-3xl font-bold text-gray-900 sm:text-4xl\"> 30$ </strong>\n <span class=\"text-sm font-medium text-gray-700\">/month</span>\n </p>\n </div>\n <ul class=\"mt-6 space-y-2\">\n <li class=\"flex items-center gap-1\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5 text-indigo-700\"\n >\n <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\" />\n </svg>\n <span class=\"text-gray-700\"> 20 users included </span>\n </li>\n <li class=\"flex items-center gap-1\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5 text-indigo-700\"\n >\n <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\" />\n </svg>\n <span class=\"text-gray-700\"> 5GB of storage </span>\n </li>\n <li class=\"flex items-center gap-1\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5 text-indigo-700\"\n >\n <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\" />\n </svg>\n <span class=\"text-gray-700\"> Email support </span>\n </li>\n <li class=\"flex items-center gap-1\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5 text-indigo-700\"\n >\n <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\" />\n </svg>\n <span class=\"text-gray-700\"> Help center access </span>\n </li>\n <li class=\"flex items-center gap-1\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5 text-indigo-700\"\n >\n <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\" />\n </svg>\n <span class=\"text-gray-700\"> Phone support </span>\n </li>\n <li class=\"flex items-center gap-1\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n[trimmed]"
+    },
+    {
+      "id": "hyperui--stats-band",
+      "file": "hyperui--stats-band.html",
+      "name": "Stats Cards Band",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/stats/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "stats",
+      "framework": "html-tailwind",
+      "niches": [
+        "agency",
+        "contractor",
+        "medical",
+        "ecommerce"
+      ],
+      "summary": "Centered heading + 4-up dl stat cards, big accent numbers above muted labels",
+      "reference": "<div class=\"mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8\">\n <div class=\"mx-auto max-w-3xl text-center\">\n <h2 class=\"text-3xl font-bold text-gray-900 sm:text-4xl\">\n Trusted by eCommerce Businesses\n </h2>\n <p class=\"mt-4 text-gray-500 sm:text-xl\">\n Lorem ipsum dolor sit amet consectetur adipisicing elit. Ratione dolores laborum labore\n provident impedit esse recusandae facere libero harum sequi.\n </p>\n </div>\n <dl class=\"mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-4\">\n <div class=\"flex flex-col rounded-lg border border-gray-100 px-4 py-8 text-center\">\n <dt class=\"order-last text-lg font-medium text-gray-500\">Total Sales</dt>\n <dd class=\"text-4xl font-extrabold text-blue-600 md:text-5xl\">$4.8m</dd>\n </div>\n <div class=\"flex flex-col rounded-lg border border-gray-100 px-4 py-8 text-center\">\n <dt class=\"order-last text-lg font-medium text-gray-500\">Official Addons</dt>\n <dd class=\"text-4xl font-extrabold text-blue-600 md:text-5xl\">24</dd>\n </div>\n <div class=\"flex flex-col rounded-lg border border-gray-100 px-4 py-8 text-center\">\n <dt class=\"order-last text-lg font-medium text-gray-500\">Total Addons</dt>\n <dd class=\"text-4xl font-extrabold text-blue-600 md:text-5xl\">86</dd>\n </div>\n <div class=\"flex flex-col rounded-lg border border-gray-100 px-4 py-8 text-center\">\n <dt class=\"order-last text-lg font-medium text-gray-500\">Downloads</dt>\n <dd class=\"text-4xl font-extrabold text-blue-600 md:text-5xl\">86k</dd>\n </div>\n </dl>\n </div>"
+    },
+    {
+      "id": "hyperui--cta-split-image",
+      "file": "hyperui--cta-split-image.html",
+      "name": "Email Capture CTA",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/ctas/2.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "cta",
+      "framework": "html-tailwind",
+      "niches": [
+        "newsletter",
+        "coaching",
+        "restaurant",
+        "retail"
+      ],
+      "summary": "Soft-background CTA panel: centered headline + inline email form with submit button",
+      "reference": "<section class=\"bg-gray-50\">\n <div class=\"p-8 md:p-12 lg:px-16 lg:py-24\">\n <div class=\"mx-auto max-w-lg text-center\">\n <h2 class=\"text-2xl font-bold text-gray-900 md:text-3xl\">\n Lorem, ipsum dolor sit amet consectetur adipisicing elit\n </h2>\n <p class=\"hidden text-gray-500 sm:mt-4 sm:block\">\n Lorem ipsum dolor sit amet, consectetur adipisicing elit. Quae dolor officia blanditiis\n repellat in, vero, aperiam porro ipsum laboriosam consequuntur exercitationem incidunt\n tempora nisi?\n </p>\n </div>\n <div class=\"mx-auto mt-8 max-w-xl\">\n <form action=\"#\" class=\"sm:flex sm:gap-4\">\n <div class=\"sm:flex-1\">\n <label for=\"email\" class=\"sr-only\">Email</label>\n <input\n type=\"email\"\n placeholder=\"Email address\"\n class=\"w-full rounded-md border-gray-200 bg-white p-3 text-gray-700 shadow-xs transition focus:border-white focus:ring-2 focus:ring-yellow-400 focus:outline-hidden\"\n />\n </div>\n <button\n type=\"submit\"\n class=\"group mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-rose-600 px-5 py-3 text-white transition focus:ring-2 focus:ring-yellow-400 focus:outline-hidden sm:mt-0 sm:w-auto\"\n >\n <span class=\"text-sm font-medium\"> Sign Up </span>\n <svg\n class=\"size-5 shadow-sm rtl:rotate-180\"\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke=\"currentColor\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n stroke-width=\"2\"\n d=\"M17 8l4 4m0 0l-4 4m4-4H3\"\n />\n </svg>\n </button>\n </form>\n </div>\n </div>\n </section>"
+    },
+    {
+      "id": "hyperui--footer-columns",
+      "file": "hyperui--footer-columns.html",
+      "name": "Multi-Column Footer",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/footers/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "footer",
+      "framework": "html-tailwind",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Logo block beside stacked link columns, social icon row, legal line",
+      "reference": "<footer class=\"bg-white\">\n <div class=\"mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8\">\n <div class=\"lg:flex lg:items-start lg:gap-8\">\n <div class=\"text-teal-600\">\n <svg class=\"h-8\" viewBox=\"0 0 28 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n <path\n d=\"[path]\"\n fill=\"currentColor\"\n />\n </svg>\n </div>\n <div class=\"mt-8 grid grid-cols-2 gap-8 lg:mt-0 lg:grid-cols-5 lg:gap-y-16\">\n <div class=\"col-span-2\">\n <div>\n <h2 class=\"text-2xl font-bold text-gray-900\">Get the latest news!</h2>\n <p class=\"mt-4 text-gray-500\">\n Lorem ipsum dolor, sit amet consectetur adipisicing elit. Esse non cupiditate quae\n nam molestias.\n </p>\n </div>\n </div>\n <div class=\"col-span-2 lg:col-span-3 lg:flex lg:items-end\">\n <form class=\"w-full\">\n <label for=\"UserEmail\" class=\"sr-only\"> Email </label>\n <div\n class=\"border border-gray-100 p-2 focus-within:ring-3 sm:flex sm:items-center sm:gap-4\"\n >\n <input\n type=\"email\"\n id=\"UserEmail\"\n placeholder=\"john@rhcp.com\"\n class=\"w-full border-none focus:border-transparent focus:ring-transparent sm:text-sm\"\n />\n <button\n class=\"mt-1 w-full bg-teal-500 px-6 py-3 text-sm font-bold tracking-wide text-white uppercase transition-none hover:bg-teal-600 sm:mt-0 sm:w-auto sm:shrink-0\"\n >\n Sign Up\n </button>\n </div>\n </form>\n </div>\n <div class=\"col-span-2 sm:col-span-1\">\n <p class=\"font-medium text-gray-900\">Services</p>\n <ul class=\"mt-6 space-y-4 text-sm\">\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\"> 1on1 Coaching </a>\n </li>\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\"> Company Review </a>\n </li>\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\">\n Accounts Review\n </a>\n </li>\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\"> HR Consulting </a>\n </li>\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\">\n SEO Optimisation\n </a>\n </li>\n </ul>\n </div>\n <div class=\"col-span-2 sm:col-span-1\">\n <p class=\"font-medium text-gray-900\">Company</p>\n <ul class=\"mt-6 space-y-4 text-sm\">\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\"> About </a>\n </li>\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\"> Meet the Team </a>\n </li>\n <li>\n <a href=\"#\" class=\"text-gray-700 transition hover:opacity-75\">\n Accounts Review\n </a>\n </li>\n </ul>\n </div>\n <div class=\"col-span-2 sm:col-span-1\">\n <p class=\"font-medium text-gray-900\">Helpful Links</p>\n <ul class=\"mt-6 space-y-4 text-sm\">\n[trimmed]"
+    },
+    {
+      "id": "hyperui--faq-details",
+      "file": "hyperui--faq-details.html",
+      "name": "Native Details FAQ",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/faqs/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "faq",
+      "framework": "html-tailwind",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Zero-JS FAQ accordion using native details/summary with rotating chevron icon",
+      "reference": "<div class=\"space-y-4\">\n <details class=\"group [&_summary::-webkit-details-marker]:hidden\" open>\n <summary\n class=\"flex items-center justify-between gap-1.5 rounded-md border border-gray-100 bg-gray-50 p-4 text-gray-900\"\n >\n <h2 class=\"text-lg font-medium\">Lorem ipsum dolor sit amet consectetur adipisicing?</h2>\n <svg\n class=\"size-5 shrink-0 transition-transform duration-300 group-open:-rotate-180\"\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke=\"currentColor\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n stroke-width=\"2\"\n d=\"M19 9l-7 7-7-7\"\n />\n </svg>\n </summary>\n <p class=\"px-4 pt-4 text-gray-900\">\n Lorem ipsum dolor sit amet consectetur, adipisicing elit. Ab hic veritatis molestias culpa\n in, recusandae laboriosam neque aliquid libero nesciunt voluptate dicta quo officiis\n explicabo consequuntur distinctio corporis earum similique!\n </p>\n </details>\n <details class=\"group [&_summary::-webkit-details-marker]:hidden\">\n <summary\n class=\"flex items-center justify-between gap-1.5 rounded-md border border-gray-100 bg-gray-50 p-4 text-gray-900\"\n >\n <h2 class=\"text-lg font-medium\">Lorem ipsum dolor sit amet consectetur adipisicing?</h2>\n <svg\n class=\"size-5 shrink-0 transition-transform duration-300 group-open:-rotate-180\"\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke=\"currentColor\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n stroke-width=\"2\"\n d=\"M19 9l-7 7-7-7\"\n />\n </svg>\n </summary>\n <p class=\"px-4 pt-4 text-gray-900\">\n Lorem ipsum dolor sit amet consectetur, adipisicing elit. Ab hic veritatis molestias culpa\n in, recusandae laboriosam neque aliquid libero nesciunt voluptate dicta quo officiis\n explicabo consequuntur distinctio corporis earum similique!\n </p>\n </details>\n <details class=\"group [&_summary::-webkit-details-marker]:hidden\">\n <summary\n class=\"flex items-center justify-between gap-1.5 rounded-md border border-gray-100 bg-gray-50 p-4 text-gray-900\"\n >\n <h2 class=\"text-lg font-medium\">Lorem ipsum dolor sit amet consectetur adipisicing?</h2>\n <svg\n class=\"size-5 shrink-0 transition-transform duration-300 group-open:-rotate-180\"\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke=\"currentColor\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n stroke-width=\"2\"\n d=\"M19 9l-7 7-7-7\"\n />\n </svg>\n </summary>\n <p class=\"px-4 pt-4 text-gray-900\">\n[trimmed]"
+    },
+    {
+      "id": "hyperui--feature-grid",
+      "file": "hyperui--feature-grid.html",
+      "name": "Icon Feature Grid",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/feature-grids/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "features",
+      "framework": "html-tailwind",
+      "niches": [
+        "tech",
+        "trades",
+        "dental",
+        "consulting"
+      ],
+      "summary": "Centered intro + 3-col bordered feature cards, each with icon chip, title, copy",
+      "reference": "<div class=\"mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8\">\n <div class=\"mx-auto max-w-lg text-center\">\n <h2 class=\"text-3xl/tight font-bold text-gray-900 sm:text-4xl\">Features for growth</h2>\n <p class=\"mt-4 text-lg text-pretty text-gray-700\">\n Lorem ipsum dolor sit, amet consectetur adipisicing elit. Veritatis tenetur, nemo quam\n voluptas sunt impedit dolorem asperiores aliquid doloribus fugit.\n </p>\n </div>\n <div class=\"mt-8 grid grid-cols-1 gap-8 md:grid-cols-3\">\n <div class=\"rounded-lg border border-gray-200 p-6\">\n <div class=\"inline-flex rounded-lg bg-gray-100 p-3 text-gray-700\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-6\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n d=\"m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z\"\n />\n </svg>\n </div>\n <h3 class=\"mt-4 text-lg font-semibold text-gray-900\">High performance</h3>\n <p class=\"mt-2 text-pretty text-gray-700\">\n Lightning-quick load times optimized for every device\n </p>\n </div>\n <div class=\"rounded-lg border border-gray-200 p-6\">\n <div class=\"inline-flex rounded-lg bg-gray-100 p-3 text-gray-700\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-6\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n d=\"[path]\"\n />\n </svg>\n </div>\n <h3 class=\"mt-4 text-lg font-semibold text-gray-900\">Enterprise security</h3>\n <p class=\"mt-2 text-pretty text-gray-700\">\n Enterprise-grade security built into every layer\n </p>\n </div>\n <div class=\"rounded-lg border border-gray-200 p-6\">\n <div class=\"inline-flex rounded-lg bg-gray-100 p-3 text-gray-700\">\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-6\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n d=\"[path]\"\n />\n </svg>\n </div>\n <h3 class=\"mt-4 text-lg font-semibold text-gray-900\">Highly configurable</h3>\n <p class=\"mt-2 text-pretty text-gray-700\">\n Adapt every aspect to match your brand and needs\n </p>\n </div>\n </div>\n </div>"
+    },
+    {
+      "id": "hyperui--header-nav",
+      "file": "hyperui--header-nav.html",
+      "name": "Marketing Header Nav",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/headers/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "nav",
+      "framework": "html-tailwind",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Header bar: logo, centered link list, login/register CTA pair, mobile menu button",
+      "reference": "<header class=\"bg-white\">\n <div class=\"mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-8\">\n <a class=\"block text-teal-600\" href=\"#\">\n <span class=\"sr-only\">Home</span>\n <svg class=\"h-8\" viewBox=\"0 0 28 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n <path\n d=\"[path]\"\n fill=\"currentColor\"\n />\n </svg>\n </a>\n <div class=\"flex flex-1 items-center justify-end md:justify-between\">\n <nav aria-label=\"Global\" class=\"hidden md:block\">\n <ul class=\"flex items-center gap-6 text-sm\">\n <li>\n <a class=\"text-gray-500 transition hover:text-gray-500/75\" href=\"#\"> About </a>\n </li>\n <li>\n <a class=\"text-gray-500 transition hover:text-gray-500/75\" href=\"#\"> Careers </a>\n </li>\n <li>\n <a class=\"text-gray-500 transition hover:text-gray-500/75\" href=\"#\"> History </a>\n </li>\n <li>\n <a class=\"text-gray-500 transition hover:text-gray-500/75\" href=\"#\"> Services </a>\n </li>\n <li>\n <a class=\"text-gray-500 transition hover:text-gray-500/75\" href=\"#\"> Projects </a>\n </li>\n <li>\n <a class=\"text-gray-500 transition hover:text-gray-500/75\" href=\"#\"> Blog </a>\n </li>\n </ul>\n </nav>\n <div class=\"flex items-center gap-4\">\n <div class=\"sm:flex sm:gap-4\">\n <a\n class=\"block rounded-md bg-teal-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-teal-700\"\n href=\"#\"\n >\n Login\n </a>\n <a\n class=\"hidden rounded-md bg-gray-100 px-5 py-2.5 text-sm font-medium text-teal-600 transition hover:text-teal-600/75 sm:block\"\n href=\"#\"\n >\n Register\n </a>\n </div>\n <button\n class=\"block rounded-sm bg-gray-100 p-2.5 text-gray-600 transition hover:text-gray-600/75 md:hidden\"\n >\n <span class=\"sr-only\">Toggle menu</span>\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n class=\"size-5\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke=\"currentColor\"\n stroke-width=\"2\"\n >\n <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6h16M4 12h16M4 18h16\" />\n </svg>\n </button>\n </div>\n </div>\n </div>\n </header>"
+    },
+    {
+      "id": "hyperui--card-promo",
+      "file": "hyperui--card-promo.html",
+      "name": "Promo Card with Thumbnail",
+      "source": "https://github.com/markmead/hyperui/blob/main/public/examples/marketing/cards/1.html",
+      "license": "MIT (plain, verified from LICENSE in markmead/hyperui)",
+      "category": "card",
+      "framework": "html-tailwind",
+      "niches": [
+        "blog",
+        "services",
+        "team bios"
+      ],
+      "summary": "Linked card: text block beside small round thumbnail, meta row of details beneath",
+      "reference": "<a href=\"#\" class=\"block rounded-md border border-gray-300 p-4 shadow-sm sm:p-6\">\n <div class=\"sm:flex sm:justify-between sm:gap-4 lg:gap-6\">\n <div class=\"sm:order-last sm:shrink-0\">\n <img\n alt=\"\"\n src=\"[image]\"\n class=\"size-16 rounded-full object-cover sm:size-18\"\n />\n </div>\n <div class=\"mt-4 sm:mt-0\">\n <h3 class=\"text-lg font-medium text-pretty text-gray-900\">\n How I built my first website with Nuxt, Tailwind CSS and Vercel\n </h3>\n <p class=\"mt-1 text-sm text-gray-700\">By John Doe</p>\n <p class=\"mt-4 line-clamp-2 text-sm text-pretty text-gray-700\">\n Lorem ipsum dolor sit, amet consectetur adipisicing elit. At velit illum provident a,\n ipsa maiores deleniti consectetur nobis et eaque.\n </p>\n </div>\n </div>\n <dl class=\"mt-6 flex gap-4 lg:gap-6\">\n <div class=\"flex items-center gap-2\">\n <dt class=\"text-gray-700\">\n <span class=\"sr-only\"> Published on </span>\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n d=\"[path]\"\n />\n </svg>\n </dt>\n <dd class=\"text-xs text-gray-700\">31/06/2025</dd>\n </div>\n <div class=\"flex items-center gap-2\">\n <dt class=\"text-gray-700\">\n <span class=\"sr-only\"> Reading time </span>\n <svg\n xmlns=\"http://www.w3.org/2000/svg\"\n fill=\"none\"\n viewBox=\"0 0 24 24\"\n stroke-width=\"1.5\"\n stroke=\"currentColor\"\n class=\"size-5\"\n >\n <path\n stroke-linecap=\"round\"\n stroke-linejoin=\"round\"\n d=\"[path]\"\n />\n </svg>\n </dt>\n <dd class=\"text-xs text-gray-700\">12 minutes</dd>\n </div>\n </dl>\n </a>"
+    },
+    {
+      "id": "shadcn--accordion",
+      "file": "shadcn--accordion.tsx",
+      "name": "Accordion Primitive",
+      "source": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/accordion.tsx",
+      "license": "MIT (plain, verified from LICENSE.md in shadcn-ui/ui)",
+      "category": "faq",
+      "framework": "react-tsx",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Radix accordion with animated open/close and rotating chevron; FAQ section backbone",
+      "reference": "\"use client\"\nimport * as React from \"react\"\nimport { ChevronDownIcon } from \"lucide-react\"\nimport { Accordion as AccordionPrimitive } from \"radix-ui\"\nimport { cn } from \"@/lib/utils\"\nfunction Accordion({\n ...props\n}: React.ComponentProps<typeof AccordionPrimitive.Root>) {\n return <AccordionPrimitive.Root data-slot=\"accordion\" {...props} />\n}\nfunction AccordionItem({\n className,\n ...props\n}: React.ComponentProps<typeof AccordionPrimitive.Item>) {\n return (\n <AccordionPrimitive.Item\n data-slot=\"accordion-item\"\n className={cn(\"border-b last:border-b-0\", className)}\n {...props}\n />\n )\n}\nfunction AccordionTrigger({\n className,\n children,\n ...props\n}: React.ComponentProps<typeof AccordionPrimitive.Trigger>) {\n return (\n <AccordionPrimitive.Header className=\"flex\">\n <AccordionPrimitive.Trigger\n data-slot=\"accordion-trigger\"\n className={cn(\n \"flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]>svg]:rotate-180\",\n className\n )}\n {...props}\n >\n {children}\n <ChevronDownIcon className=\"pointer-events-none size-4 shrink-0 translate-y-0.5 text-muted-foreground transition-transform duration-200\" />\n </AccordionPrimitive.Trigger>\n </AccordionPrimitive.Header>\n )\n}\nfunction AccordionContent({\n className,\n children,\n ...props\n}: React.ComponentProps<typeof AccordionPrimitive.Content>) {\n return (\n <AccordionPrimitive.Content\n data-slot=\"accordion-content\"\n className=\"overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down\"\n {...props}\n >\n <div className={cn(\"pt-0 pb-4\", className)}>{children}</div>\n </AccordionPrimitive.Content>\n )\n}\nexport { Accordion, AccordionItem, AccordionTrigger, AccordionContent }"
+    },
+    {
+      "id": "shadcn--card",
+      "file": "shadcn--card.tsx",
+      "name": "Card Slot Structure",
+      "source": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/card.tsx",
+      "license": "MIT (plain, verified from LICENSE.md in shadcn-ui/ui)",
+      "category": "card",
+      "framework": "react-tsx",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Slot-based card anatomy: Header/Title/Description/Action + Content + Footer regions",
+      "reference": "import * as React from \"react\"\nimport { cn } from \"@/lib/utils\"\nfunction Card({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card\"\n className={cn(\n \"flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm\",\n className\n )}\n {...props}\n />\n )\n}\nfunction CardHeader({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card-header\"\n className={cn(\n \"@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6\",\n className\n )}\n {...props}\n />\n )\n}\nfunction CardTitle({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card-title\"\n className={cn(\"leading-none font-semibold\", className)}\n {...props}\n />\n )\n}\nfunction CardDescription({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card-description\"\n className={cn(\"text-sm text-muted-foreground\", className)}\n {...props}\n />\n )\n}\nfunction CardAction({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card-action\"\n className={cn(\n \"col-start-2 row-span-2 row-start-1 self-start justify-self-end\",\n className\n )}\n {...props}\n />\n )\n}\nfunction CardContent({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card-content\"\n className={cn(\"px-6\", className)}\n {...props}\n />\n )\n}\nfunction CardFooter({ className, ...props }: React.ComponentProps<\"div\">) {\n return (\n <div\n data-slot=\"card-footer\"\n className={cn(\"flex items-center px-6 [.border-t]:pt-6\", className)}\n {...props}\n />\n )\n}\nexport {\n Card,\n CardHeader,\n CardFooter,\n CardTitle,\n CardAction,\n CardDescription,\n CardContent,\n}"
+    },
+    {
+      "id": "shadcn--carousel",
+      "file": "shadcn--carousel.tsx",
+      "name": "Carousel Structure",
+      "source": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/carousel.tsx",
+      "license": "MIT (plain, verified from LICENSE.md in shadcn-ui/ui)",
+      "category": "testimonials",
+      "framework": "react-tsx",
+      "niches": [
+        "testimonials",
+        "galleries",
+        "logo strips"
+      ],
+      "summary": "Embla-based carousel: overflow-hidden viewport, flex track, absolutely-positioned prev/next arrow buttons",
+      "reference": "\"use client\"\nimport * as React from \"react\"\nimport useEmblaCarousel, {\n type UseEmblaCarouselType,\n} from \"embla-carousel-react\"\nimport { ArrowLeft, ArrowRight } from \"lucide-react\"\nimport { cn } from \"@/lib/utils\"\nimport { Button } from \"@/registry/new-york-v4/ui/button\"\ntype CarouselApi = UseEmblaCarouselType[1]\ntype UseCarouselParameters = Parameters<typeof useEmblaCarousel>\ntype CarouselOptions = UseCarouselParameters[0]\ntype CarouselPlugin = UseCarouselParameters[1]\ntype CarouselProps = {\n opts?: CarouselOptions\n plugins?: CarouselPlugin\n orientation?: \"horizontal\" | \"vertical\"\n setApi?: (api: CarouselApi) => void\n}\ntype CarouselContextProps = {\n carouselRef: ReturnType<typeof useEmblaCarousel>[0]\n api: ReturnType<typeof useEmblaCarousel>[1]\n scrollPrev: () => void\n scrollNext: () => void\n canScrollPrev: boolean\n canScrollNext: boolean\n} & CarouselProps\nconst CarouselContext = React.createContext<CarouselContextProps | null>(null)\nfunction useCarousel() {\n const context = React.useContext(CarouselContext)\n if (!context) {\n throw new Error(\"useCarousel must be used within a <Carousel />\")\n }\n return context\n}\nfunction Carousel({\n orientation = \"horizontal\",\n opts,\n setApi,\n plugins,\n className,\n children,\n ...props\n}: React.ComponentProps<\"div\"> & CarouselProps) {\n const [carouselRef, api] = useEmblaCarousel(\n {\n ...opts,\n axis: orientation === \"horizontal\" ? \"x\" : \"y\",\n },\n plugins\n )\n const [canScrollPrev, setCanScrollPrev] = React.useState(false)\n const [canScrollNext, setCanScrollNext] = React.useState(false)\n const onSelect = React.useCallback((api: CarouselApi) => {\n if (!api) return\n setCanScrollPrev(api.canScrollPrev())\n setCanScrollNext(api.canScrollNext())\n }, [])\n const scrollPrev = React.useCallback(() => {\n api?.scrollPrev()\n }, [api])\n const scrollNext = React.useCallback(() => {\n api?.scrollNext()\n }, [api])\n const handleKeyDown = React.useCallback(\n (event: React.KeyboardEvent<HTMLDivElement>) => {\n if (event.key === \"ArrowLeft\") {\n event.preventDefault()\n scrollPrev()\n } else if (event.key === \"ArrowRight\") {\n event.preventDefault()\n scrollNext()\n }\n },\n [scrollPrev, scrollNext]\n )\n React.useEffect(() => {\n if (!api || !setApi) return\n setApi(api)\n }, [api, setApi])\n React.useEffect(() => {\n if (!api) return\n onSelect(api)\n api.on(\"reInit\", onSelect)\n api.on(\"select\", onSelect)\n return () => {\n api?.off(\"select\", onSelect)\n }\n }, [api, onSelect])\n return (\n <CarouselContext.Provider\n[trimmed]"
+    },
+    {
+      "id": "shadcn--navigation-menu",
+      "file": "shadcn--navigation-menu.tsx",
+      "name": "Navigation Menu with Dropdowns",
+      "source": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/navigation-menu.tsx",
+      "license": "MIT (plain, verified from LICENSE.md in shadcn-ui/ui)",
+      "category": "nav",
+      "framework": "react-tsx",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Radix navigation menu: trigger chevrons, animated dropdown viewport, in/out motion states",
+      "reference": "import * as React from \"react\"\nimport { cva } from \"class-variance-authority\"\nimport { ChevronDownIcon } from \"lucide-react\"\nimport { NavigationMenu as NavigationMenuPrimitive } from \"radix-ui\"\nimport { cn } from \"@/lib/utils\"\nfunction NavigationMenu({\n className,\n children,\n viewport = true,\n ...props\n}: React.ComponentProps<typeof NavigationMenuPrimitive.Root> & {\n viewport?: boolean\n}) {\n return (\n <NavigationMenuPrimitive.Root\n data-slot=\"navigation-menu\"\n data-viewport={viewport}\n className={cn(\n \"group/navigation-menu relative flex max-w-max flex-1 items-center justify-center\",\n className\n )}\n {...props}\n >\n {children}\n {viewport && <NavigationMenuViewport />}\n </NavigationMenuPrimitive.Root>\n )\n}\nfunction NavigationMenuList({\n className,\n ...props\n}: React.ComponentProps<typeof NavigationMenuPrimitive.List>) {\n return (\n <NavigationMenuPrimitive.List\n data-slot=\"navigation-menu-list\"\n className={cn(\n \"group flex flex-1 list-none items-center justify-center gap-1\",\n className\n )}\n {...props}\n />\n )\n}\nfunction NavigationMenuItem({\n className,\n ...props\n}: React.ComponentProps<typeof NavigationMenuPrimitive.Item>) {\n return (\n <NavigationMenuPrimitive.Item\n data-slot=\"navigation-menu-item\"\n className={cn(\"relative\", className)}\n {...props}\n />\n )\n}\nconst navigationMenuTriggerStyle = cva(\n \"group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-[color,box-shadow] outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-accent/50 data-[state=open]:text-accent-foreground data-[state=open]:hover:bg-accent data-[state=open]:focus:bg-accent\"\n)\nfunction NavigationMenuTrigger({\n className,\n children,\n ...props\n}: React.ComponentProps<typeof NavigationMenuPrimitive.Trigger>) {\n return (\n <NavigationMenuPrimitive.Trigger\n data-slot=\"navigation-menu-trigger\"\n className={cn(navigationMenuTriggerStyle(), \"group\", className)}\n {...props}\n >\n {children}{\" \"}\n <ChevronDownIcon\n className=\"relative top-[1px] ml-1 size-3 transition duration-300 group-data-[state=open]:rotate-180\"\n aria-hidden=\"true\"\n />\n </NavigationMenuPrimitive.Trigger>\n )\n}\nfunction NavigationMenuContent({\n className,\n ...props\n}: React.ComponentProps<typeof NavigationMenuPrimitive.Content>) {\n[trimmed]"
+    },
+    {
+      "id": "shadcn--tabs",
+      "file": "shadcn--tabs.tsx",
+      "name": "Tabs Structure",
+      "source": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/tabs.tsx",
+      "license": "MIT (plain, verified from LICENSE.md in shadcn-ui/ui)",
+      "category": "features",
+      "framework": "react-tsx",
+      "niches": [
+        "service switchers",
+        "menus",
+        "comparison sections"
+      ],
+      "summary": "Pill tab list + active-state styling + swappable content panels",
+      "reference": "\"use client\"\nimport * as React from \"react\"\nimport { cva, type VariantProps } from \"class-variance-authority\"\nimport { Tabs as TabsPrimitive } from \"radix-ui\"\nimport { cn } from \"@/lib/utils\"\nfunction Tabs({\n className,\n orientation = \"horizontal\",\n ...props\n}: React.ComponentProps<typeof TabsPrimitive.Root>) {\n return (\n <TabsPrimitive.Root\n data-slot=\"tabs\"\n data-orientation={orientation}\n orientation={orientation}\n className={cn(\n \"group/tabs flex gap-2 data-[orientation=horizontal]:flex-col\",\n className\n )}\n {...props}\n />\n )\n}\nconst tabsListVariants = cva(\n \"group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-[orientation=horizontal]/tabs:h-9 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none\",\n {\n variants: {\n variant: {\n default: \"bg-muted\",\n line: \"gap-1 bg-transparent\",\n },\n },\n defaultVariants: {\n variant: \"default\",\n },\n }\n)\nfunction TabsList({\n className,\n variant = \"default\",\n ...props\n}: React.ComponentProps<typeof TabsPrimitive.List> &\n VariantProps<typeof tabsListVariants>) {\n return (\n <TabsPrimitive.List\n data-slot=\"tabs-list\"\n data-variant={variant}\n className={cn(tabsListVariants({ variant }), className)}\n {...props}\n />\n )\n}\nfunction TabsTrigger({\n className,\n ...props\n}: React.ComponentProps<typeof TabsPrimitive.Trigger>) {\n return (\n <TabsPrimitive.Trigger\n data-slot=\"tabs-trigger\"\n className={cn(\n \"relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4\",\n[trimmed]"
+    },
+    {
+      "id": "flowbite--jumbotron-hero",
+      "file": "flowbite--jumbotron-hero.html",
+      "name": "Jumbotron Hero",
+      "source": "https://github.com/themesberg/flowbite/blob/main/content/components/jumbotron.md",
+      "license": "MIT (plain, verified from LICENSE.md in themesberg/flowbite)",
+      "category": "hero",
+      "framework": "html-tailwind",
+      "niches": [
+        "finance",
+        "nonprofit",
+        "consulting",
+        "tech"
+      ],
+      "summary": "Centered hero: oversized heading, sub-copy, primary CTA with arrow icon + secondary button",
+      "reference": "<section class=\"bg-neutral-primary\">\n <div class=\"py-8 px-4 mx-auto max-w-screen-2xl text-center lg:py-16\">\n <h1 class=\"mb-6 text-4xl font-bold tracking-tighter text-heading md:text-5xl lg:text-6xl\">We invest in the world’s potential</h1>\n <p class=\"mb-8 text-base font-normal text-body md:text-xl\">Here at Flowbite we focus on markets where technology, innovation, and capital can unlock long-term value and drive economic growth.</p>\n <div class=\"flex flex-col space-y-4 sm:flex-row sm:justify-center sm:space-y-0 md:space-x-4\">\n <button type=\"button\" class=\"inline-flex items-center justify-center text-white bg-brand hover:bg-brand-strong box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium rounded-base text-base px-5 py-3 focus:outline-none\">\n Getting started\n <svg class=\"w-4 h-4 ms-1.5 -me-0.5\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" viewBox=\"0 0 24 24\"><path stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 12H5m14 0-4 4m4-4-4-4\"/></svg>\n </button>\n <button type=\"button\" class=\"text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus:ring-4 focus:ring-neutral-tertiary shadow-xs font-medium leading-5 rounded-base text-base px-5 py-3 focus:outline-none\">Learn more</button>\n </div>\n </div>\n</section>"
+    },
+    {
+      "id": "flowbite--card",
+      "file": "flowbite--card.html",
+      "name": "Linked Text Card",
+      "source": "https://github.com/themesberg/flowbite/blob/main/content/components/card.md",
+      "license": "MIT (plain, verified from LICENSE.md in themesberg/flowbite)",
+      "category": "card",
+      "framework": "html-tailwind",
+      "niches": [
+        "blog",
+        "news",
+        "services"
+      ],
+      "summary": "Whole-card link: bordered rounded card with title + body text, hover background shift",
+      "reference": "<a href=\"#\" class=\"bg-neutral-primary-soft block max-w-sm p-6 border border-default rounded-base shadow-xs hover:bg-neutral-secondary-medium\">\n <h5 class=\"mb-3 text-2xl font-semibold tracking-tight text-heading leading-8\">Noteworthy technology acquisitions 2021</h5>\n <p class=\"text-body\">Here are the biggest technology acquisitions of 2025 so far, in reverse chronological order.</p>\n</a>"
+    },
+    {
+      "id": "flowbite--footer",
+      "file": "flowbite--footer.html",
+      "name": "Compact Footer Bar",
+      "source": "https://github.com/themesberg/flowbite/blob/main/content/components/footer.md",
+      "license": "MIT (plain, verified from LICENSE.md in themesberg/flowbite)",
+      "category": "footer",
+      "framework": "html-tailwind",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Single-row footer: brand mark, inline link list, copyright line",
+      "reference": "<footer class=\"bg-neutral-primary-soft rounded-base shadow-xs border border-default m-4\">\n <div class=\"w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between\">\n <span class=\"text-sm text-body sm:text-center\">© 2023 <a href=\"{{< param homepage >}}/\" class=\"hover:underline\">Flowbite™</a>. All Rights Reserved.\n </span>\n <ul class=\"flex flex-wrap items-center mt-3 text-sm font-medium text-body sm:mt-0\">\n <li>\n <a href=\"#\" class=\"hover:underline me-4 md:me-6\">About</a>\n </li>\n <li>\n <a href=\"#\" class=\"hover:underline me-4 md:me-6\">Privacy Policy</a>\n </li>\n <li>\n <a href=\"#\" class=\"hover:underline me-4 md:me-6\">Licensing</a>\n </li>\n <li>\n <a href=\"#\" class=\"hover:underline\">Contact</a>\n </li>\n </ul>\n </div>\n</footer>"
+    },
+    {
+      "id": "flowbite--navbar",
+      "file": "flowbite--navbar.html",
+      "name": "Responsive Navbar",
+      "source": "https://github.com/themesberg/flowbite/blob/main/content/components/navbar.md",
+      "license": "MIT (plain, verified from LICENSE.md in themesberg/flowbite)",
+      "category": "nav",
+      "framework": "html-tailwind",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Brand + hamburger toggle + collapsible link list with active-link accent",
+      "reference": "<nav class=\"bg-neutral-primary fixed w-full z-20 top-0 start-0 border-b border-default\">\n <div class=\"max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4\">\n <a href=\"{{< param homepage >}}/\" class=\"flex items-center space-x-3 rtl:space-x-reverse\">\n <img src=\"https://flowbite.com/docs/images/logo.svg\" class=\"h-7\" alt=\"Flowbite Logo\" />\n <span class=\"self-center text-xl text-heading font-semibold whitespace-nowrap\">Flowbite</span>\n </a>\n <button data-collapse-toggle=\"navbar-default\" type=\"button\" class=\"inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-body rounded-base md:hidden hover:bg-neutral-secondary-soft hover:text-heading focus:outline-none focus:ring-2 focus:ring-neutral-tertiary\" aria-controls=\"navbar-default\" aria-expanded=\"false\">\n <span class=\"sr-only\">Open main menu</span>\n <svg class=\"w-6 h-6\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" viewBox=\"0 0 24 24\"><path stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2\" d=\"M5 7h14M5 12h14M5 17h14\"/></svg>\n </button>\n <div class=\"hidden w-full md:block md:w-auto\" id=\"navbar-default\">\n <ul class=\"font-medium flex flex-col p-4 md:p-0 mt-4 border border-default rounded-base bg-neutral-secondary-soft md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-neutral-primary\">\n <li>\n <a href=\"#\" class=\"block py-2 px-3 text-white bg-brand rounded md:bg-transparent md:text-fg-brand md:p-0\" aria-current=\"page\">Home</a>\n </li>\n <li>\n <a href=\"#\" class=\"block py-2 px-3 text-heading rounded hover:bg-neutral-tertiary md:hover:bg-transparent md:border-0 md:hover:text-fg-brand md:p-0 md:dark:hover:bg-transparent\">About</a>\n </li>\n <li>\n <a href=\"#\" class=\"block py-2 px-3 text-heading rounded hover:bg-neutral-tertiary md:hover:bg-transparent md:border-0 md:hover:text-fg-brand md:p-0 md:dark:hover:bg-transparent\">Services</a>\n </li>\n <li>\n <a href=\"#\" class=\"block py-2 px-3 text-heading rounded hover:bg-neutral-tertiary md:hover:bg-transparent md:border-0 md:hover:text-fg-brand md:p-0 md:dark:hover:bg-transparent\">Pricing</a>\n </li>\n <li>\n <a href=\"#\" class=\"block py-2 px-3 text-heading rounded hover:bg-neutral-tertiary md:hover:bg-transparent md:border-0 md:hover:text-fg-brand md:p-0 md:dark:hover:bg-transparent\">Contact</a>\n </li>\n </ul>\n </div>\n </div>\n</nav>"
+    },
+    {
+      "id": "flowbite--banner-cta",
+      "file": "flowbite--banner-cta.html",
+      "name": "Sticky Banner CTA",
+      "source": "https://github.com/themesberg/flowbite/blob/main/content/components/banner.md",
+      "license": "MIT (plain, verified from LICENSE.md in themesberg/flowbite)",
+      "category": "cta",
+      "framework": "html-tailwind",
+      "niches": [
+        "promotions",
+        "announcements",
+        "events"
+      ],
+      "summary": "Full-width top banner: message with inline link, CTA, dismiss button",
+      "reference": "<div id=\"sticky-banner\" tabindex=\"-1\" class=\"fixed top-0 start-0 z-50 flex justify-between w-full p-4 border-b border-default bg-neutral-primary-soft\">\n <div class=\"flex items-center mx-auto\">\n <p class=\"flex items-center text-sm font-normal text-body\">\n <span class=\"inline-flex items-center justify-center w-6 h-6 shrink-0 me-2.5 bg-neutral-tertiary rounded-full\">\n <svg class=\"w-3.5 h-3.5 text-body\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" viewBox=\"0 0 24 24\"><path stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"[path]\"/></svg>\n <span class=\"sr-only\">Bullhorn</span>\n </span>\n <span>New brand identity has been launched for the <a href=\"https://flowbite.com\" class=\"inline font-medium text-fg-brand underline hover:no-underline\">Flowbite Library</a></span>\n </p>\n </div>\n <div class=\"flex items-center\">\n <button data-dismiss-target=\"#sticky-banner\" type=\"button\" class=\"shrink-0 inline-flex justify-center text-sm w-7 h-7 items-center text-body hover:bg-neutral-tertiary hover:text-heading rounded-sm\">\n <svg class=\"w-4 h-4\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" viewBox=\"0 0 24 24\"><path stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18 17.94 6M18 18 6.06 6\"/></svg>\n <span class=\"sr-only\">Close banner</span>\n </button>\n </div>\n</div>"
+    },
+    {
+      "id": "flowbite--accordion-faq",
+      "file": "flowbite--accordion-faq.html",
+      "name": "Accordion FAQ Panels",
+      "source": "https://github.com/themesberg/flowbite/blob/main/content/components/accordion.md",
+      "license": "MIT (plain, verified from LICENSE.md in themesberg/flowbite)",
+      "category": "faq",
+      "framework": "html-tailwind",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Stacked heading-button panels with chevron rotation, bordered bodies with links",
+      "reference": "<div id=\"accordion-collapse\" data-accordion=\"collapse\" class=\"rounded-base border border-default overflow-hidden shadow-xs\">\n <h2 id=\"accordion-collapse-heading-1\">\n <button type=\"button\" class=\"flex items-center justify-between w-full p-5 font-medium rtl:text-right text-body rounded-t-base border border-t-0 border-x-0 border-b-default hover:text-heading hover:bg-neutral-secondary-medium gap-3\" data-accordion-target=\"#accordion-collapse-body-1\" aria-expanded=\"true\" aria-controls=\"accordion-collapse-body-1\">\n <span>What is Flowbite?</span>\n <svg data-accordion-icon class=\"w-5 h-5 rotate-180 shrink-0\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" viewBox=\"0 0 24 24\"><path stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"m5 15 7-7 7 7\"/></svg>\n </button>\n </h2>\n <div id=\"accordion-collapse-body-1\" class=\"hidden border border-s-0 border-e-0 border-t-0 border-b-default\" aria-labelledby=\"accordion-collapse-heading-1\">\n <div class=\"p-4 md:p-5\">\n <p class=\"mb-2 text-body\">Flowbite is an open-source library of interactive components built on top of Tailwind CSS including buttons, dropdowns, modals, navbars, and more.</p>\n <p class=\"text-body\">Check out this guide to learn how to <a href=\"/docs/getting-started/introduction/\" class=\"text-fg-brand hover:underline\">get started</a> and start developing websites even faster with components on top of Tailwind CSS.</p>\n </div>\n </div>\n <h2 id=\"accordion-collapse-heading-2\">\n <button type=\"button\" class=\"flex items-center justify-between w-full p-5 font-medium rtl:text-right text-body border border-x-0 border-b-default border-t-0 hover:text-heading hover:bg-neutral-secondary-medium gap-3\" data-accordion-target=\"#accordion-collapse-body-2\" aria-expanded=\"false\" aria-controls=\"accordion-collapse-body-2\">\n <span>Is there a Figma file available?</span>\n <svg data-accordion-icon class=\"w-5 h-5 rotate-180 shrink-0\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" fill=\"none\" viewBox=\"0 0 24 24\"><path stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"m5 15 7-7 7 7\"/></svg>\n </button>\n </h2>\n <div id=\"accordion-collapse-body-2\" class=\"hidden border border-s-0 border-e-0 border-t-0 border-b-default\" aria-labelledby=\"accordion-collapse-heading-2\">\n <div class=\"p-4 md:p-5\">\n[trimmed]"
+    },
+    {
+      "id": "daisyui--hero",
+      "file": "daisyui--hero.css",
+      "name": "Hero Layout CSS",
+      "source": "https://github.com/saadeghi/daisyui/blob/master/packages/daisyui/src/components/hero.css",
+      "license": "MIT (plain, verified from LICENSE in saadeghi/daisyui)",
+      "category": "hero",
+      "framework": "css",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Grid-stack hero pattern: .hero centers .hero-content, .hero-overlay layers over background",
+      "reference": ".hero {\n @layer daisyui.l1.l2.l3 {\n @apply grid w-full place-items-center bg-cover bg-center;\n & > * {\n @apply col-start-1 row-start-1;\n }\n }\n}\n.hero-overlay {\n @layer daisyui.l1.l2.l3 {\n @apply bg-neutral/50 col-start-1 row-start-1 h-full w-full;\n }\n}\n.hero-content {\n @layer daisyui.l1.l2.l3 {\n @apply isolate flex max-w-[80rem] items-center justify-center gap-4 p-4;\n }\n}"
+    },
+    {
+      "id": "daisyui--card",
+      "file": "daisyui--card.css",
+      "name": "Card CSS Pattern",
+      "source": "https://github.com/saadeghi/daisyui/blob/master/packages/daisyui/src/components/card.css",
+      "license": "MIT (plain, verified from LICENSE in saadeghi/daisyui)",
+      "category": "card",
+      "framework": "css",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Flex-column .card with figure image slots, .card-body padding scale, image-full overlay variant",
+      "reference": ".card {\n @layer daisyui.l1.l2.l3 {\n @apply rounded-box relative flex flex-col;\n transition: outline 0.2s ease-in-out;\n outline: 2px solid #0000;\n outline-offset: 2px;\n &:focus-visible,\n &[aria-checked=\"true\"],\n &:has(> :checked, > :is([type=\"checkbox\"], [type=\"radio\"]):focus-visible) {\n outline-color: currentColor;\n }\n &:has(> :checked:focus-visible),\n &[aria-checked=\"true\"]:focus-visible,\n &[aria-checked=\"true\"]:has(> :is([type=\"checkbox\"], [type=\"radio\"]):focus-visible) {\n outline-width: 4px;\n }\n &:has(> :is([type=\"checkbox\"], [type=\"radio\"])) {\n @apply cursor-pointer;\n user-select: none;\n }\n > :is([type=\"checkbox\"], [type=\"radio\"]) {\n @apply appearance-none;\n }\n }\n @layer daisyui.l1.l2.l3.l4 {\n figure:first-child {\n @apply overflow-hidden;\n border-start-start-radius: inherit;\n border-start-end-radius: inherit;\n border-end-start-radius: unset;\n border-end-end-radius: unset;\n }\n figure:last-child {\n @apply overflow-hidden;\n border-start-start-radius: unset;\n border-start-end-radius: unset;\n border-end-start-radius: inherit;\n border-end-end-radius: inherit;\n }\n figure {\n @apply flex items-center justify-center;\n }\n }\n}\n.card-border {\n @layer daisyui.l1.l2 {\n border: var(--border) solid var(--color-base-200);\n }\n}\n.card-dash {\n @layer daisyui.l1.l2 {\n border: var(--border) dashed var(--color-base-200);\n }\n}\n.image-full {\n @layer daisyui.l1.l2 {\n @apply grid;\n > * {\n @apply col-start-1 row-start-1;\n }\n > .card-body {\n @apply text-neutral-content relative;\n }\n :where(figure) {\n @apply overflow-hidden;\n border-radius: inherit;\n }\n > figure img {\n @apply h-full object-cover;\n filter: brightness(28%);\n }\n }\n}\n.card-title {\n @layer daisyui.l1.l2.l3 {\n @apply flex items-center gap-2;\n font-size: var(--cardtitle-fs, 1.125rem);\n font-weight: 600;\n }\n}\n.card-body {\n @layer daisyui.l1.l2.l3 {\n @apply flex flex-auto flex-col gap-2;\n padding: var(--card-p, 1.5rem);\n font-size: var(--card-fs, 0.875rem);\n }\n @layer daisyui.l1.l2.l3.l4 {\n p {\n @apply grow;\n }\n }\n}\n.card-actions {\n @layer daisyui.l1.l2.l3 {\n @apply flex flex-wrap items-start gap-2;\n }\n}\n.card-xs {\n @layer daisyui.l1.l2 {\n .card-body {\n --card-p: 0.5rem;\n --card-fs: 0.6875rem;\n }\n .card-title {\n --cardtitle-fs: 0.875rem;\n }\n }\n}\n.card-sm {\n @layer daisyui.l1.l2 {\n .card-body {\n --card-p: 1rem;\n --card-fs: 0.75rem;\n }\n .card-title {\n --cardtitle-fs: 1rem;\n }\n }\n}\n.card-md {\n @layer daisyui.l1.l2 {\n .card-body {\n --card-p: 1.5rem;\n --card-fs: 0.875rem;\n }\n[trimmed]"
+    },
+    {
+      "id": "daisyui--stat",
+      "file": "daisyui--stat.css",
+      "name": "Stats Strip CSS",
+      "source": "https://github.com/saadeghi/daisyui/blob/master/packages/daisyui/src/components/stat.css",
+      "license": "MIT (plain, verified from LICENSE in saadeghi/daisyui)",
+      "category": "stats",
+      "framework": "css",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Inline-grid .stats strip; each .stat is a 3-col grid of title/value/desc with hairline dividers",
+      "reference": ".stats {\n @layer daisyui.l1.l2.l3 {\n @apply rounded-box relative inline-grid grid-flow-col overflow-x-auto;\n }\n}\n.stat {\n @layer daisyui.l1.l2.l3 {\n @apply inline-grid w-full gap-x-4 px-6 py-4;\n grid-template-columns: repeat(1, 1fr);\n &:not(:last-child) {\n border-inline-end: var(--border) dashed color-mix(in oklab, currentColor 10%, #0000);\n border-block-end: none;\n }\n }\n}\n.stat-figure {\n @layer daisyui.l1.l2.l3 {\n @apply col-start-2 row-span-3 row-start-1 place-self-center justify-self-end;\n }\n}\n.stat-title {\n @layer daisyui.l1.l2.l3 {\n @apply text-base-content/60 col-start-1 whitespace-nowrap;\n font-size: 0.75rem;\n }\n}\n.stat-value {\n @layer daisyui.l1.l2.l3 {\n @apply col-start-1 whitespace-nowrap;\n font-size: 2rem;\n font-weight: 800;\n }\n}\n.stat-desc {\n @layer daisyui.l1.l2.l3 {\n @apply text-base-content/60 col-start-1 whitespace-nowrap;\n font-size: 0.75rem;\n }\n}\n.stat-actions {\n @layer daisyui.l1.l2.l3 {\n @apply col-start-1 whitespace-nowrap;\n }\n}\n.stats-horizontal {\n @layer daisyui.l1.l2 {\n @apply grid-flow-col overflow-x-auto;\n .stat:not(:last-child) {\n border-inline-end: var(--border) dashed color-mix(in oklab, currentColor 10%, #0000);\n border-block-end: none;\n }\n }\n}\n.stats-vertical {\n @layer daisyui.l1.l2 {\n @apply grid-flow-row overflow-y-auto;\n .stat:not(:last-child) {\n border-inline-end: none;\n border-block-end: var(--border) dashed color-mix(in oklab, currentColor 10%, #0000);\n }\n }\n}"
+    },
+    {
+      "id": "daisyui--footer",
+      "file": "daisyui--footer.css",
+      "name": "Footer Grid CSS",
+      "source": "https://github.com/saadeghi/daisyui/blob/master/packages/daisyui/src/components/footer.css",
+      "license": "MIT (plain, verified from LICENSE in saadeghi/daisyui)",
+      "category": "footer",
+      "framework": "css",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Auto-flow footer grid with .footer-title heading style and horizontal/vertical placement variants",
+      "reference": ".footer {\n @layer daisyui.l1.l2.l3 {\n @apply grid w-full grid-flow-row place-items-start gap-x-4 gap-y-10;\n font-size: 0.875rem;\n line-height: 1.25rem;\n & > *:not(script, style, template) {\n @apply grid place-items-start gap-2;\n }\n &.footer-center {\n @apply grid-flow-col-dense place-items-center text-center;\n & > *:not(script, style, template) {\n @apply place-items-center;\n }\n }\n }\n}\n.footer-title {\n @layer daisyui.l1.l2.l3 {\n @apply mb-2 uppercase opacity-60;\n font-weight: 600;\n }\n}\n.footer-horizontal {\n @layer daisyui.l1.l2 {\n @apply grid-flow-col;\n &.footer-center {\n @apply grid-flow-row-dense;\n }\n }\n}\n.footer-vertical {\n @layer daisyui.l1.l2 {\n @apply grid-flow-row;\n &.footer-center {\n @apply grid-flow-col-dense;\n }\n }\n}"
+    },
+    {
+      "id": "daisyui--navbar",
+      "file": "daisyui--navbar.css",
+      "name": "Navbar Thirds CSS",
+      "source": "https://github.com/saadeghi/daisyui/blob/master/packages/daisyui/src/components/navbar.css",
+      "license": "MIT (plain, verified from LICENSE in saadeghi/daisyui)",
+      "category": "nav",
+      "framework": "css",
+      "niches": [
+        "universal"
+      ],
+      "summary": "Flex .navbar bar split into -start/-center/-end thirds with min-height padding",
+      "reference": ".navbar {\n @layer daisyui.l1.l2.l3 {\n @apply flex w-full items-center;\n padding: 0.5rem;\n min-height: 4rem;\n }\n}\n:where(.navbar) {\n @layer daisyui.l1.l2 {\n @apply relative;\n }\n}\n.navbar-start {\n @layer daisyui.l1.l2.l3 {\n @apply inline-flex items-center;\n width: 50%;\n justify-content: flex-start;\n }\n}\n.navbar-center {\n @layer daisyui.l1.l2.l3 {\n @apply inline-flex items-center;\n @apply shrink-0;\n }\n}\n.navbar-end {\n @layer daisyui.l1.l2.l3 {\n @apply inline-flex items-center;\n width: 50%;\n justify-content: flex-end;\n }\n}"
+    }
+  ]
 }
