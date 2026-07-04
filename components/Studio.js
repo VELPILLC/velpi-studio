@@ -375,7 +375,7 @@ export default function Studio() {
   // ── Styles library ──
   const [styles, setStyles] = useState([])
   const [styleId, setStyleId] = useState('auto')
-  const [styleOpen, setStyleOpen] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
   const [matchedStyleName, setMatchedStyleName] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
   const [newStyleName, setNewStyleName] = useState('')
@@ -517,6 +517,30 @@ export default function Studio() {
     setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
+  // Small gallery thumbnail: render the top of the site off-screen, capture,
+  // downscale to a compact JPEG data URI. Returns null on any failure.
+  async function captureThumb(substitutedHtml) {
+    const frame = document.createElement('iframe')
+    try {
+      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1024px;height:1280px;border:none;'
+      frame.setAttribute('sandbox', 'allow-same-origin')
+      document.body.appendChild(frame)
+      frame.srcdoc = substitutedHtml
+      await new Promise(res => { frame.onload = res })
+      await new Promise(res => setTimeout(res, 900))
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(frame.contentDocument.documentElement, {
+        useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
+        windowWidth: 1024, width: 1024, height: 1280, scale: 0.35, logging: false,
+      })
+      return canvas.toDataURL('image/jpeg', 0.72)
+    } catch (_) {
+      return null
+    } finally {
+      try { document.body.removeChild(frame) } catch (_) {}
+    }
+  }
+
   // Capture the whole rendered mockup as ONE tall PNG you can scroll through.
   async function downloadFullImage() {
     const out = previewHtml()
@@ -627,6 +651,7 @@ export default function Studio() {
       // Refinement (isolate icon, 1:1, fill frame, transparent, premium) runs in
       // parallel with everything else — it never blocks the build.
       mark('logo', 'active')
+      let logoAssetLocal = null // local mirror for auto-save
       const refinePayload = logo
         ? { b64: logo.data, instructions: logoNotes.trim() }
         : (scrapedData.logo ? { url: scrapedData.logo, instructions: logoNotes.trim() } : null)
@@ -635,24 +660,39 @@ export default function Studio() {
             .then(res => {
               if (res.b64) {
                 const uri = `data:image/png;base64,${res.b64}`
+                logoAssetLocal = uri
                 setRefinedLogo(uri)
                 setAssetsById(prev => ({ ...prev, logo: uri }))
               } else if (res.src || logo?.preview) {
                 // Unsupported format or refine failure — use the raw source.
-                setAssetsById(prev => ({ ...prev, logo: res.src || logo.preview }))
+                logoAssetLocal = res.src || logo.preview
+                setAssetsById(prev => ({ ...prev, logo: logoAssetLocal }))
               }
               mark('logo', 'complete')
             })
             .catch(() => {
               const fallback = logo?.preview || scrapedData.logo
-              if (fallback) setAssetsById(prev => ({ ...prev, logo: fallback }))
+              if (fallback) {
+                logoAssetLocal = fallback
+                setAssetsById(prev => ({ ...prev, logo: fallback }))
+              }
               mark('logo', 'complete')
             })
         : Promise.resolve().then(() => mark('logo', 'complete')) // no logo found — build uses a text wordmark
 
       mark('analyze', 'active')
-      const vibeText = vibeSummary()
-      const { analysis } = await callRoute('/api/analyze', { scrapedData, vibe: vibeText })
+      const manualVibe = vibeSummary()
+      const { analysis } = await callRoute('/api/analyze', { scrapedData, vibe: manualVibe })
+
+      // Vibe is INFERRED, not asked: when the creator touched nothing in
+      // Customize, the agent's own read of the business (copy tone → feel,
+      // imagery → look, business type → CTA) drives everything downstream.
+      const inf = analysis.inferred_vibe || {}
+      const vibeText = manualVibe || [
+        inf.feel ? `How should it feel? ${inf.feel}` : null,
+        inf.look ? `How should it look? ${inf.look}` : null,
+        inf.primary_cta ? `What should visitors do? ${inf.primary_cta}` : null,
+      ].filter(Boolean).join(' | ')
       setBizName(analysis.business_name || '')
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
@@ -701,12 +741,14 @@ export default function Studio() {
       }
 
       mark('images', 'active')
+      const localAssets = {} // local mirror of generated assets for auto-save
       const imagesPromise = callRoute('/api/generate-images', { analysis })
         .then(({ images }) => {
           const map = {}
           for (const a of images?.assets || []) {
             if (a.src) map[a.id] = a.src
           }
+          Object.assign(localAssets, map)
           // Never let a scraped logo overwrite the refined upload.
           setAssetsById(prev => ({ ...map, ...(prev.logo ? { logo: prev.logo } : {}) }))
           setImagesReady(true)
@@ -783,11 +825,50 @@ export default function Studio() {
 
       // Build report — everything the generator thought and used, copyable.
       const report = composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief)
+        + (!manualVibe && (inf.feel || inf.look || inf.primary_cta) ? `\n--- AUTO-INFERRED VIBE (no manual selections — agent's own read) ---\nFeel: ${inf.feel || '—'}\nLook: ${inf.look || '—'}\nPrimary CTA: ${inf.primary_cta || '—'}\n` : '')
         + (motionPreset ? `\n--- SIGNATURE MOTION ---\n${motionPreset.name} (${motionPreset.intensity} ${motionPreset.effect}, ${motionPreset.dependency}) — ${motionPreset.summary || ''}\n` : '')
         + (loopLog.length ? `\n--- REFINEMENT LOOP ---\n${loopLog.join('\n')}\n` : '')
       setBuildReport(report)
 
       await Promise.all([imagesPromise, refineP])
+
+      // AUTO-SAVE — every generation lands in the library automatically with a
+      // thumbnail and a shareable /preview/{id} URL. Best-effort: never blocks.
+      try {
+        const allSlots = [...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }]
+        const finalAssets = { ...localAssets, ...(logoAssetLocal ? { logo: logoAssetLocal } : {}) }
+        const substituted = workingHtml.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, tid) => {
+          if (finalAssets[tid]) return finalAssets[tid]
+          if (tid === 'logo') return logoAssetLocal || scrapedData.logo || placeholderSvg('logo')
+          const slot = allSlots.find(s => s.id === tid)
+          return placeholderSvg(slot ? slot.name : tid)
+        })
+        const thumb = await captureThumb(substituted)
+        const projData = {
+          bizName: analysis.business_name || '',
+          niche: analysis.industry || '',
+          sourceUrl: input.trim(),
+          analysisData: analysis,
+          slots: allSlots,
+          assetsById: finalAssets,
+          ghlUrls: {},
+          htmlTemplate: workingHtml,
+          buildReport: report,
+          vibe,
+          refinedLogo: logoAssetLocal,
+          logoUrl: scrapedData.logo || null,
+          input: input.trim(),
+          thumb,
+          savedAt: new Date().toISOString(),
+        }
+        const name = `${analysis.business_name || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        const { project } = await callRoute('/api/projects', { name, data: projData })
+        setProjects(prev => [{ ...project, thumb }, ...prev])
+        setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
+        setTimeout(() => setSavedMsg(null), 5000)
+      } catch (e) {
+        console.error('auto-save failed:', e.message) // manual Save button still available
+      }
     } catch (e) {
       const activeId = Object.keys(statuses).find(k => statuses[k] === 'active')
       if (activeId) mark(activeId, 'error')
@@ -960,15 +1041,24 @@ export default function Studio() {
         {/* Logo is fully automatic now — detected from the site, refined, and it
             populates in the Assets section below with the other images. */}
 
-        {/* ── STEP 2 — Vibe (multiple choice, up to 2 per question) ── */}
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span style={stepBadge(vibeCount > 0)}>{vibeCount > 0 ? '✓' : '2'}</span>
-            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Set the vibe</span>
-            <span style={{ ...label, fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>tap up to 2 each</span>
-          </div>
+        {/* ── Customize (optional) — the agent infers feel/look/CTA and matches
+            styles automatically; this collapsed panel is the power-user escape
+            hatch, never the primary path. ── */}
+        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+          <button
+            onClick={() => setCustomizeOpen(v => !v)}
+            style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+          >
+            <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
+              ⚙ Customize <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.74rem' }}>optional — vibe, style & CTA are inferred automatically</span>
+              {(vibeCount > 0 || styleId !== 'auto') && <span style={{ color: BLUE, fontSize: '0.72rem' }}> · overrides active</span>}
+            </span>
+            <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{customizeOpen ? '▲' : '▼'}</span>
+          </button>
+          {customizeOpen && (
+          <div style={{ padding: '0 14px 14px' }}>
           <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 12 }}>
-            These steer the design — the blend of styles, mood, and what the site pushes visitors to do.
+            Leave everything untouched and the agent reads the business itself — copy tone → feel, imagery → look, business type → call-to-action. Anything you tap here overrides the inference.
           </div>
           {VIBE_QUESTIONS.map(q => (
             <div key={q.id} style={{ marginBottom: 16 }}>
@@ -1005,21 +1095,12 @@ export default function Studio() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* ── Design style (collapsed) ── */}
-        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-          <button
-            onClick={() => setStyleOpen(v => !v)}
-            style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
-          >
-            <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
-              Design style: <span style={{ color: '#fff', fontWeight: 600 }}>{styleId === 'auto' ? '✦ Auto-Match' : (styles.find(s => s.id === styleId)?.name || 'Custom')}</span>
-            </span>
-            <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{styleOpen ? '▲' : '▼'}</span>
-          </button>
-          {styleOpen && (
-            <div style={{ padding: '0 14px 14px' }}>
+          {/* Design style — Auto-Match is the mode; manual pick is an override */}
+          <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 4, paddingTop: 14 }}>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+              Design style <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: '0.74rem' }}>— Auto-Match unless you pick one</span>
+            </div>
+            <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8, marginBottom: 12 }}>
                 <div
                   onClick={() => setStyleId('auto')}
@@ -1079,6 +1160,8 @@ export default function Studio() {
                 )}
               </div>
             </div>
+          </div>
+          </div>
           )}
         </div>
 
@@ -1095,21 +1178,35 @@ export default function Studio() {
               <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{libraryOpen ? '▲' : '▼'}</span>
             </button>
             {libraryOpen && (
-              <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ padding: '0 14px 14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
                 {projects.map(p => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '10px 12px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.82rem', color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem', color: 'rgba(255,255,255,0.4)' }}>
-                        {p.created_at ? new Date(p.created_at).toLocaleString() : ''}
+                  <div key={p.id} style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
+                    <a href={`/preview/${p.id}`} target="_blank" rel="noreferrer" title="Open live preview" style={{ display: 'block', aspectRatio: '4/5', background: '#0d1626', position: 'relative' }}>
+                      {p.thumb ? (
+                        <img src={p.thumb} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+                      ) : (
+                        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', opacity: 0.3 }}>🖥</span>
+                      )}
+                    </a>
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>
+                        {p.niche ? `${p.niche} · ` : ''}{p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        <button onClick={() => loadProject(p.id)} disabled={!!loadingProjectId} style={{ ...monoBtn, flex: 1, padding: '5px 0', fontSize: '0.58rem', opacity: loadingProjectId ? 0.5 : 1 }}>
+                          {loadingProjectId === p.id ? '…' : 'Load'}
+                        </button>
+                        <button
+                          onClick={() => { try { navigator.clipboard?.writeText(`${window.location.origin}/preview/${p.id}`) } catch (_) {}; setSavedMsg('Preview link copied'); setTimeout(() => setSavedMsg(null), 2000) }}
+                          title="Copy shareable preview link"
+                          style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem' }}
+                        >⧉</button>
+                        <button onClick={() => removeProject(p.id)} title="Delete" style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '5px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem' }}>
+                          ✕
+                        </button>
                       </div>
                     </div>
-                    <button onClick={() => loadProject(p.id)} disabled={!!loadingProjectId} style={{ ...monoBtn, padding: '6px 14px', fontSize: '0.62rem', opacity: loadingProjectId ? 0.5 : 1 }}>
-                      {loadingProjectId === p.id ? 'Loading…' : 'Load'}
-                    </button>
-                    <button onClick={() => removeProject(p.id)} style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '6px 10px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem' }}>
-                      ✕
-                    </button>
                   </div>
                 ))}
               </div>
@@ -1419,12 +1516,19 @@ export default function Studio() {
             >
               {savingProject ? 'Saving…' : '💾 Save to Library'}
             </button>
-            {savedMsg && (
-              <div style={{ textAlign: 'center', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.68rem', color: GREEN, letterSpacing: '0.04em' }}>
-                ✓ {savedMsg} — reload it anytime from the Library at the top
-              </div>
-            )}
           </div>
+        </div>
+      )}
+
+      {/* ── Global toast (saves, copied links) ── */}
+      {savedMsg && (
+        <div style={{
+          position: 'fixed', bottom: 18, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
+          background: 'rgba(10, 22, 40, 0.96)', border: `1px solid ${GREEN}`, borderRadius: 10,
+          padding: '10px 18px', color: GREEN, fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.7rem',
+          letterSpacing: '0.04em', maxWidth: '92vw', textAlign: 'center',
+        }}>
+          ✓ {savedMsg}
         </div>
       )}
       </div>

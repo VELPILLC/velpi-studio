@@ -19,6 +19,7 @@ const SYSTEM = `You are a senior brand and web strategist analyzing a business w
 
 STEP — RECON: extract EVERY piece of real information, exhaustively — business name, every phone number, every email address, every physical address/location, hours, social media links, nav structure, every service/menu item with prices when shown, every review/quote with attribution, taglines, delivery platforms, credentials, years in business. Miss nothing — the user reads this extraction directly.
 STEP — DIRECTION: commit to ONE highest-end creative direction appropriate to THIS industry (never a generic template) and name the single feeling a visitor should have within 3 seconds.
+STEP — INFER THE VIBE YOURSELF: the creator does not configure feel/look/CTA — YOU determine all three (inferred_vibe) from what you can see: the crawled copy's tone and vocabulary → feel; their existing imagery, palette, and niche norms → look; the business type's natural money action → primary_cta. If the creator DID provide manual vibe selections (in the user message), align inferred_vibe with them instead of contradicting them.
 STEP — CONVERSION STRATEGY: think like a direct-response strategist about THIS business before any design happens:
   1. The ONE primary action that makes this business money (call, book, quote, order, visit) and the strongest secondary action.
   2. The top 3 objections THIS specific customer has before acting — and which REAL extracted fact answers each (a review, years in business, a credential, a guarantee, pricing). Never manufacture an answer.
@@ -39,6 +40,11 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
   "tone": "string",
   "design_direction": "one committed creative direction for the highest-end version of a site in THIS industry",
   "target_feeling": "the single feeling a visitor should have within 3 seconds",
+  "inferred_vibe": {
+    "feel": "the feel this brand should give off, inferred from the crawled copy's tone + niche norms (e.g. 'Luxurious & refined', 'Warm & welcoming', 'Bold & high-energy', 'Minimal & modern', 'Classic & trusted', 'Editorial & artistic')",
+    "look": "the visual treatment inferred from their existing imagery + industry (e.g. 'Dramatic full-screen imagery', 'Airy whitespace', 'Dark & moody', 'Clean structured grid', 'Rich & layered', 'Bold color-blocked sections')",
+    "primary_cta": "the single action this business type most needs visitors to take (a gym: 'Join now'; a law firm: 'Book a consultation'; a boutique: 'Browse the collection')"
+  },
   "color_palette": ["#hex", "#hex"],
   "sections": ["ordered section keys, e.g. hero, services, about, reviews, hours, contact"],
   "layout": {
