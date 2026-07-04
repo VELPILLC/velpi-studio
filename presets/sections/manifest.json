@@ -1,0 +1,4 @@
+{
+  "notes": "Section/layout reference library — structural patterns the site builder studies and re-expresses in its own scoped CSS (never copied verbatim; Tailwind classes are not available in the output). Populated by the harvest agent; entries carry verified source + license.",
+  "sections": []
+}

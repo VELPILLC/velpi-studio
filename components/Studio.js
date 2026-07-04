@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { pickCreativeMix } from '../lib/designStyles'
 import { pickSignatureMotion } from '../lib/motionPresets'
+import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
 
 // Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
@@ -789,6 +790,10 @@ function extractLogoColors(dataUrl) {
       // never repeating a recent generation's effect.
       const motionPreset = pickSignatureMotion(analysis, vibeText, avoidMotionIds)
 
+      // Structural references — harvested section patterns matching the
+      // persuasion flow, studied by the builder (never copied verbatim).
+      const sectionRefs = pickSectionReferences(analysis, 4)
+
       // Design brief — a creative director fuses brand + vibe + the matched
       // systems into ONE committed spec before any HTML is written.
       mark('brief', 'active')
@@ -839,6 +844,7 @@ function extractLogoColors(dataUrl) {
         styleMds: chosenStyles.map(s => s.content),
         brief: designBrief,
         motion: motionPreset,
+        sectionRefs,
       })
       setHtmlTemplate(html)
       setBuilt(true)
@@ -892,6 +898,7 @@ function extractLogoColors(dataUrl) {
       const report = composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief)
         + (!manualVibe && (inf.feel || inf.look || inf.primary_cta) ? `\n--- AUTO-INFERRED VIBE (no manual selections — agent's own read) ---\nFeel: ${inf.feel || '—'}\nLook: ${inf.look || '—'}\nPrimary CTA: ${inf.primary_cta || '—'}\n` : '')
         + (motionPreset ? `\n--- SIGNATURE MOTION ---\n${motionPreset.name} (${motionPreset.intensity} ${motionPreset.effect}, ${motionPreset.dependency}) — ${motionPreset.summary || ''}\n` : '')
+        + (sectionRefs.length ? `\n--- STRUCTURAL REFERENCES STUDIED ---\n${sectionRefs.map(r => `${r.name} (${r.category}) — ${r.source}`).join('\n')}\n` : '')
         + (loopLog.length ? `\n--- REFINEMENT LOOP ---\n${loopLog.join('\n')}\n` : '')
       setBuildReport(report)
 

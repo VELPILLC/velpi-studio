@@ -91,7 +91,7 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { analysis, copy, slots, brief, motion } = body
+    const { analysis, copy, slots, brief, motion, sectionRefs } = body
     // Accept one style (styleMd) or several (styleMds) — several = smart mix & match.
     const styleMds = Array.isArray(body.styleMds) && body.styleMds.length
       ? body.styleMds.filter(Boolean)
@@ -146,7 +146,10 @@ ${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}
 
 ${analysis.brand ? `BRAND ANALYSIS (elevate THIS brand — do not invent a new one):\n${JSON.stringify(analysis.brand, null, 2)}\n` : ''}
 ${brief ? `DESIGN BRIEF — THE COMMITTED CREATIVE DIRECTION (a creative director already fused the brand, vibe, and reference systems into this; execute it EXACTLY — palette map, type system, hero concept, section treatments, signature details, mobile behavior):\n${brief}\n\n` : ''}${styleMds.length === 1 ? `${brief ? 'REFERENCE DESIGN SYSTEM (already fused into the brief — consult only where the brief is silent):' : 'DESIGN SYSTEM TO FOLLOW PRECISELY:'}\n${styleMds[0]}\n` : ''}${styleMds.length > 1 ? `${brief ? `REFERENCE DESIGN SYSTEMS (${styleMds.length}) — already fused into the brief above; consult only where the brief is silent.` : `DESIGN SYSTEMS TO MIX & MATCH (${styleMds.length}) — you are a smart design agent: take the strongest ideas from each (a hero treatment from one, a menu/list pattern from another, typography pairing from a third), fuse them into ONE cohesive direction perfectly niched to THIS business, and map every color decision onto the brand theme colors above. Never produce a franken-page — the blend must feel like a single intentional system.`}\n\n${styleMds.map((s, i) => `--- SYSTEM ${i + 1} ---\n${s}`).join('\n\n')}\n` : ''}
-COPY (JSON — use exactly, never invent):
+${Array.isArray(sectionRefs) && sectionRefs.length ? `STRUCTURAL REFERENCES — study each one's composition, hierarchy, and rhythm, then RE-EXPRESS those ideas in your own scoped plain CSS. The originals use Tailwind/React classes that DO NOT exist in your output — never copy their class names or markup verbatim, only the structural thinking:
+${sectionRefs.map((r, i) => `--- REF ${i + 1}: ${r.name} (${r.category}) ---\n${String(r.reference).slice(0, 2500)}`).join('\n\n')}
+
+` : ''}COPY (JSON — use exactly, never invent):
 ${JSON.stringify(copy.sections, null, 2)}
 
 IMAGE SLOTS (use every token, in its noted section):
