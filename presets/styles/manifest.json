@@ -2,7 +2,7 @@
   "notes": [
     "Style library harvested from styles.refero.design (free, no-auth library built for AI agents).",
     "Each style dir contains four formats derived from the same fullResult.designSystem JSON: design.md (editorial reference), tokens.json (raw design system + _meta), css-vars.css (:root custom properties), tailwind.config.snippet.js (theme.extend snippet).",
-    "Generated 2026-07-04T19:31:10.202Z. 38/38 styles completed."
+    "Generated 2026-07-04T19:32:50.545Z. 38/38 styles completed."
   ],
   "styles": [
     {
@@ -452,8 +452,8 @@
     {
       "key": "salon-glossgenius",
       "dir": "presets/styles/salon-glossgenius",
-      "siteName": "ONE",
-      "sourceUrl": "https://styles.refero.design/style/71745af1-2e53-4925-992e-82773e55ccd6",
+      "siteName": "Scheduling",
+      "sourceUrl": "https://styles.refero.design/style/7ad5549e-9baa-4fda-ac43-79d568a86b98",
       "formats": [
         "design.md",
         "tokens.json",
