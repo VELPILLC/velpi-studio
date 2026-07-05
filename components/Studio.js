@@ -367,6 +367,10 @@ export default function Studio() {
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
 
+  // ── Run evidence: exact prompt payload + image-API attestation ──
+  const [promptTrace, setPromptTrace] = useState(null) // { system, user }
+  const [imagesMeta, setImagesMeta] = useState(null)   // { apiCalled, aiCalls, generated, enhanced, keptOriginal }
+
   // ── Alternate layouts (post-generation option) ──
   const [altLayouts, setAltLayouts] = useState([])
   const [rebuilding, setRebuilding] = useState(null) // alternate name while rebuilding
@@ -817,12 +821,14 @@ function extractLogoColors(dataUrl) {
 
       mark('images', 'active')
       const localAssets = {} // local mirror of generated assets for auto-save
+      let imagesMetaLocal = null // image-API attestation, mirrored for auto-save
       const imagesPromise = callRoute('/api/generate-images', { analysis })
         .then(({ images }) => {
           const map = {}
           for (const a of images?.assets || []) {
             if (a.src) map[a.id] = a.src
           }
+          if (images?.meta) { imagesMetaLocal = images.meta; setImagesMeta(images.meta) }
           Object.assign(localAssets, map)
           // Never let a scraped logo overwrite the refined upload.
           setAssetsById(prev => ({ ...map, ...(prev.logo ? { logo: prev.logo } : {}) }))
@@ -853,7 +859,8 @@ function extractLogoColors(dataUrl) {
         sectionRefs,
       }
       lastRunRef.current = buildPayload // kept for alternate-layout rebuilds
-      const { html } = await callRoute('/api/build-site', buildPayload)
+      const { html, trace } = await callRoute('/api/build-site', buildPayload)
+      if (trace) setPromptTrace(trace)
       setHtmlTemplate(html)
       setBuilt(true)
       mark('build', 'complete')
@@ -983,6 +990,8 @@ function extractLogoColors(dataUrl) {
           ghlUrls: {},
           htmlTemplate: workingHtml,
           buildReport: report,
+          promptTrace: trace || null, // the exact payload sent to the build model
+          imagesMeta: imagesMetaLocal || null, // proof the image API ran (call counts)
           vibe,
           refinedLogo: logoAssetLocal,
           logoUrl: scrapedData.logo || null,
@@ -996,7 +1005,8 @@ function extractLogoColors(dataUrl) {
         setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
         setTimeout(() => setSavedMsg(null), 5000)
       } catch (e) {
-        console.error('auto-save failed:', e.message) // manual Save button still available
+        // Silent failure hid a missing DB table for weeks — never again.
+        setError(`Auto-save to the library FAILED: ${e.message}${/table|schema/i.test(e.message) ? ' — run the projects SQL from lib/supabase.js in the Supabase SQL editor, then use the Save button.' : ' — use the Save button to retry.'}`)
       }
     } catch (e) {
       const activeId = Object.keys(statuses).find(k => statuses[k] === 'active')
@@ -1107,10 +1117,24 @@ function extractLogoColors(dataUrl) {
     setTimeout(() => URL.revokeObjectURL(url), 5000)
   }
 
+  // The exact payload sent to the code-generation model — full system + user text.
+  function downloadPromptTrace() {
+    if (!promptTrace) return
+    const text = `===== EXACT BUILD PAYLOAD =====\nBusiness: ${bizName || '?'}\nCaptured: ${new Date().toISOString()}\n\n----- SYSTEM PROMPT -----\n${promptTrace.system || ''}\n\n----- USER PROMPT -----\n${promptTrace.user || ''}\n`
+    const blob = new Blob([text], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeName(bizName)}-prompt-trace.txt`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
   function downloadAssetsJson() {
     const manifest = {
       business: bizName || null,
       generatedAt: new Date().toISOString(),
+      imageApiAttestation: imagesMeta || null,
       logo: { detected: logoUrl || null, refined: !!refinedLogo, ghlUrl: ghlUrls.logo || null },
       images: slots.filter(s => s.id !== 'logo').map((s, i) => ({
         slot: i + 1, id: s.id, name: s.name, section: s.section || null,
@@ -1589,7 +1613,7 @@ function extractLogoColors(dataUrl) {
           <div style={{ ...card, maxWidth: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
               <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>
-                Assets ({slots.length}){!imagesReady && generating ? ' — generating…' : ''}
+                Assets ({slots.length}){!imagesReady && generating ? ' — generating…' : ''}{imagesMeta ? ` — API verified: ${imagesMeta.generated} generated · ${imagesMeta.enhanced} enhanced · ${imagesMeta.keptOriginal} kept` : ''}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: allLinked ? GREEN : '#e5c07b' }}>
@@ -1675,6 +1699,7 @@ function extractLogoColors(dataUrl) {
                 <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
                 <button onClick={downloadDecisions} style={monoBtn}>⬇ decisions.md</button>
                 <button onClick={downloadAssetsJson} style={monoBtn}>⬇ assets.json</button>
+                {promptTrace && <button onClick={downloadPromptTrace} style={monoBtn}>⬇ prompt-trace</button>}
                 <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
               </div>
             </div>

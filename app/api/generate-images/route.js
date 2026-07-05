@@ -115,7 +115,18 @@ export async function POST(request) {
       }
     }
 
-    return Response.json({ images: { assets, warning } })
+    // Attestation: proves whether the image API was actually called this run
+    // (and how), instead of trusting a green checkmark in the UI.
+    const meta = {
+      apiCalled: aiOps > 0,
+      aiCalls: aiOps,
+      generated: assets.filter(a => a.kind === 'generated').length,
+      enhanced: assets.filter(a => a.kind === 'enhanced').length,
+      keptOriginal: assets.filter(a => a.kind === 'photo').length,
+      logo: assets.some(a => a.kind === 'logo'),
+      at: new Date().toISOString(),
+    }
+    return Response.json({ images: { assets, warning, meta } })
   } catch (err) {
     console.error('generate-images error:', err)
     return Response.json({ error: `Image generation failed: ${err.message}` }, { status: 500 })

@@ -169,7 +169,10 @@ ${slotBlock}`
 
     // Placeholders are intentionally NOT substituted here — the client maps each
     // %%IMG:id%% token to a generated preview image or a pasted GoHighLevel URL.
-    return Response.json({ html })
+    // trace: the EXACT payload sent to the model — persisted with the project
+    // and downloadable, so "what was actually in the prompt" is answerable
+    // with an artifact instead of code archaeology.
+    return Response.json({ html, trace: { system: SYSTEM, user } })
   } catch (err) {
     console.error('build-site error:', err)
     return Response.json({ error: `Mockup build failed: ${err.message}` }, { status: 500 })
