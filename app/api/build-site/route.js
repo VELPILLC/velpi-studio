@@ -77,6 +77,7 @@ BRAND CONTINUITY: a BRAND ANALYSIS of the business's existing site may be provid
 OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 - Return ONLY the HTML. Start with <!DOCTYPE html>. No markdown, no commentary.
 - ONE self-contained file: ALL CSS in a single <style> tag. Google Fonts loaded via @import at the TOP of that <style> tag (never a <link> tag) — @import survives when the code is pasted into a GoHighLevel custom-code element.
+- VIEWPORT META TAG — ABSOLUTE HARD REQUIREMENT, THE PAGE IS BROKEN ON MOBILE WITHOUT IT: the <head> MUST contain exactly <meta name="viewport" content="width=device-width, initial-scale=1"> as the first tag after <title>. Without this, real phone browsers render the page at a fake desktop-width viewport and zoom it out — every mobile-first CSS rule below becomes inert on an actual device even though it looks fine in a same-width preview frame. Never omit it, never alter its content value.
 - SCOPING: wrap ALL body content in <div class="velpi-page"> ... </div> and prefix EVERY CSS selector with .velpi-page (e.g. ".velpi-page .hero", ".velpi-page h2"). This prevents style collisions when pasted into a GoHighLevel page. Set base font-size/color/background on .velpi-page itself, not on body/html.
 - No JavaScript. No external scripts, CDNs, or frameworks. No position:fixed. Sticky nav is allowed via position:sticky inside .velpi-page.
 - MOBILE-FIRST OUTPUT CONTRACT (the page is judged on a phone first):
@@ -86,6 +87,9 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
   * Fluid type with clamp() everywhere (e.g. hero clamp(2.4rem, 9vw, 7rem)) so headlines fill the phone width edge to edge without overflowing.
   * CTAs and cards go FULL-WIDTH on mobile (100% width, generous tap height ≥ 52px); grids collapse to single column with zero horizontal gutter.
   * Absolutely no horizontal scroll at 390px — test every oversized/overlapping element with max-width: 100% and overflow-x guards.
+  * Body/paragraph text never renders below 16px on mobile (nav labels/fine print/legal can go to 13px minimum) — anything smaller forces visitors to pinch-zoom, which fails a mobile-friendly test instantly.
+  * MOBILE NAV — no JavaScript means no hamburger toggle, so don't attempt one: on mobile, the nav shows ONLY the logo and the single primary CTA button, full nav link list hidden via the @media(max-width:767px) query. Desktop/tablet shows the full link list. Keep the mobile nav bar compact (~56-64px tall) so it doesn't eat the small screen.
+  * Any cluster of small tap targets (footer links, social icons, nav items) keeps at least 8px of real spacing between adjacent targets so a thumb can't mis-tap the wrong one.
 - LEGIBILITY & CONTRAST — NON-NEGOTIABLE, CHECK EVERY SECTION BEFORE YOU FINISH: text color must always have strong contrast against whatever is directly behind it, no exceptions.
   * White or near-white text is ONLY allowed on a dark surface: a dark solid section background, or a photo with a real dark scrim (e.g. linear-gradient with black/near-black at 45%+ opacity) behind it. Never place white/near-white text on a light page background, a light photo, or an unscrimmed light image — it becomes invisible.
   * Dark ink/navy/charcoal text is ONLY for light surfaces (cream/white backgrounds, light photos, light cards).
