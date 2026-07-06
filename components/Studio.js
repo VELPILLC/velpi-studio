@@ -146,6 +146,20 @@ function placeholderSvg(text) {
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='100%25' height='100%25' fill='%23233248'/%3E%3Ctext x='50%25' y='50%25' fill='%237d8aa0' font-family='monospace' font-size='36' text-anchor='middle'%3E${t}%3C/text%3E%3C/svg%3E`
 }
 
+// Shared %%IMG:id%% token substitution — used both for the active session's
+// live preview and for quick-previewing a saved project straight from the
+// Library without disturbing whatever is currently being built.
+function substituteImageTokens(html, { assetsById = {}, ghlUrls = {}, logoSrc = null, slots = [] }) {
+  if (!html) return ''
+  return html.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
+    if (ghlUrls[id]?.trim()) return ghlUrls[id].trim()
+    if (assetsById[id]) return assetsById[id]
+    if (id === 'logo') return logoSrc || placeholderSvg('logo')
+    const slot = slots.find(s => s.id === id)
+    return placeholderSvg(slot ? slot.name : id)
+  })
+}
+
 // Plain-text report of everything the generator extracted, decided, and used —
 // made to be copy-pasted into a chat so the "thinking" can be critiqued.
 function composeReport(analysis, vibeText, chosenStyles, photoSlots, designBrief) {
@@ -249,6 +263,13 @@ export default function Studio() {
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
 
+  // ── In-app mobile preview: a real, scrollable, interactive phone-width view
+  // — not the tiny static thumbnail. Works for the active build AND for any
+  // saved Library project via a quick, non-destructive fetch. ──
+  const [mobilePreview, setMobilePreview] = useState(null) // { html, label } | null
+  const [mobilePreviewLoadingId, setMobilePreviewLoadingId] = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+
   // ── Run evidence: exact prompt payload + image-API attestation ──
   const [promptTrace, setPromptTrace] = useState(null) // { system, user }
   const [imagesMeta, setImagesMeta] = useState(null)   // { apiCalled, aiCalls, generated, enhanced, keptOriginal }
@@ -343,7 +364,42 @@ export default function Studio() {
     try {
       await fetch('/api/projects', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
       setProjects(prev => prev.filter(p => p.id !== id))
-    } catch (_) {}
+    } catch (e) {
+      setError(`Could not delete that project: ${e.message}`)
+    } finally {
+      setConfirmDeleteId(null)
+    }
+  }
+
+  // Opens the in-app interactive mobile preview for the given HTML.
+  function openMobilePreview(html, label) {
+    if (!html) return
+    setMobilePreview({ html, label: label || bizName || 'Preview' })
+  }
+
+  // Quick-preview a saved Library project on mobile WITHOUT loading it into
+  // the active session — a non-destructive peek at finished work.
+  async function quickPreviewProjectMobile(project) {
+    if (mobilePreviewLoadingId) return
+    setMobilePreviewLoadingId(project.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(project.id)}`)
+      const json = await res.json()
+      if (json.error || !json.project?.data) throw new Error(json.error || 'Project data missing.')
+      const d = json.project.data
+      const html = substituteImageTokens(d.htmlTemplate, {
+        assetsById: d.assetsById || {},
+        ghlUrls: d.ghlUrls || {},
+        slots: d.slots || [],
+        logoSrc: d.refinedLogo || d.logoUrl,
+      })
+      openMobilePreview(html, d.bizName || project.name)
+    } catch (e) {
+      setError(`Could not preview that project: ${e.message}`)
+    } finally {
+      setMobilePreviewLoadingId(null)
+    }
   }
 
   // The logo is auto-detected from the website and refined automatically —
@@ -368,12 +424,9 @@ export default function Studio() {
   // ── HTML rendering ──
   function previewHtml() {
     if (!htmlTemplate) return ''
-    return htmlTemplate.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
-      if (ghlUrls[id]?.trim()) return ghlUrls[id].trim()
-      if (assetsById[id]) return assetsById[id]
-      if (id === 'logo') return refinedLogo || logo?.preview || logoUrl || placeholderSvg('logo')
-      const slot = slots.find(s => s.id === id)
-      return placeholderSvg(slot ? slot.name : id)
+    return substituteImageTokens(htmlTemplate, {
+      assetsById, ghlUrls, slots,
+      logoSrc: refinedLogo || logo?.preview || logoUrl,
     })
   }
 
@@ -1105,19 +1158,32 @@ function extractLogoColors(dataUrl) {
                       <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>
                         {p.niche ? `${p.niche} · ` : ''}{p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}
                       </div>
-                      <div style={{ display: 'flex', gap: 5 }}>
+                      <div style={{ display: 'flex', gap: 5, marginBottom: confirmDeleteId === p.id ? 5 : 0 }}>
                         <button onClick={() => loadProject(p.id)} disabled={!!loadingProjectId} style={{ ...monoBtn, flex: 1, padding: '5px 0', fontSize: '0.58rem', opacity: loadingProjectId ? 0.5 : 1 }}>
                           {loadingProjectId === p.id ? '…' : 'Load'}
                         </button>
+                        <button
+                          onClick={() => quickPreviewProjectMobile(p)}
+                          disabled={!!mobilePreviewLoadingId}
+                          title="Preview on mobile"
+                          style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem', opacity: mobilePreviewLoadingId ? 0.5 : 1 }}
+                        >{mobilePreviewLoadingId === p.id ? '…' : '📱'}</button>
                         <button
                           onClick={() => { try { navigator.clipboard?.writeText(`${window.location.origin}/preview/${p.id}`) } catch (_) {}; setSavedMsg('Preview link copied'); setTimeout(() => setSavedMsg(null), 2000) }}
                           title="Copy shareable preview link"
                           style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem' }}
                         >⧉</button>
-                        <button onClick={() => removeProject(p.id)} title="Delete" style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '5px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem' }}>
+                        <button onClick={() => setConfirmDeleteId(p.id)} title="Delete" style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '5px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem' }}>
                           ✕
                         </button>
                       </div>
+                      {confirmDeleteId === p.id && (
+                        <div style={{ display: 'flex', gap: 5, alignItems: 'center', background: 'rgba(255,68,85,0.08)', border: '1px solid rgba(255,68,85,0.35)', borderRadius: 8, padding: '5px 7px' }}>
+                          <span style={{ flex: 1, fontFamily: 'var(--font-inter)', fontSize: '0.62rem', color: '#ff9aa5' }}>Delete for good?</span>
+                          <button onClick={() => removeProject(p.id)} style={{ background: '#ff4455', border: 'none', color: '#fff', borderRadius: 6, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem' }}>Delete</button>
+                          <button onClick={() => setConfirmDeleteId(null)} style={{ background: 'transparent', border: `1px solid ${BORDER}`, color: '#fff', borderRadius: 6, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem' }}>Cancel</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1183,17 +1249,20 @@ function extractLogoColors(dataUrl) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
               <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>Your new website{bizName ? ` — ${bizName}` : ''}</span>
-              <button onClick={openPreview} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>↗ Open Full Preview</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => openMobilePreview(previewHtml(), bizName)} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>📱 Preview Mobile</button>
+                <button onClick={openPreview} style={monoBtn}>↗ Open Full Preview</button>
+              </div>
             </div>
             <div style={{
               border: `1px solid ${BORDER}`, borderRadius: 16, background: PANEL,
               padding: 18, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap',
               boxShadow: '0 18px 60px rgba(0,0,0,0.5)',
             }}>
-              {/* Phone-scale live mini preview */}
+              {/* Phone-scale live mini preview — tap to open the real interactive mobile view */}
               <div
-                onClick={openPreview}
-                title="Open full preview"
+                onClick={() => openMobilePreview(previewHtml(), bizName)}
+                title="Tap to preview on mobile"
                 style={{ width: 208, height: 380, borderRadius: 20, overflow: 'hidden', border: `2px solid ${BORDER}`, background: '#fff', flexShrink: 0, cursor: 'pointer', position: 'relative' }}
               >
                 <iframe
@@ -1210,8 +1279,11 @@ function extractLogoColors(dataUrl) {
                 <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.02rem', color: '#fff' }}>
                   {bizName ? `${bizName} — website ready` : 'Website ready'}
                 </span>
-                <button onClick={openPreview} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
-                  ↗ Open Full Preview
+                <button onClick={() => openMobilePreview(previewHtml(), bizName)} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
+                  📱 Preview Mobile
+                </button>
+                <button onClick={openPreview} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
+                  ↗ Open Full Preview (desktop tab)
                 </button>
                 <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
                   {snapping ? 'Capturing…' : '⬇ Download as Image (full page)'}
@@ -1455,6 +1527,49 @@ function extractLogoColors(dataUrl) {
           letterSpacing: '0.04em', maxWidth: '92vw', textAlign: 'center',
         }}>
           ✓ {savedMsg}
+        </div>
+      )}
+
+      {/* ── In-app interactive mobile preview — a real phone-width, scrollable,
+          tappable view of the site, not just a locked thumbnail. Works for the
+          active build and for any saved Library project. ── */}
+      {mobilePreview && (
+        <div
+          onClick={() => setMobilePreview(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(3, 6, 15, 0.88)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '18px 12px', backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 400, marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.86rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              📱 {mobilePreview.label}
+            </span>
+            <button
+              onClick={e => { e.stopPropagation(); setMobilePreview(null) }}
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', fontSize: '0.9rem', flexShrink: 0 }}
+            >✕</button>
+          </div>
+          {/* Phone bezel — the iframe inside is fully interactive: real scrolling, real taps */}
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 'min(390px, 92vw)', height: 'min(844px, 78vh)', borderRadius: 34,
+              border: '6px solid #1a1f2c', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+              overflow: 'hidden', position: 'relative', flexShrink: 0,
+            }}
+          >
+            <iframe
+              title="Mobile preview"
+              srcDoc={mobilePreview.html}
+              sandbox="allow-same-origin"
+              style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+            />
+          </div>
+          <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', marginTop: 10, letterSpacing: '0.04em' }}>
+            Scroll and tap inside — this is the real mobile layout. Tap outside or ✕ to close.
+          </div>
         </div>
       )}
       </div>
