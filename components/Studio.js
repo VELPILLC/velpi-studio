@@ -5,11 +5,10 @@ import { pickSignatureMotion } from '../lib/motionPresets'
 import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
 
-// Vibe questionnaire — quick multiple-choice (tap up to 2 per question). The
-// answers steer style mixing + the build direction so every site is themed to
-// the brand's vibe instead of one default format per industry.
-// Vibe picker — every option is a tiny visual preview of the look, with a
-// plain-English description. `ai` is the richer phrasing sent to the agent.
+// Vibe question data — kept only so vibeSummary() can reconstruct a readable
+// summary from a LOADED project's saved vibe answers. There is no manual entry
+// UI anymore: every generation is fully automatic (the agent infers feel, look,
+// and primary CTA itself). `ai` is the richer phrasing sent to the agent.
 const VIBE_QUESTIONS = [
   {
     id: 'feel', q: 'How should it feel?',
@@ -46,104 +45,6 @@ const VIBE_QUESTIONS = [
   },
 ]
 
-// Hand-drawn mini website previews (pure CSS) so every vibe option is SEEN,
-// not decoded from marketing words.
-function MiniPreview({ kind }) {
-  const box = { width: '100%', aspectRatio: '16/10', borderRadius: 8, overflow: 'hidden', position: 'relative', display: 'block' }
-  const bar = (w, h, bg, extra = {}) => <div style={{ width: w, height: h, background: bg, borderRadius: 2, ...extra }} />
-  switch (kind) {
-    case 'lux': return (
-      <div style={{ ...box, background: '#161210', padding: '8px 10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          {bar(14, 3, '#c9a35f')}{bar(30, 2, 'rgba(255,255,255,0.25)')}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginTop: 8 }}>
-          {bar('55%', 5, '#e9dfd0')}{bar('35%', 3, '#c9a35f')}{bar(26, 8, 'transparent', { border: '1px solid #c9a35f', marginTop: 5 })}
-        </div>
-      </div>)
-    case 'bold': return (
-      <div style={{ ...box, background: '#f2f0eb', padding: '7px 9px' }}>
-        {bar('88%', 11, '#111', { marginBottom: 4 })}
-        {bar('66%', 11, '#111', { marginBottom: 7 })}
-        <div style={{ display: 'flex', gap: 4 }}>{bar(34, 10, '#e8442e')}{bar(20, 10, 'transparent', { border: '1.5px solid #111' })}</div>
-      </div>)
-    case 'warm': return (
-      <div style={{ ...box, background: '#f7eede', padding: '8px 10px' }}>
-        <div style={{ position: 'absolute', top: 8, right: 10, width: 18, height: 18, borderRadius: '50%', background: '#e8a75d' }} />
-        <div style={{ marginTop: 14 }}>
-          {bar('52%', 6, '#7a4a2b', { borderRadius: 4, marginBottom: 4 })}
-          {bar('40%', 4, 'rgba(122,74,43,0.5)', { borderRadius: 4, marginBottom: 8 })}
-          {bar(38, 11, '#c96f3b', { borderRadius: 7 })}
-        </div>
-      </div>)
-    case 'minimal': return (
-      <div style={{ ...box, background: '#ffffff', padding: '10px 12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>{bar(12, 3, '#111')}{bar(26, 2, '#ccc')}</div>
-        {bar('44%', 4, '#111', { marginBottom: 4 })}
-        {bar('30%', 2.5, '#bbb', { marginBottom: 10 })}
-        {bar(26, 8, '#111')}
-      </div>)
-    case 'editorial': return (
-      <div style={{ ...box, background: '#f4f2ec', padding: 0 }}>
-        <div style={{ position: 'absolute', left: 8, top: 9, zIndex: 2 }}>
-          {bar(52, 7, '#191919', { marginBottom: 3 })}{bar(36, 7, '#191919')}
-        </div>
-        <div style={{ position: 'absolute', right: 6, top: 20, width: '46%', height: '58%', background: 'linear-gradient(140deg,#8d9aa8,#5b6673)', borderRadius: 3 }} />
-        <div style={{ position: 'absolute', left: 10, bottom: 8 }}>{bar(30, 2.5, '#999', { marginBottom: 2 })}{bar(40, 2.5, '#999')}</div>
-      </div>)
-    case 'classic': return (
-      <div style={{ ...box, background: '#fff' }}>
-        <div style={{ height: '26%', background: '#1d3557', display: 'flex', alignItems: 'center', padding: '0 9px', gap: 5 }}>
-          {bar(10, 4, '#d4af6a')}{bar(22, 2.5, 'rgba(255,255,255,0.6)')}
-        </div>
-        <div style={{ display: 'flex', gap: 5, padding: '9px 9px 0' }}>
-          {[0, 1, 2].map(i => <div key={i} style={{ flex: 1, height: 26, background: '#eef1f5', borderRadius: 2, borderTop: '2px solid #1d3557' }} />)}
-        </div>
-      </div>)
-    case 'photos': return (
-      <div style={{ ...box, background: 'linear-gradient(150deg,#3d6b8f 0%,#27476b 55%,#152a45 100%)' }}>
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '52%', background: 'linear-gradient(to top, rgba(0,0,0,0.72), transparent)' }} />
-        <div style={{ position: 'absolute', bottom: 8, left: 9 }}>
-          {bar(58, 6, '#fff', { marginBottom: 3 })}{bar(30, 8, '#e8b23a', { marginTop: 3 })}
-        </div>
-      </div>)
-    case 'airy': return (
-      <div style={{ ...box, background: '#fdfdfc', padding: '16px 12px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, marginTop: 6 }}>
-          {bar('36%', 4, '#2a2a2a')}{bar('24%', 2.5, '#c8c8c4')}{bar(22, 7, 'transparent', { border: '1px solid #2a2a2a', marginTop: 6 })}
-        </div>
-      </div>)
-    case 'dark': return (
-      <div style={{ ...box, background: '#0b0e14', padding: '10px 11px' }}>
-        {bar('50%', 6, '#e8ecf4', { marginBottom: 4 })}
-        {bar('34%', 3, '#4f6b8f', { marginBottom: 9 })}
-        {bar(32, 9, '#2990fa', { boxShadow: '0 0 10px rgba(41,144,250,0.7)' })}
-        <div style={{ position: 'absolute', right: 8, top: 10, width: 26, height: 26, borderRadius: '50%', background: 'radial-gradient(circle,#22344f 0%,transparent 70%)' }} />
-      </div>)
-    case 'blocks': return (
-      <div style={{ ...box }}>
-        <div style={{ height: '34%', background: '#264653', padding: '6px 8px' }}>{bar(38, 4, '#fff')}</div>
-        <div style={{ height: '33%', background: '#e9c46a', padding: '6px 8px' }}>{bar(30, 4, '#264653')}</div>
-        <div style={{ height: '33%', background: '#e76f51', padding: '6px 8px' }}>{bar(34, 4, '#fff')}</div>
-      </div>)
-    case 'grid': return (
-      <div style={{ ...box, background: '#fafafa', padding: '8px 9px' }}>
-        {bar('34%', 4, '#222', { marginBottom: 6 })}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-          {[...Array(6)].map((_, i) => <div key={i} style={{ height: 15, background: '#e7e9ee', borderRadius: 2 }} />)}
-        </div>
-      </div>)
-    case 'layered': return (
-      <div style={{ ...box, background: '#e9e4dc' }}>
-        <div style={{ position: 'absolute', left: 7, top: 7, width: '58%', height: '68%', background: 'linear-gradient(150deg,#7d8a99,#4c5866)', borderRadius: 4 }} />
-        <div style={{ position: 'absolute', right: 7, bottom: 7, width: '52%', height: '56%', background: '#fff', borderRadius: 4, boxShadow: '0 6px 16px rgba(0,0,0,0.25)', padding: '6px 7px' }}>
-          {bar('70%', 4, '#1a1a1a', { marginBottom: 3 })}{bar('50%', 2.5, '#b5b5b0', { marginBottom: 5 })}{bar(20, 6, '#c96f3b')}
-        </div>
-      </div>)
-    default: return <div style={{ ...box, background: '#101c30' }} />
-  }
-}
-
 const BLUE = '#2990fa'
 // Translucent surfaces let the ambient lightning glow through the UI.
 const BG = 'rgba(6, 13, 31, 0.72)'
@@ -158,8 +59,6 @@ const STEP_DEFS = [
   { id: 'brief', label: 'Writing design brief' },
   { id: 'copy', label: 'Writing copy' },
   { id: 'build', label: 'Building website' },
-  { id: 'elevate', label: 'Elevating design — pass 2' },
-  { id: 'perfect', label: 'Refinement loop — critique & fix (up to 3 rounds)' },
   { id: 'images', label: 'Generating images' },
 ]
 
@@ -247,25 +146,9 @@ function placeholderSvg(text) {
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='100%25' height='100%25' fill='%23233248'/%3E%3Ctext x='50%25' y='50%25' fill='%237d8aa0' font-family='monospace' font-size='36' text-anchor='middle'%3E${t}%3C/text%3E%3C/svg%3E`
 }
 
-function parseBulkStyles(text) {
-  const blocks = text.split(/\n={5,}\n?/).map(b => b.trim()).filter(Boolean)
-  const out = []
-  for (const block of blocks) {
-    const lines = block.split('\n')
-    const name = (lines.shift() || '').trim()
-    let niches = ''
-    if (lines[0] && /^niches\s*:/i.test(lines[0])) {
-      niches = lines.shift().replace(/^niches\s*:/i, '').trim()
-    }
-    const content = lines.join('\n').trim()
-    if (name && content) out.push({ name, niches, content })
-  }
-  return out
-}
-
 // Plain-text report of everything the generator extracted, decided, and used —
 // made to be copy-pasted into a chat so the "thinking" can be critiqued.
-function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief) {
+function composeReport(analysis, vibeText, chosenStyles, photoSlots, designBrief) {
   const a = analysis || {}
   const f = a.facts || {}
   const b = a.brand || {}
@@ -286,7 +169,6 @@ function composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applie
   L.push(`Section order: ${(a.layout?.section_order || a.sections || []).join(' → ')}`)
   if (a.layout?.notes) L.push(`Layout notes: ${a.layout.notes}`)
   L.push(`Styles mixed: ${(chosenStyles || []).map(s => s.name).join(' + ') || '(none)'}`)
-  L.push(`Second elevation pass applied: ${pass2Applied ? 'yes' : 'NO — pass 1 only'}`)
   L.push('')
   if (designBrief) {
     L.push('--- DESIGN BRIEF (the committed direction) ---')
@@ -384,18 +266,10 @@ export default function Studio() {
   const [loadingProjectId, setLoadingProjectId] = useState(null)
   const [regenIds, setRegenIds] = useState({})
 
-  // ── Styles library ──
+  // ── Styles library — Auto-Match only, no manual override UI ──
   const [styles, setStyles] = useState([])
-  const [styleId, setStyleId] = useState('auto')
-  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [styleId] = useState('auto')
   const [matchedStyleName, setMatchedStyleName] = useState('')
-  const [bulkMode, setBulkMode] = useState(false)
-  const [newStyleName, setNewStyleName] = useState('')
-  const [newStyleNiches, setNewStyleNiches] = useState('')
-  const [newStyleContent, setNewStyleContent] = useState('')
-  const [bulkText, setBulkText] = useState('')
-  const [bulkStatus, setBulkStatus] = useState(null)
-  const [savingStyle, setSavingStyle] = useState(false)
 
   // ── Results UI ──
   const [showCode, setShowCode] = useState(false)
@@ -476,17 +350,10 @@ export default function Studio() {
   // uploading one is now just an optional override.
   const readyToGenerate = !!input.trim() && !!logo
   const missing = [!input.trim() && 'website URL', !logo && 'business logo'].filter(Boolean)
-  const vibeCount = Object.values(vibe).reduce((a, arr) => a + (arr?.length || 0), 0)
 
-  function toggleVibe(qid, opt) {
-    setVibe(prev => {
-      const cur = prev[qid] || []
-      if (cur.includes(opt)) return { ...prev, [qid]: cur.filter(o => o !== opt) }
-      if (cur.length >= 2) return { ...prev, [qid]: [cur[1], opt] } // keep newest two
-      return { ...prev, [qid]: [...cur, opt] }
-    })
-  }
-
+  // Reconstructs a readable vibe summary — only ever populated by loading a
+  // project saved before manual vibe entry was removed. Fresh runs are fully
+  // automatic, so this returns '' and the agent infers everything itself.
   function vibeSummary() {
     const parts = []
     for (const q of VIBE_QUESTIONS) {
@@ -637,43 +504,6 @@ function extractLogoColors(dataUrl) {
       setLogoPalette(await extractLogoColors(png.preview))
     } catch (e) {
       setError(e.message)
-    }
-  }
-
-  // ── Styles save ──
-  async function saveNewStyle() {
-    if (savingStyle) return
-    setSavingStyle(true)
-    setError(null)
-    setBulkStatus(null)
-    try {
-      if (bulkMode) {
-        const parsed = parseBulkStyles(bulkText)
-        if (!parsed.length) throw new Error('No styles found. Separate each with a line of ===== — first line is the name, optional "Niches: a, b" line, then the DESIGN.md content.')
-        let ok = 0
-        const added = []
-        for (const p of parsed) {
-          try {
-            const { style } = await callRoute('/api/styles', p)
-            added.push(style); ok++
-          } catch (e) {
-            setBulkStatus(`Imported ${ok}/${parsed.length} — stopped on "${p.name}": ${e.message}`)
-            break
-          }
-        }
-        if (ok === parsed.length) { setBulkStatus(`Imported all ${ok} styles.`); setBulkText('') }
-        if (added.length) setStyles(prev => [...prev.filter(s => s.builtIn), ...added, ...prev.filter(s => !s.builtIn)])
-      } else {
-        if (!newStyleName.trim() || !newStyleContent.trim()) return
-        const { style } = await callRoute('/api/styles', { name: newStyleName, content: newStyleContent, niches: newStyleNiches })
-        setStyles(prev => [...prev.filter(s => s.builtIn), style, ...prev.filter(s => !s.builtIn)])
-        setStyleId(style.id)
-        setNewStyleName(''); setNewStyleNiches(''); setNewStyleContent('')
-      }
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setSavingStyle(false)
     }
   }
 
@@ -872,56 +702,13 @@ function extractLogoColors(dataUrl) {
         .then(res => setAltLayouts(res.alternates || []))
         .catch(() => {})
 
-      // PASS 2 — art-director elevation: the first draft is re-prompted against
-      // itself to push composition, density, and premium detail past the single-
-      // response ceiling. Falls back to pass 1 untouched if anything goes wrong.
-      mark('elevate', 'active')
-      let pass2Applied = false
-      let workingHtml = html
-      try {
-        const res = await callRoute('/api/enhance-site', { html, analysis, vibe: vibeText, brief: designBrief })
-        if (res.html) {
-          workingHtml = res.html
-          setHtmlTemplate(res.html)
-          pass2Applied = !!res.pass2
-        }
-        mark('elevate', 'complete')
-      } catch (_) {
-        mark('elevate', 'error') // non-fatal — pass-1 site stays usable
-      }
-
-      // REFINEMENT LOOP — critique -> surgical fix, up to 3 rounds, until the
-      // QA director passes it as deliverable. Every round is non-fatal.
-      mark('perfect', 'active')
-      let loopLog = []
-      try {
-        for (let round = 1; round <= 3; round++) {
-          const crit = await callRoute('/api/critique-site', { html: workingHtml, analysis, brief: designBrief })
-          if (crit.pass || !crit.issues?.length) {
-            loopLog.push(`Round ${round}: PASSED${crit.score != null ? ` (score ${crit.score})` : ''} — deliverable.`)
-            break
-          }
-          loopLog.push(`Round ${round}: score ${crit.score ?? '?'} — fixing ${crit.issues.length} issue(s): ${crit.issues.map(i => i.issue).join(' | ').slice(0, 400)}`)
-          const fix = await callRoute('/api/enhance-site', { html: workingHtml, analysis, vibe: vibeText, brief: designBrief, issues: crit.issues })
-          if (fix.html && fix.pass2) {
-            workingHtml = fix.html
-            setHtmlTemplate(fix.html)
-          } else {
-            loopLog.push(`Round ${round}: fix failed safety gates — keeping previous version.`)
-            break
-          }
-        }
-        mark('perfect', 'complete')
-      } catch (_) {
-        mark('perfect', 'error') // non-fatal — latest good version stands
-      }
-
-      // Build report — everything the generator thought and used, copyable.
-      const report = composeReport(analysis, vibeText, chosenStyles, photoSlots, pass2Applied, designBrief)
+      // Single-pass build: every elevation/density/conversion directive that
+      // used to run as a separate "pass 2" + critique-and-fix loop is now baked
+      // directly into the one build-site call — no second pass, no re-prompting.
+      const report = composeReport(analysis, vibeText, chosenStyles, photoSlots, designBrief)
         + (!manualVibe && (inf.feel || inf.look || inf.primary_cta) ? `\n--- AUTO-INFERRED VIBE (no manual selections — agent's own read) ---\nFeel: ${inf.feel || '—'}\nLook: ${inf.look || '—'}\nPrimary CTA: ${inf.primary_cta || '—'}\n` : '')
         + (motionPreset ? `\n--- SIGNATURE MOTION ---\n${motionPreset.name} (${motionPreset.intensity} ${motionPreset.effect}, ${motionPreset.dependency}) — ${motionPreset.summary || ''}\n` : '')
         + (sectionRefs.length ? `\n--- STRUCTURAL REFERENCES STUDIED ---\n${sectionRefs.map(r => `${r.name} (${r.category}) — ${r.source}`).join('\n')}\n` : '')
-        + (loopLog.length ? `\n--- REFINEMENT LOOP ---\n${loopLog.join('\n')}\n` : '')
       setBuildReport(report)
 
       await Promise.all([imagesPromise, refineP])
@@ -973,7 +760,7 @@ function extractLogoColors(dataUrl) {
       try {
         const allSlots = [...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }]
         const finalAssets = { ...localAssets, ...(logoAssetLocal ? { logo: logoAssetLocal } : {}) }
-        const substituted = workingHtml.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, tid) => {
+        const substituted = html.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, tid) => {
           if (finalAssets[tid]) return finalAssets[tid]
           if (tid === 'logo') return logoAssetLocal || scrapedData.logo || placeholderSvg('logo')
           const slot = allSlots.find(s => s.id === tid)
@@ -988,7 +775,7 @@ function extractLogoColors(dataUrl) {
           slots: allSlots,
           assetsById: finalAssets,
           ghlUrls: {},
-          htmlTemplate: workingHtml,
+          htmlTemplate: html,
           buildReport: report,
           promptTrace: trace || null, // the exact payload sent to the build model
           imagesMeta: imagesMetaLocal || null, // proof the image API ran (call counts)
@@ -1289,130 +1076,6 @@ function extractLogoColors(dataUrl) {
           )}
         </div>
 
-        {/* ── Customize (optional) — the agent infers feel/look/CTA and matches
-            styles automatically; this collapsed panel is the power-user escape
-            hatch, never the primary path. ── */}
-        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-          <button
-            onClick={() => setCustomizeOpen(v => !v)}
-            style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
-          >
-            <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
-              ⚙ Customize <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.74rem' }}>optional — vibe, style & CTA are inferred automatically</span>
-              {(vibeCount > 0 || styleId !== 'auto') && <span style={{ color: BLUE, fontSize: '0.72rem' }}> · overrides active</span>}
-            </span>
-            <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{customizeOpen ? '▲' : '▼'}</span>
-          </button>
-          {customizeOpen && (
-          <div style={{ padding: '0 14px 14px' }}>
-          <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 12 }}>
-            Leave everything untouched and the agent reads the business itself — copy tone → feel, imagery → look, business type → call-to-action. Anything you tap here overrides the inference.
-          </div>
-
-          {VIBE_QUESTIONS.map(q => (
-            <div key={q.id} style={{ marginBottom: 16 }}>
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>{q.q}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: q.id === 'convert' ? 'repeat(auto-fill, minmax(140px, 1fr))' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
-                {q.options.map(opt => {
-                  const on = (vibe[q.id] || []).includes(opt.label)
-                  return (
-                    <div
-                      key={opt.label}
-                      onClick={() => !generating && toggleVibe(q.id, opt.label)}
-                      style={{
-                        background: on ? 'rgba(41,144,250,0.14)' : BG,
-                        border: `1.5px solid ${on ? BLUE : BORDER}`,
-                        borderRadius: 12, padding: 7, cursor: generating ? 'default' : 'pointer',
-                        position: 'relative',
-                      }}
-                    >
-                      {on && (
-                        <span style={{ position: 'absolute', top: 5, right: 5, zIndex: 2, width: 18, height: 18, borderRadius: '50%', background: BLUE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem' }}>✓</span>
-                      )}
-                      {opt.preview ? (
-                        <MiniPreview kind={opt.preview} />
-                      ) : (
-                        <div style={{ width: '100%', aspectRatio: '16/7', borderRadius: 8, background: 'rgba(6,13,31,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                          {opt.icon}
-                        </div>
-                      )}
-                      <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.78rem', color: '#fff', margin: '7px 2px 2px' }}>{opt.label}</div>
-                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.66rem', color: 'rgba(255,255,255,0.5)', margin: '0 2px', lineHeight: 1.35 }}>{opt.desc}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-          {/* Design style — Auto-Match is the mode; manual pick is an override */}
-          <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 4, paddingTop: 14 }}>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>
-              Design style <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: '0.74rem' }}>— Auto-Match unless you pick one</span>
-            </div>
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8, marginBottom: 12 }}>
-                <div
-                  onClick={() => setStyleId('auto')}
-                  style={{ background: styleId === 'auto' ? 'rgba(41,144,250,0.12)' : BG, border: `1px solid ${styleId === 'auto' ? BLUE : BORDER}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }}
-                >
-                  <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.8rem', marginBottom: 3 }}>✦ Auto-Match</div>
-                  <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.66rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
-                    Detects the niche, mixes the best matching systems
-                  </div>
-                </div>
-                {styles.map(s => {
-                  const tags = Array.isArray(s.niches) ? s.niches : String(s.niches || '').split(',').map(t => t.trim()).filter(Boolean)
-                  const active = styleId === s.id
-                  return (
-                    <div key={s.id} onClick={() => setStyleId(s.id)} style={{ background: active ? 'rgba(41,144,250,0.12)' : BG, border: `1px solid ${active ? BLUE : BORDER}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer' }}>
-                      <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.8rem', marginBottom: 4 }}>{s.builtIn ? '' : '◆ '}{s.name}</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                        {tags.slice(0, 3).map(t => (
-                          <span key={t} style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.52rem', color: BLUE, background: 'rgba(41,144,250,0.1)', border: '1px solid rgba(41,144,250,0.3)', borderRadius: 4, padding: '1px 5px', textTransform: 'uppercase' }}>{t}</span>
-                        ))}
-                        {tags.length > 3 && <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.52rem', color: 'rgba(255,255,255,0.35)' }}>+{tags.length - 3}</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              {/* Add styles */}
-              <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ ...label, color: BLUE }}>Add design system{bulkMode ? 's (bulk)' : ''}</span>
-                  <button onClick={() => { setBulkMode(v => !v); setBulkStatus(null) }} style={{ ...monoBtn, padding: '3px 10px', fontSize: '0.58rem' }}>
-                    {bulkMode ? 'Single' : 'Bulk import'}
-                  </button>
-                </div>
-                {bulkMode ? (
-                  <>
-                    <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={6}
-                      placeholder={'Name\nNiches: restaurant, cafe\n# DESIGN.md content...\n=====\nNext style...'}
-                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '10px 12px', fontSize: '0.74rem', fontFamily: 'var(--font-ibm-plex-mono)', resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
-                    {bulkStatus && <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: bulkStatus.startsWith('Imported all') ? GREEN : '#e5c07b', marginBottom: 8 }}>{bulkStatus}</div>}
-                    <button onClick={saveNewStyle} disabled={savingStyle || !bulkText.trim()} style={{ ...monoBtn, background: BLUE, color: '#fff', opacity: savingStyle || !bulkText.trim() ? 0.5 : 1 }}>
-                      {savingStyle ? 'Importing…' : 'Import All'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <input value={newStyleName} onChange={e => setNewStyleName(e.target.value)} placeholder="Style name"
-                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginBottom: 6 }} />
-                    <input value={newStyleNiches} onChange={e => setNewStyleNiches(e.target.value)} placeholder="Niches (comma-separated) — powers Auto-Match"
-                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginBottom: 6 }} />
-                    <textarea value={newStyleContent} onChange={e => setNewStyleContent(e.target.value)} rows={5} placeholder="Paste the DESIGN.md content…"
-                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', padding: '9px 12px', fontSize: '0.74rem', fontFamily: 'var(--font-ibm-plex-mono)', resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
-                    <button onClick={saveNewStyle} disabled={savingStyle || !newStyleName.trim() || !newStyleContent.trim()} style={{ ...monoBtn, background: BLUE, color: '#fff', opacity: savingStyle || !newStyleName.trim() || !newStyleContent.trim() ? 0.5 : 1 }}>
-                      {savingStyle ? 'Saving…' : 'Save Style'}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          </div>
-          )}
-        </div>
 
         {/* ── Library (saved builds — load & keep refining) ── */}
         {projects.length > 0 && (
