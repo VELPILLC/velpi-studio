@@ -1,7 +1,9 @@
 // Vercel: allow long-running AI work (up to 5 min with fluid compute)
 export const maxDuration = 300
 
-import { callClaude, parseJson } from '../../../lib/claude'
+import { callClaude, parseJson, stripFences } from '../../../lib/claude'
+
+const REPAIR_SYSTEM = `You are given text that was supposed to be a single valid JSON object but failed to parse — usually because it was cut off mid-response or has a stray syntax error. Return ONLY the corrected, complete, valid JSON object with the exact same content and meaning. If it was truncated, complete it sensibly using the surrounding context. No markdown, no commentary, no explanation — JSON only.`
 
 const SYSTEM = `You are a direct-response copywriter rewriting website copy.
 
@@ -13,6 +15,7 @@ RULES:
 - Use only verifiable facts from the crawled source; never invent claims, credentials, or numbers.
 - NEVER invent facts, numbers, names, awards, or claims that are not supported by the original content. If a fact is unknown, write benefit-driven copy without specifics.
 - Keep the brand's real business name.
+- Do NOT reproduce full review quotes verbatim anywhere in this JSON — reviews are sourced and rendered separately by the page builder. If a review needs referencing, paraphrase it in under 12 words (e.g. "praised for same-day service"). This keeps the output short enough to never truncate.
 
 Return ONLY valid JSON (no markdown) shaped as:
 {
@@ -59,10 +62,24 @@ Execution rules for the strategy:
 
 Base everything on what is true for this business. Do not invent facts.`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 8000 })
-    const copy = parseJson(raw)
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 16000 })
+    let copy = parseJson(raw)
+
+    // Self-repair: a truncated or malformed response gets one automatic fix
+    // pass before we give up and surface an error to the user.
     if (!copy || !copy.sections) {
-      return Response.json({ error: 'Could not generate copy for this business.' }, { status: 502 })
+      console.error('generate-copy: initial parse failed, attempting repair. Raw tail:', stripFences(raw).slice(-400))
+      try {
+        const repaired = await callClaude({ system: REPAIR_SYSTEM, user: stripFences(raw), maxTokens: 16000 })
+        copy = parseJson(repaired)
+      } catch (repairErr) {
+        console.error('generate-copy: repair attempt failed:', repairErr.message)
+      }
+    }
+
+    if (!copy || !copy.sections) {
+      console.error('generate-copy: unrecoverable. Raw response length:', raw?.length || 0, 'tail:', stripFences(raw).slice(-400))
+      return Response.json({ error: 'Could not generate copy for this business — the response was malformed even after a retry. Try generating again.' }, { status: 502 })
     }
     return Response.json({ copy })
   } catch (err) {
