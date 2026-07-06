@@ -474,8 +474,8 @@ export default function Studio() {
 
   // The logo is auto-detected from the website and refined automatically —
   // uploading one is now just an optional override.
-  const readyToGenerate = !!input.trim()
-  const missing = [!input.trim() && 'website URL'].filter(Boolean)
+  const readyToGenerate = !!input.trim() && !!logo
+  const missing = [!input.trim() && 'website URL', !logo && 'business logo'].filter(Boolean)
   const vibeCount = Object.values(vibe).reduce((a, arr) => a + (arr?.length || 0), 0)
 
   function toggleVibe(qid, opt) {
@@ -1243,8 +1243,51 @@ function extractLogoColors(dataUrl) {
           />
         </div>
 
-        {/* Logo is fully automatic now — detected from the site, refined, and it
-            populates in the Assets section below with the other images. */}
+        {/* ── STEP 2 — Logo (required) ── */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={stepBadge(!!logo)}>{logo ? '✓' : '2'}</span>
+            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Business logo</span>
+            <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: logo ? GREEN : '#ff8a8a' }}>required</span>
+          </div>
+          <div
+            onClick={() => !generating && logoInputRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: generating ? 'default' : 'pointer', background: BG, border: `1.5px dashed ${logo ? 'rgba(57,217,138,0.5)' : 'rgba(255,138,138,0.5)'}`, borderRadius: 10, padding: 10 }}
+          >
+            <div style={{ width: 54, height: 54, borderRadius: 8, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {logo ? <img src={logo.preview} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ opacity: 0.3 }}>✦</span>}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: '#fff' }}>
+                {logo ? `${logo.name} — tap to change` : 'Upload the business logo (PNG, SVG, or a screenshot)'}
+              </div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
+                {logo ? 'Auto-refined for the build — upscaled, cleaned, theme colors extracted.' : 'Required before you can generate — used to lock the brand theme and refine into a premium mark.'}
+              </div>
+              {logoPalette.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)' }}>theme colors:</span>
+                  {logoPalette.map(c => <span key={c} title={c} style={{ width: 13, height: 13, borderRadius: 3, background: c, border: '1px solid rgba(255,255,255,0.25)' }} />)}
+                </div>
+              )}
+            </div>
+            {logo && (
+              <button onClick={e => { e.stopPropagation(); setLogo(null); setLogoPalette([]); setRefinedLogo(null) }} style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 7, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0 }}>✕</button>
+            )}
+            <input ref={logoInputRef} type="file" accept="image/*,.svg" onChange={e => { onLogoFile(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+          </div>
+          {logo && (
+            <input
+              value={logoNotes}
+              onChange={e => setLogoNotes(e.target.value)}
+              disabled={generating}
+              placeholder='Optional refinement notes — e.g. "remove the white background"'
+              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '10px 13px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8 }}
+            />
+          )}
+        </div>
 
         {/* ── Customize (optional) — the agent infers feel/look/CTA and matches
             styles automatically; this collapsed panel is the power-user escape
@@ -1264,45 +1307,6 @@ function extractLogoColors(dataUrl) {
           <div style={{ padding: '0 14px 14px' }}>
           <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, marginBottom: 12 }}>
             Leave everything untouched and the agent reads the business itself — copy tone → feel, imagery → look, business type → call-to-action. Anything you tap here overrides the inference.
-          </div>
-
-          {/* Logo override — upload skips crawl detection entirely */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', fontWeight: 600, color: '#fff', marginBottom: 8 }}>
-              Logo <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: '0.74rem' }}>— auto-detected from the site unless you upload one</span>
-            </div>
-            <div
-              onClick={() => !generating && logoInputRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: generating ? 'default' : 'pointer', background: BG, border: `1.5px dashed ${logo ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 10, padding: 10 }}
-            >
-              <div style={{ width: 54, height: 54, borderRadius: 8, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {logo ? <img src={logo.preview} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ opacity: 0.3 }}>✦</span>}
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.8rem', color: '#fff' }}>
-                  {logo ? `${logo.name} — this replaces detection (tap to change)` : 'Upload a logo to override detection (PNG, SVG, screenshot)'}
-                </div>
-                {logoPalette.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, marginTop: 5, alignItems: 'center' }}>
-                    <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)' }}>theme colors:</span>
-                    {logoPalette.map(c => <span key={c} title={c} style={{ width: 13, height: 13, borderRadius: 3, background: c, border: '1px solid rgba(255,255,255,0.25)' }} />)}
-                  </div>
-                )}
-              </div>
-              {logo && (
-                <button onClick={e => { e.stopPropagation(); setLogo(null); setLogoPalette([]); setRefinedLogo(null) }} style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 7, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', flexShrink: 0 }}>✕</button>
-              )}
-              <input ref={logoInputRef} type="file" accept="image/*,.svg" onChange={e => { onLogoFile(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
-            </div>
-            <input
-              value={logoNotes}
-              onChange={e => setLogoNotes(e.target.value)}
-              disabled={generating}
-              placeholder='Optional refinement notes — e.g. "remove the white background"'
-              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '10px 13px', fontSize: '0.8rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8 }}
-            />
           </div>
 
           {VIBE_QUESTIONS.map(q => (
