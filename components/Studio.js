@@ -433,8 +433,13 @@ export default function Studio() {
   function finalHtml() {
     if (!htmlTemplate) return ''
     return htmlTemplate.replace(/%%IMG:([a-z0-9_]+)%%/gi, (_, id) => {
+      // A pasted GoHighLevel URL always wins (that's the deliberate final-deploy
+      // override). Otherwise fall back to the AI-generated/enhanced image itself
+      // — every slot already has one after a normal run, so export should show
+      // the real image, not a "paste it yourself" placeholder.
       if (ghlUrls[id]?.trim()) return ghlUrls[id].trim()
-      if (id === 'logo') return logoUrl || 'https://PASTE-LOGO-URL-HERE'
+      if (id === 'logo') return refinedLogo || assetsById.logo || logoUrl || logo?.preview || 'https://PASTE-LOGO-URL-HERE'
+      if (assetsById[id]) return assetsById[id]
       const n = slots.findIndex(s => s.id === id) + 1
       return `https://PASTE-IMAGE-${n || 'X'}-URL-HERE`
     })
@@ -1430,7 +1435,7 @@ function extractLogoColors(dataUrl) {
                 <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                   {allLinked
                     ? 'Every asset is linked. This HTML deploys to GoHighLevel with zero manual edits.'
-                    : `${slots.length - linkedCount} asset link${slots.length - linkedCount === 1 ? '' : 's'} still pending — unlinked slots export with PASTE-URL-HERE tokens you can swap later.`}
+                    : `${slots.length - linkedCount} asset${slots.length - linkedCount === 1 ? '' : 's'} still using the AI-generated image directly (bigger file) — paste a GoHighLevel media URL per slot for a lighter, production-ready export.`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

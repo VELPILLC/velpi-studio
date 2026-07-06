@@ -28,7 +28,7 @@ STEP — CONVERSION STRATEGY: think like a direct-response strategist about THIS
   3. A proof map: every piece of real proof (each review, credential, stat) assigned to the exact section where it converts hardest — proof belongs NEXT TO the CTA it supports, not quarantined in its own section.
   4. The honest offer/hook: from the real facts, why act now (same-day service, free consult, seasonal relevance). If no urgency exists, use clarity of value instead — never fake scarcity.
   5. The persuasion flow: order the sections as attention → problem/desire → proof → offer → action, and say in one line what job each section does.
-STEP — IMAGE PLAN: plan EXACTLY 5 photographic images for the new site — the hero plus the 4 most valuable supporting images for this industry. For each, write a complete, standalone image-generation prompt that specifies THREE things: the SUBJECT (what is in the image and what is happening), what STAYS THE SAME (the business's real mood, setting, industry authenticity), and what CHANGES (crisp, modern, professional, well-lit, photorealistic). Each prompt must be detailed enough to hand to any image generator on its own. No text, logos, or watermarks in any image.
+STEP — IMAGE PLAN: plan between 5 and 8 photographic images for the new site — the hero is mandatory; spend the rest on whichever sections most need visual weight so nothing reads as a bare color block. Distribute images across AT LEAST 5 different sections — never pile 3+ into one gallery/collage while leaving trust, services, reviews, or contact with zero imagery. For each image, write a complete, standalone image-generation prompt that specifies FOUR things: the SUBJECT (what is in the image and what is happening), what STAYS THE SAME (the business's real mood, setting, industry authenticity), what CHANGES (crisp, modern, professional, well-lit, photorealistic), and the THEME LOCK — reference this site's real or chosen palette (see EXISTING PALETTE below, or the palette you commit to) and its 3-second feeling, so every image — real or generated — is graded and lit like it belongs to the same shoot. Each prompt must be detailed enough to hand to any image generator on its own. No text, logos, or watermarks in any image.
 
 ${INDUSTRY_PATTERNS}
 
@@ -107,8 +107,8 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
 }
 
 Rules:
-- image_inventory must contain EXACTLY 5 photographic items (this is a hard requirement), plus ONE optional logo item FIRST (section "header", action "keep", with the logo URL) only if a logo URL was provided.
-- REUSE REAL PHOTOS AGGRESSIVELY — AND ALWAYS ENHANCE THEM: when an image URL or its alt text clearly indicates a real photograph of the business (team, owner, storefront, interior, work examples, food, community events — e.g. uploads paths, descriptive alts), assign it to the matching slot with source:"real", action:"enhance" — NEVER "keep" for photographic slots; every real photo gets a professional retouch pass. The prompt must stay authentic (same people, place, composition) while directing: people → cinematic professional lighting; buildings → straightened, aligned verticals, clean; backgrounds → subtly evened out. Real photos of the actual business ALWAYS beat generated stand-ins. Use source:"none", action:"generate" only when no plausible real photo fits the slot.
+- image_inventory must contain between 5 and 8 photographic items (never fewer than 5, never more than 8) — choose the count based on how many sections genuinely benefit from a real image, and spread them across at least 5 different sections rather than clustering most into one gallery — plus ONE optional logo item FIRST (section "header", action "keep", with the logo URL) only if a logo URL was provided.
+- REUSE REAL PHOTOS AGGRESSIVELY — AND ALWAYS ENHANCE + THEME THEM: when an image URL or its alt text clearly indicates a real photograph of the business (team, owner, storefront, interior, work examples, food, community events — e.g. uploads paths, descriptive alts), assign it to the matching slot with source:"real", action:"enhance" — NEVER "keep" for photographic slots; every real photo gets a professional retouch pass AND a color-grade toward this site's palette/mood so it never looks like a bare stock photo dropped onto a themed page. If the real photo is especially plain, poorly lit, or generic (a flat product shot, a dim phone photo, a cluttered background), push the prompt further — restyle its lighting and color grade decisively toward the theme rather than a light touch-up, keeping only the real subject and setting. The prompt must stay authentic (same people, place, composition) while directing: people → cinematic professional lighting; buildings → straightened, aligned verticals, clean; backgrounds → subtly evened out. Real photos of the actual business ALWAYS beat generated stand-ins. Use source:"none", action:"generate" only when no plausible real photo fits the slot — generated images must match the same palette/mood so they're indistinguishable in tone from the enhanced real photos.
 - Never invent the business name, hours, phone, address, or reviews — only use what appears in the crawled content.
 - Keep the provided palette if present; otherwise infer a tasteful 2-4 color palette.
 - BRAND CONTINUITY: if the existing website has an established palette and design language, the new site must feel like an ELEVATED version of the same brand — never a different brand. Extract the brand block as completely as the content allows.`
@@ -176,9 +176,9 @@ ${(scrapedData.content || '').slice(0, 36000)}`
         })
       }
     }
-    // Cap photographic items at 5 (defensive) and renumber slots.
+    // Cap photographic items at 8 (defensive) and renumber slots.
     const logoItems = analysis.image_inventory.filter(im => /logo/i.test(im.what || '') || im.section === 'header')
-    const photoItems = analysis.image_inventory.filter(im => !logoItems.includes(im)).slice(0, 5)
+    const photoItems = analysis.image_inventory.filter(im => !logoItems.includes(im)).slice(0, 8)
     analysis.image_inventory = [...logoItems.slice(0, 1), ...photoItems].map((im, i) => ({ ...im, slot: i }))
 
     if (!analysis.color_palette || !analysis.color_palette.length) {

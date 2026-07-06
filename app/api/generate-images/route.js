@@ -8,8 +8,8 @@ export const maxDuration = 300
 // Returns assets in inventory order so build-site can place each in its section.
 
 // Cap total AI image operations (enhance + generate) per run for speed/cost.
-// The analyze step plans exactly 5 site images, so the cap matches.
-const MAX_AI_OPS = 5
+// The analyze step plans 5-8 site images, so the cap matches the top of that range.
+const MAX_AI_OPS = 8
 
 function assetId(item, i) {
   if (/logo/i.test(item.what || '') || item.section === 'header') return 'logo'
@@ -50,70 +50,83 @@ export async function POST(request) {
       toFile = mod.toFile
     }
 
-    const assets = []
-    let aiOps = 0
     let warning = null
 
-    for (let i = 0; i < inventory.length; i++) {
-      const item = inventory[i]
+    // Theme cohesion: every image (enhanced real photo or freshly generated)
+    // gets graded toward the SAME site palette/mood so nothing looks like a
+    // stock photo dropped onto a themed page — this is the "recreate it in
+    // theme if it's too basic" step, applied programmatically to every slot.
+    const palette = (analysis.color_palette || []).join(', ')
+    const mood = analysis.target_feeling || analysis.tone || ''
+    const THEME_LINE = palette || mood
+      ? ` Color grade toward this site's theme — palette: ${palette || '(use the brand tones already visible)'}${mood ? `, mood: "${mood}"` : ''} — so this image reads as part of the same shoot as every other image on the page.`
+      : ''
+    // Professional retouch contract for real photos pulled from the site:
+    // authentic first — same people, same place, same composition — elevated
+    // to look professionally shot, then themed.
+    const PRO_TOUCHUP = ' Professional retouch directives: stay authentic and true to the original — same people, same place, same composition, recognizably the same photo. If people are present: cinematic, flattering professional lighting and color grade. If buildings/architecture are present: straighten and align verticals and horizontals so it looks like a professional architectural photograph. Subtly clean and even out distracting background elements. If the original is especially plain, dim, or generic, do not stop at a light touch-up — restyle its lighting and color grade decisively toward the theme below. Crisp, high-end result. No added text, no logos, no watermarks.' + THEME_LINE
+
+    // Decide up front (in inventory order) which items get an AI op within
+    // budget — everything else passes through as a plain "photo"/"logo" asset
+    // or is skipped. This lets the actual AI calls run CONCURRENTLY below:
+    // with up to 8 images now planned, awaiting gpt-image-1 one at a time
+    // risked blowing past the 300s function timeout for the whole batch.
+    let budget = MAX_AI_OPS
+    const plans = inventory.map((item, i) => {
       const id = assetId(item, i)
       const isLogo = id === 'logo'
-      // prompt rides along so the UI can show/copy it next to each image
       const base = { id, role: item.what || '', section: item.section || '', prompt: item.prompt || '' }
 
-      // Logos and "keep" real photos pass through untouched.
       if (isLogo || item.action === 'keep' || (item.source === 'real' && item.action !== 'enhance' && item.action !== 'generate')) {
-        if (item.url) assets.push({ ...base, kind: isLogo ? 'logo' : 'photo', src: item.url })
-        continue
+        return { passthrough: item.url ? { ...base, kind: isLogo ? 'logo' : 'photo', src: item.url } : null }
       }
-
-      const overBudget = aiOps >= MAX_AI_OPS
       if (!hasOpenAI) {
-        if (item.url) assets.push({ ...base, kind: 'photo', src: item.url })
         warning = 'OPENAI_API_KEY not set — kept original images instead of enhancing/generating.'
-        continue
+        return { passthrough: item.url ? { ...base, kind: 'photo', src: item.url } : null }
       }
-      if (overBudget) {
-        if (item.url) assets.push({ ...base, kind: 'photo', src: item.url })
-        continue
+      if (budget <= 0) {
+        return { passthrough: item.url ? { ...base, kind: 'photo', src: item.url } : null }
       }
+      budget--
 
-      // Professional retouch contract for real photos pulled from the site:
-      // authentic first — same people, same place, same composition — elevated
-      // to look professionally shot.
-      const PRO_TOUCHUP = ' Professional retouch directives: stay authentic and true to the original — same people, same place, same composition, recognizably the same photo. If people are present: cinematic, flattering professional lighting and color grade. If buildings/architecture are present: straighten and align verticals and horizontals so it looks like a professional architectural photograph. Subtly clean and even out distracting background elements. Crisp, high-end result. No added text, no logos, no watermarks.'
-      let prompt = item.prompt || `Subject: ${item.what || 'brand image'} for a ${analysis.industry || 'business'} website. Keep the same: the overall subject and intent. Change: make it a clean, modern, photorealistic, well-lit image. No text, no logos, no watermarks.`
-      if (item.action === 'enhance') prompt += PRO_TOUCHUP
-      base.prompt = prompt
+      let prompt = item.prompt || `Subject: ${item.what || 'brand image'} for a ${analysis.industry || 'business'} website. Keep the same: the overall subject and intent. Change: make it a clean, modern, photorealistic, well-lit image.${THEME_LINE} No text, no logos, no watermarks.`
+      prompt += item.action === 'enhance' ? PRO_TOUCHUP : THEME_LINE
+      return { aiOp: true, item, base: { ...base, prompt } }
+    })
 
-      // Up to 2 attempts per image — transient API failures were leaving
-      // placeholder holes in otherwise-finished sites.
-      let done = false
-      for (let attempt = 1; attempt <= 2 && !done; attempt++) {
+    let aiOps = plans.filter(p => p.aiOp).length
+
+    // Up to 2 attempts per image — transient API failures were leaving
+    // placeholder holes in otherwise-finished sites.
+    async function runAiOp({ item, base }) {
+      const prompt = base.prompt
+      for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           if (item.action === 'enhance' && item.url) {
-            if (attempt === 1) aiOps++
             const file = await fetchAsFile(item.url, toFile)
             const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
             const res = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, n: 1, size: isHero ? '1536x1024' : '1024x1024', quality: isHero ? 'high' : 'medium' })
             const b64 = res.data?.[0]?.b64_json
-            assets.push({ ...base, kind: 'enhanced', src: b64 ? `data:image/png;base64,${b64}` : item.url })
-            done = true
+            return { ...base, kind: 'enhanced', src: b64 ? `data:image/png;base64,${b64}` : item.url }
           } else {
-            if (attempt === 1) aiOps++
             const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
             // Heroes render full-bleed — landscape + high quality; support images stay square/medium.
             const res = await openai.images.generate({ model: 'gpt-image-1', prompt, n: 1, size: isHero ? '1536x1024' : '1024x1024', quality: isHero ? 'high' : 'medium' })
             const b64 = res.data?.[0]?.b64_json
-            if (b64) { assets.push({ ...base, kind: 'generated', src: `data:image/png;base64,${b64}` }); done = true }
-            else if (attempt === 2 && item.url) { assets.push({ ...base, kind: 'photo', src: item.url }); done = true }
+            if (b64) return { ...base, kind: 'generated', src: `data:image/png;base64,${b64}` }
+            if (attempt === 2 && item.url) return { ...base, kind: 'photo', src: item.url }
           }
         } catch (e) {
           console.error(`image op failed (slot ${item.slot}, attempt ${attempt}):`, e.message)
-          if (attempt === 2 && item.url) assets.push({ ...base, kind: 'photo', src: item.url }) // graceful fallback
+          if (attempt === 2 && item.url) return { ...base, kind: 'photo', src: item.url } // graceful fallback
         }
       }
+      return null
     }
+
+    const assets = (await Promise.all(
+      plans.map(p => (p.aiOp ? runAiOp(p) : Promise.resolve(p.passthrough))),
+    )).filter(Boolean)
 
     // Attestation: proves whether the image API was actually called this run
     // (and how), instead of trusting a green checkmark in the UI.
