@@ -86,7 +86,12 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
   * Fluid type with clamp() everywhere (e.g. hero clamp(2.4rem, 9vw, 7rem)) so headlines fill the phone width edge to edge without overflowing.
   * CTAs and cards go FULL-WIDTH on mobile (100% width, generous tap height ≥ 52px); grids collapse to single column with zero horizontal gutter.
   * Absolutely no horizontal scroll at 390px — test every oversized/overlapping element with max-width: 100% and overflow-x guards.
-- LEGIBILITY: any text over a photo sits on a dark scrim. Headlines constrained and wrapping — never overflowing.
+- LEGIBILITY & CONTRAST — NON-NEGOTIABLE, CHECK EVERY SECTION BEFORE YOU FINISH: text color must always have strong contrast against whatever is directly behind it, no exceptions.
+  * White or near-white text is ONLY allowed on a dark surface: a dark solid section background, or a photo with a real dark scrim (e.g. linear-gradient with black/near-black at 45%+ opacity) behind it. Never place white/near-white text on a light page background, a light photo, or an unscrimmed light image — it becomes invisible.
+  * Dark ink/navy/charcoal text is ONLY for light surfaces (cream/white backgrounds, light photos, light cards).
+  * If a hero photo is light, airy, or desaturated, either add a real dark scrim behind the text or switch the headline to the dark ink color — never leave light text floating over a light image hoping it reads.
+  * Before finalizing, mentally check each section: name its background color/image and its text color, and confirm they are opposite ends of light/dark. If they are not, fix it.
+  * Headlines are always constrained and wrapping — never overflowing.
 - IMAGE PLACEHOLDERS — CRITICAL: for every image use the EXACT placeholder token as the src, e.g. <img src="%%IMG:img_1%%"> or a CSS background-image url('%%IMG:img_1%%'). Use each provided slot id exactly once or more. NEVER invent an image URL, never use data URIs, never leave a src empty. The logo slot (if provided) goes in the nav AND MUST RENDER PROMINENTLY: give the logo img an explicit height of 52-64px on desktop (44-52px on mobile) with width:auto and object-fit:contain so it fills the nav bar's height to the maximum — never a tiny 20-30px speck. Repeat the logo larger (80-120px) in the footer brand column. If there is no logo slot, render the business name as a clean text wordmark.
 - CONTENT: use only the copy and facts provided. Do NOT invent hours, addresses, phone numbers, emails, reviews, awards, or claims. Omit what you don't have.`
 
@@ -146,7 +151,7 @@ ${motion?.snippet ? `SIGNATURE MOTION TREATMENT — exactly ONE per site, never 
 "${motion.name}" (${motion.intensity} ${motion.effect}) — ${motion.summary || ''}
 Base implementation (zero-JS CSS/HTML — adapt it, don't just paste):
 ${motion.snippet}
-Rules: place it where the brief says (default: hero backdrop). Map var(--vm-c1)/var(--vm-c2) to the brand palette. Merge its <style> rules into your single style tag, keeping the .vm- class prefixes and the prefers-reduced-motion rule. Keep content above it (position:relative; z-index). Do NOT add any other ambient/background animation anywhere else on the page — this is the site's one signature motion. If the design brief overruled motion with "none", omit this entirely.` : ''}
+Rules: place it where the brief says (default: hero backdrop). Map var(--vm-c1)/var(--vm-c2) to the brand's SECONDARY or NEUTRAL palette color — never the accent/CTA color, which must stay reserved for buttons and small emphasis so it never gets diluted into a big decorative texture. CONTAINMENT (hard requirement): the .vm-...-wrap element wraps ONLY the one section it lives in — never the page shell, never <div class="velpi-page"> itself, never more than one section. WEIGHT (hard requirement): it must read as a faint atmospheric texture glimpsed behind content, not a foreground graphic — cap any pattern/grid/line opacity so it stays subtle (roughly 6-15% visual weight against its section's background) and never approaches the contrast of real text or CTAs. Merge its <style> rules into your single style tag, keeping the .vm- class prefixes and the prefers-reduced-motion rule. Keep content above it (position:relative; z-index). Do NOT add any other ambient/background animation anywhere else on the page — this is the site's one signature motion. If the design brief overruled motion with "none", omit this entirely.` : ''}
 
 CONVERSION STRATEGY (the page's brain — execute exactly):
 ${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}
