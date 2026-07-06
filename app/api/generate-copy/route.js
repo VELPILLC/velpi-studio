@@ -3,7 +3,7 @@ export const maxDuration = 300
 
 import { callClaude, parseJson, stripFences } from '../../../lib/claude'
 
-const REPAIR_SYSTEM = `You are given text that was supposed to be a single valid JSON object but failed to parse — usually because it was cut off mid-response or has a stray syntax error. Return ONLY the corrected, complete, valid JSON object with the exact same content and meaning. If it was truncated, complete it sensibly using the surrounding context. No markdown, no commentary, no explanation — JSON only.`
+const REPAIR_SYSTEM = `You are given text that was supposed to be a single valid JSON object but failed to parse. The single most common cause: a stray, UNESCAPED double-quote mark inside a string value — a quoted word or aside (e.g. a "nickname") left as a literal " instead of \\" (or a single quote). Scan every string value for this first and fix any you find. The next most common cause is truncation (cut off mid-response) — if that's what happened instead, complete it sensibly using the surrounding context. Return ONLY the corrected, complete, valid JSON object with the exact same content and meaning. No markdown, no commentary, no explanation — JSON only.`
 
 const SYSTEM = `You are a direct-response copywriter rewriting website copy.
 
@@ -16,6 +16,7 @@ RULES:
 - NEVER invent facts, numbers, names, awards, or claims that are not supported by the original content. If a fact is unknown, write benefit-driven copy without specifics.
 - Keep the brand's real business name.
 - Do NOT reproduce full review quotes verbatim anywhere in this JSON — reviews are sourced and rendered separately by the page builder. If a review needs referencing, paraphrase it in under 12 words (e.g. "praised for same-day service"). This keeps the output short enough to never truncate.
+- JSON SAFETY — this breaks the ENTIRE response if missed: if any copy you write quotes a word or short phrase for emphasis, every double-quote character INSIDE that string value MUST be escaped as \\" or rewritten with a single quote (') — a single unescaped inner quote makes the whole JSON unparsable.
 
 Return ONLY valid JSON (no markdown) shaped as:
 {
