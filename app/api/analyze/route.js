@@ -1,7 +1,9 @@
 // Vercel: allow long-running AI work (up to 5 min with fluid compute)
 export const maxDuration = 300
 
-import { callClaude, parseJson } from '../../../lib/claude'
+import { callClaude, parseJson, stripFences } from '../../../lib/claude'
+
+const REPAIR_SYSTEM = `You are given text that was supposed to be a single valid JSON object but failed to parse — usually because it was cut off mid-response or has a stray syntax error. Return ONLY the corrected, complete, valid JSON object with the exact same content and meaning. If it was truncated, complete it sensibly using the surrounding context (never invent new facts — only close out the structure). No markdown, no commentary, no explanation — JSON only.`
 
 const INDUSTRY_PATTERNS = `INDUSTRY STRUCTURE PATTERNS — apply the matching one (detect any other industry automatically and apply the best-fit structure):
 - HVAC: emergency-availability hero, services, trust signals, phone CTA
@@ -132,10 +134,25 @@ ${(scrapedData.images || []).slice(0, 30).map((im, i) => typeof im === 'string' 
 FULL CRAWLED CONTENT:
 ${(scrapedData.content || '').slice(0, 36000)}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 8000 })
-    const analysis = parseJson(raw)
+    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 16000 })
+    let analysis = parseJson(raw)
+
+    // Self-repair: this JSON is the densest in the pipeline (facts + full
+    // conversion strategy + brand block + 5 image prompts) — a truncated or
+    // malformed response gets one automatic fix pass before we give up.
     if (!analysis || !analysis.business_name) {
-      return Response.json({ error: 'Could not analyze the website content. Try a different site.' }, { status: 502 })
+      console.error('analyze: initial parse failed, attempting repair. Raw tail:', stripFences(raw).slice(-400))
+      try {
+        const repaired = await callClaude({ system: REPAIR_SYSTEM, user: stripFences(raw), maxTokens: 16000 })
+        analysis = parseJson(repaired)
+      } catch (repairErr) {
+        console.error('analyze: repair attempt failed:', repairErr.message)
+      }
+    }
+
+    if (!analysis || !analysis.business_name) {
+      console.error('analyze: unrecoverable. Raw response length:', raw?.length || 0, 'tail:', stripFences(raw).slice(-400))
+      return Response.json({ error: 'Could not analyze the website content — the response was malformed even after a retry. Try again, or try a different site.' }, { status: 502 })
     }
 
     // Normalize for the rest of the pipeline.
