@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "npm run test:creative",
-    "test:creative": "node --test test/creative/understanding.test.mjs test/creative/strategy.test.mjs test/creative/director.test.mjs test/creative/defaults.test.mjs test/creative/blueprint.test.mjs test/creative/validator.test.mjs test/creative/assembler.test.mjs test/creative/metrics.test.mjs"
+    "test:creative": "node --test test/creative/understanding.test.mjs test/creative/strategy.test.mjs test/creative/director.test.mjs test/creative/defaults.test.mjs test/creative/blueprint.test.mjs test/creative/validator.test.mjs test/creative/assembler.test.mjs test/creative/metrics.test.mjs test/creative/review.test.mjs test/creative/exportPackage.test.mjs test/creative/claudeRetry.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

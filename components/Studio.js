@@ -4,6 +4,8 @@ import { pickCreativeMix } from '../lib/designStyles'
 import { pickSignatureMotion } from '../lib/motionPresets'
 import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
+import ReviewPanel from './dev/ReviewPanel'
+import { isDevReviewClient } from '../lib/creative/flags.mjs'
 
 // Vibe question data — kept only so vibeSummary() can reconstruct a readable
 // summary from a LOADED project's saved vibe answers. There is no manual entry
@@ -292,6 +294,11 @@ export default function Studio() {
   const [styleId] = useState('auto')
   const [matchedStyleName, setMatchedStyleName] = useState('')
 
+  // ── Dev Review System (development only) — ids linking this generation to its
+  // Creative Directive (CIL run) and its saved project, for the review panel. ──
+  const [cilRunId, setCilRunId] = useState(null)
+  const [cilProjectId, setCilProjectId] = useState(null)
+
   // ── Results UI ──
   const [showCode, setShowCode] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -570,6 +577,8 @@ function extractLogoColors(dataUrl) {
     if (!readyToGenerate || generating) return
     setError(null)
     setBuilt(false)
+    setCilRunId(null)
+    setCilProjectId(null)
     setImagesReady(false)
     setHtmlTemplate(null)
     setAnalysisData(null)
@@ -662,6 +671,7 @@ function extractLogoColors(dataUrl) {
         const cilMode = (process.env.NEXT_PUBLIC_CIL_MODE || '').toLowerCase()
         if (cilMode && cilMode !== 'off' && cilMode !== 'legacy') {
           const cilRunId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `run_${Date.now()}`
+          setCilRunId(cilRunId)
           callRoute('/api/creative/understand', { scrapedData, analysis })
             .then(u => {
               try { console.log('[CIL:shadow] understanding', u) } catch (_) {}
@@ -912,6 +922,7 @@ function extractLogoColors(dataUrl) {
         }
         const name = `${analysis.business_name || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
         const { project } = await callRoute('/api/projects', { name, data: projData })
+        setCilProjectId(project.id)
         setProjects(prev => [{ ...project, thumb }, ...prev])
         setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
         setTimeout(() => setSavedMsg(null), 5000)
@@ -1586,6 +1597,10 @@ function extractLogoColors(dataUrl) {
               {savingProject ? 'Saving…' : '💾 Save to Library'}
             </button>
           </div>
+
+          {isDevReviewClient() && (
+            <ReviewPanel runId={cilRunId} projectId={cilProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
+          )}
         </div>
       )}
 
