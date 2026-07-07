@@ -717,11 +717,15 @@ function extractLogoColors(dataUrl) {
             if (a.src) map[a.id] = a.src
           }
           if (images?.meta) { imagesMetaLocal = images.meta; setImagesMeta(images.meta) }
+          // Server-side warnings (dead API key, missing key) were previously
+          // dropped on the floor — a run could ship all-original photos while
+          // every step showed green.
+          if (images?.warning) setError(images.warning)
           Object.assign(localAssets, map)
           // Never let a scraped logo overwrite the refined upload.
           setAssetsById(prev => ({ ...map, ...(prev.logo ? { logo: prev.logo } : {}) }))
           setImagesReady(true)
-          mark('images', 'complete')
+          mark('images', images?.warning ? 'error' : 'complete')
         })
         .catch(e => {
           mark('images', 'error')

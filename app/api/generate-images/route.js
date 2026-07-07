@@ -151,7 +151,12 @@ export async function POST(request) {
           console.error(`image op failed (slot ${item.slot}, attempt ${attempt}):`, e.message)
         }
       }
-      if (item.url) return { ...base, kind: 'photo', src: item.url } // graceful fallback
+      // Graceful fallback to the original photo — but still RECORD the failure,
+      // otherwise a dead API key looks like success on every enhance slot.
+      if (item.url) {
+        failures.push({ id: base.id, role: base.role, reason: lastErr?.message || 'unknown', fellBackToOriginal: true })
+        return { ...base, kind: 'photo', src: item.url }
+      }
       failures.push({ id: base.id, role: base.role, reason: lastErr?.message || 'unknown' })
       return null
     }
@@ -160,6 +165,12 @@ export async function POST(request) {
       plans, 3,
       p => (p.aiOp ? runAiOp(p) : Promise.resolve(p.passthrough)),
     )).filter(Boolean)
+
+    // A bad key fails EVERY call — name it loudly instead of letting enhance
+    // fallbacks make the run look mostly fine.
+    if (!warning && failures.some(f => /401|incorrect api key|invalid api key/i.test(f.reason || ''))) {
+      warning = 'Your OpenAI API key was rejected (401) — no images were actually enhanced or generated this run; photo slots fell back to the original unedited photos. Update OPENAI_API_KEY (on Vercel: Settings → Environment Variables, then redeploy; locally: .env.local, then restart), then use Regenerate on the slots.'
+    }
 
     // Attestation: proves whether the image API was actually called this run
     // (and how), instead of trusting a green checkmark in the UI.
