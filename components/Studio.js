@@ -774,6 +774,7 @@ function extractLogoColors(dataUrl) {
       // IMAGE COMPLETION GATE — no placeholders ship. Every photo slot must
       // hold a real (enhanced) or freshly generated image; missing slots are
       // resolved automatically with per-slot regeneration, up to two rounds.
+      let lastFailReason = null
       for (let round = 1; round <= 2; round++) {
         const missing = photoSlots.filter(s => !localAssets[s.id])
         if (!missing.length) break
@@ -787,6 +788,8 @@ function extractLogoColors(dataUrl) {
             if (asset) {
               localAssets[s.id] = asset.src
               setAssetsById(prev => ({ ...prev, [s.id]: asset.src }))
+            } else if (retry?.meta?.failures?.length) {
+              lastFailReason = retry.meta.failures[0].reason
             }
           } catch (_) {}
         }
@@ -795,7 +798,7 @@ function extractLogoColors(dataUrl) {
       const stillMissing = photoSlots.filter(s => !localAssets[s.id])
       if (stillMissing.length) {
         mark('images', 'error')
-        setError(`${stillMissing.length} image slot${stillMissing.length > 1 ? 's' : ''} could not be generated after retries (${stillMissing.map(s => s.name).join(', ')}) — use Regenerate on those slots in Assets.`)
+        setError(`${stillMissing.length} image slot${stillMissing.length > 1 ? 's' : ''} could not be generated after retries (${stillMissing.map(s => s.name).join(', ')})${lastFailReason ? ` — last API error: "${lastFailReason}"` : ''} — use Regenerate on those slots in Assets.`)
       } else {
         mark('images', 'complete')
       }

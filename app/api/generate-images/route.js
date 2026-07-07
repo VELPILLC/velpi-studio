@@ -25,6 +25,24 @@ async function fetchAsFile(url, toFile) {
   return toFile(buf, `src.${ext}`, { type })
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// Run tasks with a concurrency ceiling — results keep input order. Firing all
+// 8 image ops at once tripped OpenAI's images-per-minute rate limit; 3 at a
+// time stays under it while still finishing well inside the 300s window.
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length)
+  let next = 0
+  async function worker() {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
 export async function POST(request) {
   try {
     const { analysis } = await request.json()
@@ -96,36 +114,51 @@ export async function POST(request) {
 
     let aiOps = plans.filter(p => p.aiOp).length
 
-    // Up to 2 attempts per image — transient API failures were leaving
-    // placeholder holes in otherwise-finished sites.
+    // Up to 2 attempts per image. Attempt 2 handles the two real failure modes
+    // differently: transient errors (429/5xx) get a backoff wait then the same
+    // prompt; everything else (usually a content-policy rejection of the exact
+    // prompt — e.g. it names a real person) gets a SANITIZED generic prompt,
+    // because resending a rejected prompt verbatim fails deterministically.
+    const failures = []
     async function runAiOp({ item, base }) {
-      const prompt = base.prompt
+      const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
+      // Strip parentheticals (where analyze tends to put real names, e.g.
+      // "Team (Patrick and Nick)") and fall back to role/industry language.
+      const safeWhat = String(item.what || 'brand image').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim()
+      const fallbackPrompt = `Subject: ${safeWhat} for a ${analysis.industry || 'business'} website — depict people generically by role only (never a specific named individual). Professional, photorealistic, well-lit marketing photo.${THEME_LINE} No text, no logos, no watermarks.`
+      let lastErr = null
       for (let attempt = 1; attempt <= 2; attempt++) {
+        // On retry: rate-limit errors just need patience; anything else was
+        // probably the prompt itself, so swap to the sanitized fallback.
+        const rateLimited = lastErr && (lastErr.status === 429 || /rate.?limit/i.test(lastErr.message || ''))
+        if (attempt === 2) await sleep(rateLimited ? 20000 : 2000)
+        const prompt = attempt === 2 && !rateLimited && item.action !== 'enhance' ? fallbackPrompt : base.prompt
         try {
           if (item.action === 'enhance' && item.url) {
             const file = await fetchAsFile(item.url, toFile)
-            const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
             const res = await openai.images.edit({ model: 'gpt-image-1', image: file, prompt, n: 1, size: isHero ? '1536x1024' : '1024x1024', quality: isHero ? 'high' : 'medium' })
             const b64 = res.data?.[0]?.b64_json
             return { ...base, kind: 'enhanced', src: b64 ? `data:image/png;base64,${b64}` : item.url }
           } else {
-            const isHero = /hero/i.test(item.section || '') || /hero/i.test(item.what || '')
             // Heroes render full-bleed — landscape + high quality; support images stay square/medium.
             const res = await openai.images.generate({ model: 'gpt-image-1', prompt, n: 1, size: isHero ? '1536x1024' : '1024x1024', quality: isHero ? 'high' : 'medium' })
             const b64 = res.data?.[0]?.b64_json
             if (b64) return { ...base, kind: 'generated', src: `data:image/png;base64,${b64}` }
-            if (attempt === 2 && item.url) return { ...base, kind: 'photo', src: item.url }
+            lastErr = new Error('empty image response')
           }
         } catch (e) {
+          lastErr = e
           console.error(`image op failed (slot ${item.slot}, attempt ${attempt}):`, e.message)
-          if (attempt === 2 && item.url) return { ...base, kind: 'photo', src: item.url } // graceful fallback
         }
       }
+      if (item.url) return { ...base, kind: 'photo', src: item.url } // graceful fallback
+      failures.push({ id: base.id, role: base.role, reason: lastErr?.message || 'unknown' })
       return null
     }
 
-    const assets = (await Promise.all(
-      plans.map(p => (p.aiOp ? runAiOp(p) : Promise.resolve(p.passthrough))),
+    const assets = (await mapLimit(
+      plans, 3,
+      p => (p.aiOp ? runAiOp(p) : Promise.resolve(p.passthrough)),
     )).filter(Boolean)
 
     // Attestation: proves whether the image API was actually called this run
@@ -137,6 +170,7 @@ export async function POST(request) {
       enhanced: assets.filter(a => a.kind === 'enhanced').length,
       keptOriginal: assets.filter(a => a.kind === 'photo').length,
       logo: assets.some(a => a.kind === 'logo'),
+      failures, // per-slot failure reasons so the UI can say WHY, not just "failed"
       at: new Date().toISOString(),
     }
     return Response.json({ images: { assets, warning, meta } })
