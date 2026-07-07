@@ -396,6 +396,384 @@
       ],
       "summary": "Flex .navbar bar split into -start/-center/-end thirds with min-height padding",
       "reference": ".navbar {\n @layer daisyui.l1.l2.l3 {\n @apply flex w-full items-center;\n padding: 0.5rem;\n min-height: 4rem;\n }\n}\n:where(.navbar) {\n @layer daisyui.l1.l2 {\n @apply relative;\n }\n}\n.navbar-start {\n @layer daisyui.l1.l2.l3 {\n @apply inline-flex items-center;\n width: 50%;\n justify-content: flex-start;\n }\n}\n.navbar-center {\n @layer daisyui.l1.l2.l3 {\n @apply inline-flex items-center;\n @apply shrink-0;\n }\n}\n.navbar-end {\n @layer daisyui.l1.l2.l3 {\n @apply inline-flex items-center;\n width: 50%;\n justify-content: flex-end;\n }\n}"
+    },
+    {
+      "id": "velpi--hero--split-editorial-masthead",
+      "file": "velpi--hero--split-editorial-masthead.html",
+      "name": "Split Editorial Masthead",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "hero",
+      "framework": "html-css",
+      "niches": [
+        "fashion",
+        "architecture",
+        "agency",
+        "editorial",
+        "luxury"
+      ],
+      "summary": "A 7/5 asymmetric split hero where oversized display type in the left column bleeds toward a full-bleed image panel on the right with a vertical caption label.",
+      "reference": "<section class=\"mast\">\n  <div class=\"mast-copy\">\n    <p class=\"eyebrow\">Issue 01 — Spring</p>\n    <h1>Form<br><em>follows</em><br>feeling</h1>\n    <p class=\"lede\">A studio for building spaces that are quietly unforgettable. We design the pause between rooms.</p>\n    <a class=\"link\" href=\"#\">View the portfolio →</a>\n  </div>\n  <div class=\"mast-img\">\n    <img src=\"#\" alt=\"[image]\">\n    <span class=\"vlabel\">Studio / 2024</span>\n  </div>\n  <style>\n    .mast{display:grid;grid-template-columns:7fr 5fr;min-height:88vh;font-family:Georgia,serif;background:#faf7f2;color:#1a1a1a}\n    .mast-copy{padding:8vh 4vw;display:flex;flex-direction:column;justify-content:center}\n    .eyebrow{letter-spacing:.3em;text-transform:uppercase;font-size:.7rem;font-family:system-ui;color:#8a7f6a}\n    .mast h1{font-size:clamp(3rem,9vw,7.5rem);line-height:.92;font-weight:400;margin:.3em 0}\n    .mast h1 em{color:#b5502e}\n    .lede{max-width:34ch;font-size:1.05rem;line-height:1.6;color:#4a463f}\n    .link{margin-top:1.5rem;font-family:system-ui;font-size:.9rem;color:#1a1a1a;text-decoration:none;border-bottom:1px solid}\n    .mast-img{position:relative;overflow:hidden}\n    .mast-img img{width:100%;height:100%;object-fit:cover;display:block}\n    .vlabel{position:absolute;top:2rem;left:-1.5rem;writing-mode:vertical-rl;transform:rotate(180deg);font-family:system-ui;font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;background:#faf7f2;padding:.6rem}\n    @media(max-width:760px){.mast{grid-template-columns:1fr}.mast-img{min-height:50vh}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--hero--diagonal-split-screen",
+      "file": "velpi--hero--diagonal-split-screen.html",
+      "name": "Diagonal Split-Screen Hero",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "hero",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "fintech",
+        "startup",
+        "tech",
+        "product"
+      ],
+      "summary": "A full-viewport hero cut by a diagonal clip-path into a dark copy panel and a light product panel, with a floating stat chip straddling the seam.",
+      "reference": "<section class=\"dsplit\">\n  <div class=\"pane dark\">\n    <p class=\"tag\">● Live in 40 countries</p>\n    <h1>Money that moves at the speed of you</h1>\n    <p class=\"sub\">Open an account in minutes. Spend, save and send without the borders.</p>\n    <a class=\"cta\" href=\"#\">Get started</a>\n  </div>\n  <div class=\"pane light\">\n    <div class=\"card\">[image]</div>\n  </div>\n  <div class=\"chip\"><strong>$2.4B</strong><span>moved this year</span></div>\n  <style>\n    .dsplit{position:relative;display:grid;grid-template-columns:1fr 1fr;min-height:90vh;font-family:system-ui;overflow:hidden}\n    .pane{padding:9vh 4vw;display:flex;flex-direction:column;justify-content:center}\n    .dark{background:#0e1116;color:#fff;clip-path:polygon(0 0,100% 0,82% 100%,0 100%)}\n    .light{background:#eef2ff;align-items:center;margin-left:-6%}\n    .tag{color:#6ee7b7;font-size:.8rem;letter-spacing:.05em}\n    .dark h1{font-size:clamp(2.4rem,5vw,4rem);line-height:1.02;margin:.4em 0;max-width:12ch}\n    .sub{color:#9aa4b2;max-width:34ch;line-height:1.6}\n    .cta{margin-top:1.6rem;align-self:flex-start;background:#6ee7b7;color:#0e1116;padding:.9rem 1.8rem;border-radius:99px;text-decoration:none;font-weight:600}\n    .card{width:min(360px,80%);aspect-ratio:3/4;background:#fff;border-radius:20px;box-shadow:0 30px 60px rgba(30,41,120,.18);display:flex;align-items:center;justify-content:center;color:#c7d2fe}\n    .chip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:1rem 1.4rem;border-radius:14px;box-shadow:0 20px 40px rgba(0,0,0,.15);text-align:center}\n    .chip strong{display:block;font-size:1.5rem;color:#0e1116}\n    .chip span{font-size:.75rem;color:#64748b}\n    @media(max-width:760px){.dsplit{grid-template-columns:1fr}.dark{clip-path:none}.light{margin:0;padding-top:0}.chip{display:none}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--hero--oversized-numeral-interlude",
+      "file": "velpi--hero--oversized-numeral-interlude.html",
+      "name": "Oversized Numeral Interlude Hero",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "hero",
+      "framework": "html-css",
+      "niches": [
+        "podcast",
+        "music",
+        "events",
+        "creative",
+        "media"
+      ],
+      "summary": "A typographic hero where a giant outlined numeral sits behind layered heading text with mix-blend, anchored by a baseline row of meta labels.",
+      "reference": "<section class=\"numhero\">\n  <span class=\"ghost\">05</span>\n  <div class=\"front\">\n    <h1>The Longform<br>Sessions</h1>\n    <p>Unhurried conversations with the people building tomorrow's culture. New episode every Thursday.</p>\n  </div>\n  <div class=\"meta\">\n    <span>Season 05</span><span>·</span><span>42 episodes</span><span>·</span><span>Listen anywhere</span>\n  </div>\n  <style>\n    .numhero{position:relative;min-height:86vh;background:#131018;color:#f4efe6;font-family:'Helvetica Neue',system-ui,sans-serif;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 5vw}\n    .ghost{position:absolute;right:-2vw;top:-4vh;font-size:60vh;font-weight:800;line-height:1;color:transparent;-webkit-text-stroke:2px #2c2536;user-select:none}\n    .front h1{font-size:clamp(2.8rem,8vw,6.5rem);line-height:.95;font-weight:800;mix-blend-mode:difference;margin:0}\n    .front p{max-width:40ch;margin-top:1.4rem;color:#a89fb2;line-height:1.7;font-size:1.05rem}\n    .meta{margin-top:3rem;display:flex;gap:1rem;flex-wrap:wrap;font-size:.8rem;letter-spacing:.15em;text-transform:uppercase;color:#7a7086}\n    @media(max-width:760px){.ghost{font-size:38vh}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--features--bento-mixed-tiles",
+      "file": "velpi--features--bento-mixed-tiles.html",
+      "name": "Bento Mixed-Size Feature Grid",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "features",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "developer-tools",
+        "ai",
+        "productivity",
+        "tech"
+      ],
+      "summary": "A bento grid using grid-template-areas to place one tall hero tile beside stacked wide and square tiles of varying emphasis.",
+      "reference": "<section class=\"bento\">\n  <h2>Everything, in one canvas</h2>\n  <div class=\"grid\">\n    <article class=\"t a big\"><h3>Realtime collab</h3><p>See every cursor, comment and change as it happens.</p><div class=\"art\">[image]</div></article>\n    <article class=\"t b\"><h3>Version history</h3><p>Rewind to any moment.</p></article>\n    <article class=\"t c accent\"><h3>99.99%</h3><p>uptime, measured</p></article>\n    <article class=\"t d\"><h3>Integrations</h3><p>Connect 120+ tools in a click.</p></article>\n    <article class=\"t e wide\"><h3>Automations that run themselves</h3><p>Trigger flows from any event and let the busywork disappear.</p></article>\n  </div>\n  <style>\n    .bento{padding:8vh 5vw;background:#0f1115;color:#e8eaed;font-family:system-ui}\n    .bento>h2{font-size:clamp(1.8rem,4vw,3rem);margin:0 0 2rem;font-weight:700}\n    .grid{display:grid;gap:14px;grid-template-columns:repeat(4,1fr);grid-template-areas:'a a b c' 'a a d d' 'e e e e'}\n    .t{background:#1a1d24;border:1px solid #262a33;border-radius:18px;padding:1.6rem;display:flex;flex-direction:column;gap:.5rem}\n    .t h3{margin:0;font-size:1.15rem}\n    .t p{margin:0;color:#9aa2ad;font-size:.92rem;line-height:1.5}\n    .a{grid-area:a}.b{grid-area:b}.c{grid-area:c}.d{grid-area:d}.e{grid-area:e}\n    .big .art{margin-top:auto;aspect-ratio:16/10;background:#12151b;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#3a414d}\n    .accent{background:#1e2a1c;border-color:#2e5227}\n    .accent h3{font-size:2rem;color:#8ee06a}\n    .wide{flex-direction:row;align-items:center;justify-content:space-between}\n    @media(max-width:760px){.grid{grid-template-columns:1fr 1fr;grid-template-areas:'a a' 'b c' 'd d' 'e e'}.wide{flex-direction:column;align-items:flex-start}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--features--sticky-scroll-reveal",
+      "file": "velpi--features--sticky-scroll-reveal.html",
+      "name": "Sticky Scroll Feature Reveal",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "features",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "fintech",
+        "analytics",
+        "b2b",
+        "platform"
+      ],
+      "summary": "A two-column feature section where a sticky visual pane holds while a scrolling list of numbered feature steps advances beside it.",
+      "reference": "<section class=\"sticky-feat\">\n  <div class=\"visual\"><div class=\"screen\">[image]</div></div>\n  <ol class=\"steps\">\n    <li><span class=\"n\">01</span><h3>Connect your data</h3><p>Plug in warehouses, spreadsheets and APIs without writing glue code.</p></li>\n    <li><span class=\"n\">02</span><h3>Model in minutes</h3><p>Drag fields into place and watch metrics compute live.</p></li>\n    <li><span class=\"n\">03</span><h3>Share the truth</h3><p>Publish dashboards that everyone can trust and nobody can break.</p></li>\n    <li><span class=\"n\">04</span><h3>Alert on drift</h3><p>Get pinged the moment a number wanders off course.</p></li>\n  </ol>\n  <style>\n    .sticky-feat{display:grid;grid-template-columns:5fr 7fr;gap:5vw;padding:10vh 5vw;background:#fbfbfd;color:#14161a;font-family:system-ui}\n    .visual{position:sticky;top:12vh;align-self:start;height:70vh}\n    .screen{width:100%;height:100%;background:linear-gradient(135deg,#e8ecff,#f6e8ff);border-radius:22px;box-shadow:0 30px 70px rgba(60,50,120,.14);display:flex;align-items:center;justify-content:center;color:#9b8fce;font-size:1.2rem}\n    .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14vh}\n    .steps li{border-left:2px solid #e3e3ea;padding-left:1.4rem}\n    .n{font-size:.8rem;letter-spacing:.2em;color:#8a86ff;font-weight:700}\n    .steps h3{font-size:1.8rem;margin:.4rem 0 .6rem}\n    .steps p{color:#5b606b;line-height:1.7;max-width:42ch}\n    @media(max-width:760px){.sticky-feat{grid-template-columns:1fr}.visual{position:static;height:40vh}.steps{gap:6vh}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--features--image-as-layout-grid",
+      "file": "velpi--features--image-as-layout-grid.html",
+      "name": "Image-as-Layout Feature Frame",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "features",
+      "framework": "html-css",
+      "niches": [
+        "travel",
+        "hospitality",
+        "real-estate",
+        "wellness",
+        "lifestyle"
+      ],
+      "summary": "A full-bleed cover image acts as the layout frame with feature captions pinned to its corners over a gradient scrim.",
+      "reference": "<section class=\"imgframe\">\n  <img class=\"bg\" src=\"#\" alt=\"[image]\">\n  <div class=\"scrim\"></div>\n  <div class=\"corners\">\n    <div class=\"c tl\"><h2>Stay where the map ends</h2></div>\n    <div class=\"c bl\"><h3>Off-grid cabins</h3><p>Solar-warmed, wifi-free, unforgettable.</p></div>\n    <div class=\"c br\"><h3>Guided by locals</h3><p>Every trail comes with a story.</p></div>\n  </div>\n  <style>\n    .imgframe{position:relative;min-height:92vh;overflow:hidden;font-family:'Georgia',serif;color:#fff}\n    .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}\n    .scrim{position:absolute;inset:0;background:linear-gradient(120deg,rgba(20,28,22,.75),rgba(20,28,22,.15) 45%,rgba(20,28,22,.7))}\n    .corners{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;padding:6vh 5vw}\n    .c{max-width:34ch}\n    .tl{grid-column:1;grid-row:1}\n    .bl{grid-column:1;grid-row:2;align-self:end}\n    .br{grid-column:2;grid-row:2;align-self:end;justify-self:end;text-align:right}\n    .tl h2{font-size:clamp(2rem,5vw,4rem);line-height:1.05;margin:0}\n    .c h3{font-family:system-ui;letter-spacing:.02em;margin:0 0 .3rem}\n    .c p{font-family:system-ui;color:#dfe7e0;line-height:1.6;margin:0}\n    @media(max-width:760px){.corners{grid-template-columns:1fr;grid-template-rows:auto;gap:2rem}.br{text-align:left;justify-self:start}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--pricing--offset-featured-plan",
+      "file": "velpi--pricing--offset-featured-plan.html",
+      "name": "Offset Featured Pricing Plan",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "pricing",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "subscription",
+        "b2b",
+        "tools",
+        "startup"
+      ],
+      "summary": "Three pricing cards where the middle plan is vertically offset and enlarged with a negative margin, breaking the flat row rhythm.",
+      "reference": "<section class=\"pricing\">\n  <h2>Pick a plan that grows with you</h2>\n  <div class=\"plans\">\n    <article class=\"plan\"><h3>Starter</h3><p class=\"price\">$0<span>/mo</span></p><ul><li>Up to 3 projects</li><li>Community support</li><li>1 seat</li></ul><a href=\"#\">Choose</a></article>\n    <article class=\"plan feat\"><span class=\"ribbon\">Most popular</span><h3>Studio</h3><p class=\"price\">$29<span>/mo</span></p><ul><li>Unlimited projects</li><li>Priority support</li><li>10 seats</li><li>Advanced exports</li></ul><a href=\"#\">Choose</a></article>\n    <article class=\"plan\"><h3>Scale</h3><p class=\"price\">$99<span>/mo</span></p><ul><li>SSO &amp; audit logs</li><li>Dedicated manager</li><li>Unlimited seats</li></ul><a href=\"#\">Choose</a></article>\n  </div>\n  <style>\n    .pricing{padding:9vh 5vw;background:#f4f5f8;color:#181b20;font-family:system-ui;text-align:center}\n    .pricing>h2{font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 3rem}\n    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;max-width:1000px;margin:0 auto;align-items:start}\n    .plan{background:#fff;border:1px solid #e4e6ec;border-radius:18px;padding:2rem 1.6rem;text-align:left}\n    .feat{transform:translateY(-28px);padding:2.6rem 1.8rem;box-shadow:0 26px 50px rgba(40,50,90,.16);border-color:#c9d2ff;position:relative}\n    .ribbon{position:absolute;top:-12px;left:1.8rem;background:#4f5bff;color:#fff;font-size:.7rem;padding:.35rem .8rem;border-radius:99px;letter-spacing:.05em}\n    .plan h3{margin:0 0 .4rem}\n    .price{font-size:2.6rem;font-weight:700;margin:.2rem 0 1rem}\n    .price span{font-size:.9rem;color:#8a8f9a;font-weight:400}\n    .plan ul{list-style:none;padding:0;margin:0 0 1.6rem;display:flex;flex-direction:column;gap:.6rem;color:#4c515b}\n    .plan a{display:block;text-align:center;padding:.8rem;border-radius:10px;background:#181b20;color:#fff;text-decoration:none}\n    .feat a{background:#4f5bff}\n    @media(max-width:760px){.plans{grid-template-columns:1fr}.feat{transform:none}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--pricing--comparison-toggle-panel",
+      "file": "velpi--pricing--comparison-toggle-panel.html",
+      "name": "Side-by-Side Comparison Panel",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "pricing",
+      "framework": "html-css",
+      "niches": [
+        "b2b",
+        "enterprise",
+        "saas",
+        "agency",
+        "services"
+      ],
+      "summary": "A dark-vs-light two-panel comparison layout contrasting a legacy approach against the product with aligned feature rows.",
+      "reference": "<section class=\"compare\">\n  <h2>The old way, and the better way</h2>\n  <div class=\"cols\">\n    <div class=\"col old\">\n      <p class=\"lbl\">Doing it yourself</p>\n      <ul><li>Weeks of setup</li><li>Spreadsheets everywhere</li><li>No single source of truth</li><li>Support tickets in the void</li></ul>\n      <p class=\"foot\">$0 upfront, endless hours</p>\n    </div>\n    <div class=\"col new\">\n      <p class=\"lbl\">With Velpi</p>\n      <ul><li>Live in an afternoon</li><li>One connected workspace</li><li>Metrics everyone trusts</li><li>Answers in minutes</li></ul>\n      <p class=\"foot\">$29/mo, all in</p>\n      <a href=\"#\">Start free</a>\n    </div>\n  </div>\n  <style>\n    .compare{padding:9vh 5vw;background:#101318;color:#eef1f5;font-family:system-ui;text-align:center}\n    .compare>h2{font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 2.6rem}\n    .cols{display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:860px;margin:0 auto;border-radius:20px;overflow:hidden}\n    .col{padding:2.4rem 2rem;text-align:left}\n    .old{background:#181b22;color:#8a909b}\n    .new{background:linear-gradient(160deg,#1f2b6b,#3a2b8f);color:#fff}\n    .lbl{font-size:.8rem;letter-spacing:.15em;text-transform:uppercase;opacity:.8;margin:0 0 1.2rem}\n    .col ul{list-style:none;padding:0;margin:0 0 1.6rem;display:flex;flex-direction:column;gap:.9rem}\n    .old li::before{content:'✕  ';color:#e0655a}\n    .new li::before{content:'✓  ';color:#8ee06a}\n    .foot{font-weight:600;margin:0}\n    .new a{display:inline-block;margin-top:1.2rem;background:#fff;color:#2a2380;padding:.7rem 1.6rem;border-radius:99px;text-decoration:none;font-weight:600}\n    @media(max-width:760px){.cols{grid-template-columns:1fr}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--testimonials--overlap-quote-photo",
+      "file": "velpi--testimonials--overlap-quote-photo.html",
+      "name": "Overlapping Quote Over Photo",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "testimonials",
+      "framework": "html-css",
+      "niches": [
+        "consulting",
+        "coaching",
+        "agency",
+        "personal-brand",
+        "services"
+      ],
+      "summary": "A large portrait with a quote card floating over its lower edge via negative margin, plus an oversized decorative quotation mark.",
+      "reference": "<section class=\"otesti\">\n  <div class=\"frame\">\n    <img src=\"#\" alt=\"[image]\">\n    <blockquote class=\"qcard\">\n      <span class=\"mark\">“</span>\n      <p>They didn't just rebrand us. They found the sentence we'd been trying to say for ten years.</p>\n      <footer><strong>Dana Ortiz</strong><span>Founder, Meridian Coffee</span></footer>\n    </blockquote>\n  </div>\n  <style>\n    .otesti{padding:9vh 5vw;background:#efe9e0;font-family:system-ui;display:flex;justify-content:center}\n    .frame{position:relative;width:min(560px,100%)}\n    .frame img{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:14px;display:block;background:#cbb}\n    .qcard{position:relative;background:#fff;margin:-90px 0 0 -30px;margin-right:auto;width:78%;padding:2rem 2rem 1.6rem;border-radius:14px;box-shadow:0 24px 50px rgba(60,40,20,.18)}\n    .mark{position:absolute;top:-.4em;left:.5rem;font-size:5rem;color:#e2b06a;font-family:Georgia,serif;line-height:1}\n    .qcard p{font-size:1.25rem;line-height:1.5;margin:1.4rem 0 1.2rem;color:#2a241d}\n    .qcard footer{display:flex;flex-direction:column}\n    .qcard strong{color:#1a1611}\n    .qcard span{font-size:.85rem;color:#8a8072}\n    @media(max-width:760px){.qcard{margin:-60px auto 0;width:88%}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--testimonials--masonry-quote-wall",
+      "file": "velpi--testimonials--masonry-quote-wall.html",
+      "name": "Masonry Quote Wall",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "testimonials",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "community",
+        "app",
+        "marketplace",
+        "tech"
+      ],
+      "summary": "A CSS columns masonry wall of quote cards at varying lengths so tiles interlock organically instead of aligning in a grid.",
+      "reference": "<section class=\"qwall\">\n  <h2>Loved by makers everywhere</h2>\n  <div class=\"cols\">\n    <figure><p>Cut our release time in half. I keep waiting for the catch.</p><figcaption>— Priya, eng lead</figcaption></figure>\n    <figure class=\"big\"><p>I've tried every tool in this space. This is the first one my whole team actually opens without being nagged. It just fits the way we already think.</p><figcaption>— Marco, PM</figcaption></figure>\n    <figure><p>Onboarding took one coffee.</p><figcaption>— Lin, designer</figcaption></figure>\n    <figure><p>The support replies faster than my coworkers do.</p><figcaption>— Sam, ops</figcaption></figure>\n    <figure class=\"big\"><p>We replaced four subscriptions with this. Finance is thrilled and honestly so am I.</p><figcaption>— Ada, founder</figcaption></figure>\n    <figure><p>Quietly brilliant.</p><figcaption>— Theo, dev</figcaption></figure>\n  </div>\n  <style>\n    .qwall{padding:9vh 5vw;background:#fff;color:#191c22;font-family:system-ui}\n    .qwall>h2{text-align:center;font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 2.6rem}\n    .cols{column-count:3;column-gap:18px;max-width:1040px;margin:0 auto}\n    figure{break-inside:avoid;margin:0 0 18px;padding:1.4rem 1.5rem;background:#f5f6f9;border:1px solid #e8eaef;border-radius:16px}\n    figure.big{background:#191c22;color:#f2f3f6}\n    figure p{margin:0 0 .8rem;line-height:1.6;font-size:1.02rem}\n    figcaption{font-size:.85rem;color:#7b818c}\n    figure.big figcaption{color:#aeb4c0}\n    @media(max-width:900px){.cols{column-count:2}}\n    @media(max-width:560px){.cols{column-count:1}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--stats--offgrid-editorial-figures",
+      "file": "velpi--stats--offgrid-editorial-figures.html",
+      "name": "Off-Grid Editorial Figures",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "stats",
+      "framework": "html-css",
+      "niches": [
+        "nonprofit",
+        "report",
+        "finance",
+        "corporate",
+        "impact"
+      ],
+      "summary": "Stat blocks placed on an asymmetric grid at staggered offsets with oversized numerals and a leading headline column instead of an even row.",
+      "reference": "<section class=\"figs\">\n  <div class=\"intro\"><p class=\"eye\">2024 in review</p><h2>Numbers that kept us honest</h2></div>\n  <div class=\"a\"><strong>1.2M</strong><span>meals delivered across 14 regions</span></div>\n  <div class=\"b\"><strong>93%</strong><span>of funds reached the field directly</span></div>\n  <div class=\"c\"><strong>+340</strong><span>volunteers joined this year</span></div>\n  <div class=\"d\"><strong>6</strong><span>new partner countries</span></div>\n  <style>\n    .figs{padding:9vh 5vw;background:#12130f;color:#f0 efe6;color:#f0efe6;font-family:Georgia,serif;display:grid;grid-template-columns:repeat(6,1fr);gap:2rem 1.5rem;align-items:start}\n    .intro{grid-column:1/4}\n    .eye{font-family:system-ui;letter-spacing:.25em;text-transform:uppercase;font-size:.72rem;color:#9c8f6a}\n    .intro h2{font-size:clamp(1.8rem,4vw,3rem);line-height:1.05;margin:.4rem 0 0}\n    .figs strong{display:block;font-size:clamp(2.6rem,6vw,4.6rem);line-height:.9;color:#e6c169}\n    .figs span{display:block;margin-top:.6rem;font-family:system-ui;color:#b7b3a6;font-size:.95rem;line-height:1.5;max-width:26ch}\n    .a{grid-column:4/6;margin-top:1.5rem}\n    .b{grid-column:6/7;margin-top:4rem}\n    .c{grid-column:1/3;margin-top:1rem}\n    .d{grid-column:4/6}\n    @media(max-width:760px){.figs{grid-template-columns:1fr 1fr}.intro,.a,.b,.c,.d{grid-column:auto;margin-top:0}.intro{grid-column:1/3}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--stats--counter-band-diagonal",
+      "file": "velpi--stats--counter-band-diagonal.html",
+      "name": "Diagonal Counter Band",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "stats",
+      "framework": "html-css",
+      "niches": [
+        "tech",
+        "startup",
+        "agency",
+        "product",
+        "growth"
+      ],
+      "summary": "A clip-path angled color band holding four counters divided by thin rules, with one counter emphasized larger to break symmetry.",
+      "reference": "<section class=\"cband\">\n  <div class=\"inner\">\n    <div class=\"stat lead\"><strong>4.9M</strong><span>API calls / day</span></div>\n    <div class=\"stat\"><strong>120ms</strong><span>median latency</span></div>\n    <div class=\"stat\"><strong>38</strong><span>regions live</span></div>\n    <div class=\"stat\"><strong>99.99%</strong><span>uptime SLA</span></div>\n  </div>\n  <style>\n    .cband{background:linear-gradient(100deg,#3b1d9e,#7b2ff7);color:#fff;font-family:system-ui;clip-path:polygon(0 8%,100% 0,100% 92%,0 100%);padding:11vh 5vw}\n    .inner{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:0}\n    .stat{padding:0 1.6rem;border-left:1px solid rgba(255,255,255,.22)}\n    .stat:first-child{border-left:0;padding-left:0}\n    .stat strong{display:block;font-size:clamp(2rem,4vw,3rem);line-height:1}\n    .lead strong{font-size:clamp(2.8rem,6vw,4.4rem)}\n    .stat span{display:block;margin-top:.5rem;font-size:.9rem;opacity:.82}\n    @media(max-width:760px){.inner{grid-template-columns:1fr 1fr;gap:2rem}.stat{border-left:0;padding:0}.cband{clip-path:none}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--cta--floating-dock-panel",
+      "file": "velpi--cta--floating-dock-panel.html",
+      "name": "Floating CTA Dock",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "cta",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "app",
+        "product",
+        "fintech",
+        "tech"
+      ],
+      "summary": "A rounded CTA dock floating with heavy shadow over a soft gradient field, with copy on the left and a stacked action group on the right.",
+      "reference": "<section class=\"ctafield\">\n  <div class=\"dock\">\n    <div class=\"left\">\n      <h2>Ship your first mockup tonight</h2>\n      <p>No credit card. No sales call. Just build.</p>\n    </div>\n    <div class=\"right\">\n      <a class=\"primary\" href=\"#\">Start free</a>\n      <a class=\"ghost\" href=\"#\">Book a demo</a>\n      <small>Join 12,000+ makers</small>\n    </div>\n  </div>\n  <style>\n    .ctafield{padding:12vh 5vw;background:radial-gradient(120% 120% at 20% 0%,#dfe7ff,#f7f0ff 60%,#fff);font-family:system-ui;display:flex;justify-content:center}\n    .dock{width:min(920px,100%);background:#12131a;color:#fff;border-radius:26px;padding:2.6rem 3rem;display:flex;justify-content:space-between;align-items:center;gap:2rem;box-shadow:0 40px 80px rgba(40,40,90,.28)}\n    .left h2{font-size:clamp(1.6rem,3.5vw,2.4rem);margin:0 0 .5rem;line-height:1.1}\n    .left p{margin:0;color:#a7abbd}\n    .right{display:flex;flex-direction:column;align-items:stretch;gap:.7rem;min-width:200px}\n    .primary{background:#6c7bff;color:#fff;text-align:center;padding:.9rem 1.6rem;border-radius:12px;text-decoration:none;font-weight:600}\n    .ghost{border:1px solid #3a3c4a;color:#fff;text-align:center;padding:.9rem 1.6rem;border-radius:12px;text-decoration:none}\n    .right small{text-align:center;color:#8a8fa3}\n    @media(max-width:680px){.dock{flex-direction:column;align-items:stretch;text-align:center}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--cta--full-bleed-type-interlude",
+      "file": "velpi--cta--full-bleed-type-interlude.html",
+      "name": "Full-Bleed Typographic CTA Interlude",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "cta",
+      "framework": "html-css",
+      "niches": [
+        "fashion",
+        "creative",
+        "agency",
+        "editorial",
+        "luxury"
+      ],
+      "summary": "A full-bleed interlude where a single oversized statement wraps across the viewport with an inline underlined link acting as the CTA within the sentence.",
+      "reference": "<section class=\"interlude\">\n  <p class=\"big\">Let's make something people screenshot. <a href=\"#\">Start a project</a> and we'll take it from there.</p>\n  <div class=\"foot\"><span>Booking Q3 now</span><span>hello@studio.co</span></div>\n  <style>\n    .interlude{min-height:80vh;background:#e8462b;color:#fff2ec;font-family:Georgia,serif;display:flex;flex-direction:column;justify-content:center;padding:8vh 6vw}\n    .big{font-size:clamp(2.4rem,7vw,6rem);line-height:1.02;font-weight:400;margin:0;max-width:16ch}\n    .big a{color:#fff;text-decoration:none;border-bottom:4px solid #fff;padding-bottom:.05em}\n    .big a:hover{background:#fff;color:#e8462b}\n    .foot{margin-top:3rem;display:flex;gap:2rem;font-family:system-ui;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:#ffd7cc}\n    @media(max-width:760px){.foot{flex-direction:column;gap:.4rem}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--faq--two-column-anchored-list",
+      "file": "velpi--faq--two-column-anchored-list.html",
+      "name": "Two-Column Anchored FAQ",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "faq",
+      "framework": "html-css",
+      "niches": [
+        "saas",
+        "services",
+        "ecommerce",
+        "support",
+        "b2b"
+      ],
+      "summary": "A sticky sidebar headline anchors a two-column FAQ where native details/summary items flow across columns.",
+      "reference": "<section class=\"faq\">\n  <aside class=\"aside\"><p class=\"eye\">Support</p><h2>Questions, answered</h2><p class=\"help\">Still stuck? <a href=\"#\">Talk to a human →</a></p></aside>\n  <div class=\"list\">\n    <details open><summary>How does billing work?</summary><p>Monthly or annual, cancel anytime from your dashboard.</p></details>\n    <details><summary>Can I import my existing data?</summary><p>Yes — CSV, API or one-click integrations bring it all over.</p></details>\n    <details><summary>Is there a free plan?</summary><p>Forever-free tier with three projects, no card required.</p></details>\n    <details><summary>Where is my data stored?</summary><p>Encrypted at rest in the region closest to your team.</p></details>\n    <details><summary>Do you offer education discounts?</summary><p>50% off for verified students and nonprofits.</p></details>\n  </div>\n  <style>\n    .faq{display:grid;grid-template-columns:4fr 8fr;gap:5vw;padding:9vh 5vw;background:#fbfbfc;color:#181b21;font-family:system-ui}\n    .aside{position:sticky;top:12vh;align-self:start}\n    .eye{letter-spacing:.22em;text-transform:uppercase;font-size:.72rem;color:#8a8fa0}\n    .aside h2{font-size:clamp(1.8rem,3vw,2.6rem);margin:.3rem 0 1rem;line-height:1.1}\n    .help a{color:#4f5bff;text-decoration:none}\n    .list{display:block;column-count:2;column-gap:40px}\n    details{break-inside:avoid;border-bottom:1px solid #e5e7ee;padding:1rem 0;margin-bottom:0}\n    summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}\n    summary::after{content:'+';color:#8a8fa0}\n    details[open] summary::after{content:'–'}\n    details p{margin:.7rem 0 0;color:#5a606d;line-height:1.6}\n    @media(max-width:760px){.faq{grid-template-columns:1fr}.aside{position:static}.list{column-count:1}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--faq--accordion-split-lede",
+      "file": "velpi--faq--accordion-split-lede.html",
+      "name": "Split-Lede Accordion FAQ",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "faq",
+      "framework": "html-css",
+      "niches": [
+        "healthcare",
+        "legal",
+        "finance",
+        "education",
+        "enterprise"
+      ],
+      "summary": "A dark FAQ with a bold numbered lede row above a single full-width accordion column using large index numbers per question.",
+      "reference": "<section class=\"nfaq\">\n  <div class=\"top\"><h2>Everything you were about to ask</h2><p>Clear answers, no fine print. Reach out if anything is missing.</p></div>\n  <div class=\"acc\">\n    <details open><summary><span class=\"idx\">01</span> Is my information confidential?</summary><p>Always. We are fully compliant and your records never leave encrypted storage.</p></details>\n    <details><summary><span class=\"idx\">02</span> How long does onboarding take?</summary><p>Most clients are fully set up within three business days.</p></details>\n    <details><summary><span class=\"idx\">03</span> Can I switch plans later?</summary><p>Upgrade or downgrade at any time; changes prorate automatically.</p></details>\n    <details><summary><span class=\"idx\">04</span> Do you offer dedicated support?</summary><p>Every account above Starter includes a named specialist.</p></details>\n  </div>\n  <style>\n    .nfaq{padding:9vh 5vw;background:#0f1216;color:#eef1f5;font-family:system-ui}\n    .top{max-width:640px;margin:0 0 3rem}\n    .top h2{font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 .8rem}\n    .top p{color:#9aa1ad;line-height:1.6;margin:0}\n    .acc{max-width:820px}\n    .acc details{border-top:1px solid #262b33;padding:1.3rem 0}\n    .acc summary{cursor:pointer;list-style:none;font-size:1.2rem;display:flex;gap:1rem;align-items:baseline}\n    .idx{color:#6c7bff;font-variant-numeric:tabular-nums;font-weight:700;font-size:.9rem}\n    .acc p{margin:.9rem 0 0 2.4rem;color:#9aa1ad;line-height:1.7;max-width:60ch}\n    @media(max-width:600px){.acc p{margin-left:0}}\n  </style>\n</section>"
+    },
+    {
+      "id": "velpi--footer--editorial-grid-sitemap",
+      "file": "velpi--footer--editorial-grid-sitemap.html",
+      "name": "Editorial Grid Sitemap Footer",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "footer",
+      "framework": "html-css",
+      "niches": [
+        "media",
+        "publishing",
+        "agency",
+        "corporate",
+        "brand"
+      ],
+      "summary": "A footer where an oversized wordmark spans the full width above an asymmetric link grid, with a baseline legal row split left and right.",
+      "reference": "<footer class=\"efoot\">\n  <div class=\"nav\">\n    <div class=\"col wide\"><p class=\"eye\">Velpi Studio</p><p class=\"pitch\">Mockups that feel finished before they are.</p><form class=\"sub\"><input placeholder=\"you@work.com\"><button>Subscribe</button></form></div>\n    <div class=\"col\"><h4>Product</h4><a href=\"#\">Features</a><a href=\"#\">Pricing</a><a href=\"#\">Changelog</a></div>\n    <div class=\"col\"><h4>Company</h4><a href=\"#\">About</a><a href=\"#\">Careers</a><a href=\"#\">Press</a></div>\n    <div class=\"col\"><h4>Resources</h4><a href=\"#\">Docs</a><a href=\"#\">Guides</a><a href=\"#\">Support</a></div>\n  </div>\n  <div class=\"mark\">VELPI</div>\n  <div class=\"legal\"><span>© 2024 Velpi Studio</span><span>Privacy · Terms · Cookies</span></div>\n  <style>\n    .efoot{background:#101014;color:#e7e7ec;font-family:system-ui;padding:7vh 5vw 3vh}\n    .nav{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:2.5rem;border-bottom:1px solid #26262e;padding-bottom:3rem}\n    .eye{letter-spacing:.2em;text-transform:uppercase;font-size:.72rem;color:#8a8a97}\n    .pitch{font-size:1.15rem;line-height:1.4;max-width:24ch;margin:.6rem 0 1.4rem}\n    .sub{display:flex;gap:.4rem}\n    .sub input{flex:1;background:#1b1b22;border:1px solid #2e2e38;border-radius:8px;padding:.6rem .8rem;color:#fff}\n    .sub button{background:#fff;color:#101014;border:0;border-radius:8px;padding:0 1rem;font-weight:600;cursor:pointer}\n    .col h4{font-size:.85rem;letter-spacing:.06em;color:#b7b7c2;margin:0 0 1rem}\n    .col a{display:block;color:#8a8a97;text-decoration:none;margin-bottom:.6rem}\n    .mark{font-size:clamp(4rem,18vw,15rem);font-weight:800;letter-spacing:-.04em;line-height:.8;color:transparent;-webkit-text-stroke:1px #2c2c36;margin:2rem 0 0}\n    .legal{display:flex;justify-content:space-between;font-size:.8rem;color:#6f6f7c;padding-top:1.5rem}\n    @media(max-width:760px){.nav{grid-template-columns:1fr 1fr}.legal{flex-direction:column;gap:.4rem}}\n  </style>\n</footer>"
+    },
+    {
+      "id": "velpi--footer--vertical-label-columns",
+      "file": "velpi--footer--vertical-label-columns.html",
+      "name": "Vertical-Label Column Footer",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "footer",
+      "framework": "html-css",
+      "niches": [
+        "studio",
+        "architecture",
+        "fashion",
+        "portfolio",
+        "creative"
+      ],
+      "summary": "A minimal footer using writing-mode vertical section labels beside their link stacks, with a large contact call-to-action anchoring the left.",
+      "reference": "<footer class=\"vfoot\">\n  <div class=\"contact\"><p class=\"lbl\">Say hello</p><a class=\"mail\" href=\"#\">studio@velpi.net</a><p class=\"addr\">14 Kiln Lane<br>Lisbon, PT</p></div>\n  <div class=\"group\"><span class=\"vlab\">Explore</span><nav><a href=\"#\">Work</a><a href=\"#\">Studio</a><a href=\"#\">Journal</a></nav></div>\n  <div class=\"group\"><span class=\"vlab\">Social</span><nav><a href=\"#\">Instagram</a><a href=\"#\">Are.na</a><a href=\"#\">LinkedIn</a></nav></div>\n  <div class=\"copy\">© Velpi Studio</div>\n  <style>\n    .vfoot{background:#f3f1ec;color:#1c1a15;font-family:system-ui;padding:8vh 5vw 4vh;display:grid;grid-template-columns:2fr 1fr 1fr;gap:3rem;align-items:start}\n    .lbl{letter-spacing:.2em;text-transform:uppercase;font-size:.72rem;color:#8a8272}\n    .mail{display:inline-block;font-size:clamp(1.6rem,4vw,3rem);color:#1c1a15;text-decoration:none;border-bottom:2px solid #1c1a15;margin:.4rem 0 1.4rem}\n    .addr{color:#6a6355;line-height:1.6;margin:0}\n    .group{display:flex;gap:1rem}\n    .vlab{writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.2em;text-transform:uppercase;font-size:.7rem;color:#a39a86}\n    .group nav{display:flex;flex-direction:column;gap:.7rem}\n    .group a{color:#3a352c;text-decoration:none}\n    .copy{grid-column:1/-1;border-top:1px solid #ddd8cd;padding-top:1.6rem;font-size:.8rem;color:#8a8272}\n    @media(max-width:700px){.vfoot{grid-template-columns:1fr 1fr}.contact{grid-column:1/-1}}\n  </style>\n</footer>"
+    },
+    {
+      "id": "velpi--card--horizontal-split-media",
+      "file": "velpi--card--horizontal-split-media.html",
+      "name": "Horizontal Split-Media Card",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "card",
+      "framework": "html-css",
+      "niches": [
+        "blog",
+        "ecommerce",
+        "real-estate",
+        "events",
+        "listings"
+      ],
+      "summary": "A single wide card split into a cover image and a copy panel with a corner-tucked meta badge and a baseline-aligned action row.",
+      "reference": "<article class=\"hcard\">\n  <div class=\"media\"><img src=\"#\" alt=\"[image]\"><span class=\"badge\">New</span></div>\n  <div class=\"body\">\n    <p class=\"kicker\">Field Notes · 6 min read</p>\n    <h3>Designing for the quiet moments between clicks</h3>\n    <p class=\"ex\">Micro-interactions rarely announce themselves, yet they carry the feel of a whole product. Here's how we tune them.</p>\n    <div class=\"row\"><div class=\"author\"><span class=\"av\"></span><span>By R. Okoro</span></div><a href=\"#\">Read →</a></div>\n  </div>\n  <style>\n    .hcard{display:grid;grid-template-columns:5fr 7fr;background:#fff;border:1px solid #e8e9ee;border-radius:20px;overflow:hidden;max-width:820px;margin:4vh auto;font-family:system-ui;box-shadow:0 18px 40px rgba(30,34,60,.08)}\n    .media{position:relative}\n    .media img{width:100%;height:100%;object-fit:cover;display:block;min-height:220px;background:#dfe3ee}\n    .badge{position:absolute;top:1rem;left:1rem;background:#12131a;color:#fff;font-size:.72rem;padding:.3rem .7rem;border-radius:99px}\n    .body{padding:2rem 2.2rem;display:flex;flex-direction:column}\n    .kicker{color:#8a8fa0;font-size:.82rem;letter-spacing:.03em;margin:0 0 .6rem}\n    .body h3{font-size:1.5rem;line-height:1.2;margin:0 0 .8rem}\n    .ex{color:#5a606d;line-height:1.6;margin:0 0 1.4rem}\n    .row{margin-top:auto;display:flex;justify-content:space-between;align-items:center}\n    .author{display:flex;align-items:center;gap:.6rem;font-size:.9rem;color:#3a3f4b}\n    .av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#8a9bff,#c58aff)}\n    .row a{color:#4f5bff;text-decoration:none;font-weight:600}\n    @media(max-width:640px){.hcard{grid-template-columns:1fr}}\n  </style>\n</article>"
+    },
+    {
+      "id": "velpi--card--stacked-profile-tilt",
+      "file": "velpi--card--stacked-profile-tilt.html",
+      "name": "Stacked Tilt Profile Card",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "card",
+      "framework": "html-css",
+      "niches": [
+        "team",
+        "portfolio",
+        "agency",
+        "personal-brand",
+        "creative"
+      ],
+      "summary": "A profile card with a rotated color plate peeking behind the photo and an overlapping detail strip, giving a layered stacked-paper feel.",
+      "reference": "<article class=\"pcard\">\n  <div class=\"stack\">\n    <div class=\"plate\"></div>\n    <img src=\"#\" alt=\"[image]\">\n    <div class=\"strip\"><strong>Nadia Rehm</strong><span>Creative Director</span></div>\n  </div>\n  <p class=\"bio\">Fifteen years turning fuzzy briefs into brands people remember. Formerly at two studios you've heard of.</p>\n  <div class=\"tags\"><span>Branding</span><span>Art direction</span><span>Type</span></div>\n  <style>\n    .pcard{width:300px;margin:5vh auto;font-family:system-ui;color:#1a1c22}\n    .stack{position:relative;margin-bottom:2.4rem}\n    .plate{position:absolute;inset:0;background:#ffd15c;border-radius:18px;transform:rotate(-5deg)}\n    .stack img{position:relative;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:18px;display:block;background:#cbd0dd}\n    .strip{position:absolute;left:1rem;right:1rem;bottom:-1.6rem;background:#12131a;color:#fff;border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;box-shadow:0 12px 24px rgba(0,0,0,.2)}\n    .strip strong{font-size:1.05rem}\n    .strip span{font-size:.8rem;color:#a7abbd}\n    .bio{color:#565b67;line-height:1.6;font-size:.95rem}\n    .tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}\n    .tags span{font-size:.75rem;background:#f0f1f5;border:1px solid #e2e4ea;padding:.3rem .7rem;border-radius:99px;color:#4a4f5b}\n  </style>\n</article>"
+    },
+    {
+      "id": "velpi--features--timeline-connected-process",
+      "file": "velpi--features--timeline-connected-process.html",
+      "name": "Connected-Line Process Timeline",
+      "source": "velpi original",
+      "license": "velpi original (MIT)",
+      "category": "features",
+      "framework": "html-css",
+      "niches": [
+        "agency",
+        "consulting",
+        "services",
+        "onboarding",
+        "b2b"
+      ],
+      "summary": "A horizontal process timeline with a connecting line threaded through alternating above/below step cards anchored to node dots.",
+      "reference": "<section class=\"tl\">\n  <h2>How an engagement runs</h2>\n  <div class=\"track\">\n    <div class=\"line\"></div>\n    <div class=\"node up\"><span class=\"dot\"></span><div class=\"box\"><h3>01 Discover</h3><p>We map the terrain and the real problem.</p></div></div>\n    <div class=\"node down\"><span class=\"dot\"></span><div class=\"box\"><h3>02 Shape</h3><p>Directions, not decks. We pick a bet.</p></div></div>\n    <div class=\"node up\"><span class=\"dot\"></span><div class=\"box\"><h3>03 Build</h3><p>Tight loops, weekly shippable proof.</p></div></div>\n    <div class=\"node down\"><span class=\"dot\"></span><div class=\"box\"><h3>04 Launch</h3><p>We hand off something you can run.</p></div></div>\n  </div>\n  <style>\n    .tl{padding:9vh 5vw;background:#fbfbfd;color:#191c22;font-family:system-ui;text-align:center}\n    .tl>h2{font-size:clamp(1.8rem,4vw,2.8rem);margin:0 0 4rem}\n    .track{position:relative;display:grid;grid-template-columns:repeat(4,1fr);max-width:1000px;margin:0 auto;padding:6rem 0}\n    .line{position:absolute;left:0;right:0;top:50%;height:2px;background:#d7dae3}\n    .node{position:relative;display:flex;justify-content:center}\n    .dot{position:absolute;top:50%;transform:translate(-50%,-50%);left:50%;width:16px;height:16px;border-radius:50%;background:#4f5bff;border:3px solid #fbfbfd;box-shadow:0 0 0 2px #4f5bff}\n    .box{position:absolute;width:80%;background:#fff;border:1px solid #e6e8ef;border-radius:14px;padding:1rem 1.2rem;text-align:left;box-shadow:0 12px 26px rgba(30,34,60,.08)}\n    .up .box{bottom:calc(50% + 34px)}\n    .down .box{top:calc(50% + 34px)}\n    .box h3{margin:0 0 .3rem;font-size:1rem}\n    .box p{margin:0;font-size:.85rem;color:#5a606d;line-height:1.5}\n    @media(max-width:760px){.track{grid-template-columns:1fr;padding:0}.line{left:8px;right:auto;top:0;bottom:0;width:2px;height:auto}.node{justify-content:flex-start;padding:1.2rem 0 1.2rem 2.4rem}.dot{left:8px;top:1.8rem}.box{position:static;width:100%}}\n  </style>\n</section>"
     }
   ]
 }
