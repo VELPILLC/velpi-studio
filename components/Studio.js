@@ -651,6 +651,65 @@ function extractLogoColors(dataUrl) {
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
 
+      // ── CIL Stages 1→2→3→4→5 (Understanding → Strategy → Creative Director → Blueprint → Validator) — SHADOW ONLY ──
+      // Fire-and-forget: never awaited, never sets state, never touches the
+      // shipped output or the legacy pipeline. Gated by NEXT_PUBLIC_CIL_MODE
+      // (each server route re-checks CIL_MODE, so BOTH flags must be enabled).
+      // Off by default → this block is inert. Stage 5 consumes the fully
+      // assembled Blueprint (+ context) and reports; it never modifies it.
+      // Nothing downstream consumes any of them. Logs only.
+      try {
+        const cilMode = (process.env.NEXT_PUBLIC_CIL_MODE || '').toLowerCase()
+        if (cilMode && cilMode !== 'off' && cilMode !== 'legacy') {
+          const cilRunId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `run_${Date.now()}`
+          callRoute('/api/creative/understand', { scrapedData, analysis })
+            .then(u => {
+              try { console.log('[CIL:shadow] understanding', u) } catch (_) {}
+              if (!(u?.ok && u.understanding)) return
+              return callRoute('/api/creative/strategize', { understanding: u.understanding })
+                .then(s => {
+                  try { console.log('[CIL:shadow] strategy', s) } catch (_) {}
+                  if (!(s?.ok && s.strategy)) return
+                  return callRoute('/api/creative/direct', { strategy: s.strategy })
+                    .then(d => {
+                      try { console.log('[CIL:shadow] creative_director', d) } catch (_) {}
+                      if (!(d?.ok && d.director)) return
+                      return callRoute('/api/creative/blueprint', {
+                        director: d.director, strategy: s.strategy,
+                        palette: analysis.color_palette, industry: analysis.industry,
+                      }).then(b => {
+                        try { console.log('[CIL:shadow] blueprint', b) } catch (_) {}
+                        if (!(b?.ok && b.blueprint)) return
+                        return callRoute('/api/creative/validate', {
+                          blueprint: b.blueprint, director: d.director, strategy: s.strategy,
+                          palette: analysis.color_palette, industry: analysis.industry,
+                        }).then(v => {
+                          try { console.log('[CIL:shadow] validation', v) } catch (_) {}
+                          // Assemble all five stages into one versioned CDO for the dashboard.
+                          return callRoute('/api/creative/assemble', {
+                            runId: cilRunId,
+                            businessName: analysis.business_name || '',
+                            niche: analysis.industry || '',
+                            tier: s.strategy?.creative_direction?.premium_tier || '',
+                            stages: {
+                              understanding: u.understanding, strategy: s.strategy, director: d.director,
+                              blueprint: b.blueprint, seedDefaults: b.seedDefaults,
+                              validation: v?.ok ? { validation: v.validation, internal_critique: v.internal_critique, confidence: v.confidence, revisions: v.revisions } : null,
+                            },
+                            metas: {
+                              understanding: u.meta, strategy: s.meta, creative_director: d.meta,
+                              blueprint: b.meta, validation: v?.meta,
+                            },
+                          }).then(a => { try { console.log('[CIL:shadow] assembled', a?.directive?.rollup) } catch (_) {} })
+                        })
+                      })
+                    })
+                })
+            })
+            .catch(err => { try { console.warn('[CIL:shadow] chain failed:', err?.message) } catch (_) {} })
+        }
+      } catch (_) { /* shadow must never affect the run */ }
+
       const inv = analysis.image_inventory || []
       const photoSlots = inv
         .map((item, i) => ({ item, id: slotIdFor(item, i) }))
