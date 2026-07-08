@@ -1375,6 +1375,11 @@ function extractLogoColors(dataUrl) {
                 </span>
               </div>
             </div>
+            {/* Developer Review Panel (dev only) — below the preview, above the refine input */}
+            {isDevReviewClient() && (
+              <ReviewPanel runId={cilRunId} projectId={cilProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
+            )}
+
             {/* Refine chat */}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <input
@@ -1597,10 +1602,6 @@ function extractLogoColors(dataUrl) {
               {savingProject ? 'Saving…' : '💾 Save to Library'}
             </button>
           </div>
-
-          {isDevReviewClient() && (
-            <ReviewPanel runId={cilRunId} projectId={cilProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
-          )}
         </div>
       )}
 
