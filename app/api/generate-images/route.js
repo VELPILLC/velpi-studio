@@ -171,6 +171,13 @@ export async function POST(request) {
     if (!warning && failures.some(f => /401|incorrect api key|invalid api key/i.test(f.reason || ''))) {
       warning = 'Your OpenAI API key was rejected (401) — no images were actually enhanced or generated this run; photo slots fell back to the original unedited photos. Update OPENAI_API_KEY (on Vercel: Settings → Environment Variables, then redeploy; locally: .env.local, then restart), then use Regenerate on the slots.'
     }
+    // A billing hard limit also fails every call — same silent-fallback risk as
+    // a bad key (enhance/generate quietly degrade to the original photo with a
+    // green "complete" step and no visible error), so it gets the same loud
+    // treatment instead of hiding behind a clean-looking run.
+    if (!warning && failures.some(f => /billing_hard_limit_reached|billing hard limit|hard limit has been reached/i.test(f.reason || ''))) {
+      warning = 'Your OpenAI account has hit its billing hard limit — no images were actually enhanced or generated this run; photo slots fell back to the original unedited photos. Raise or remove the limit at platform.openai.com/account/billing/limits (or add a payment method), then use Regenerate on the slots.'
+    }
 
     // Attestation: proves whether the image API was actually called this run
     // (and how), instead of trusting a green checkmark in the UI.

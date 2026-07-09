@@ -1,6 +1,6 @@
 @echo off
 title Velpi Studio
-cd /d "C:\Users\angel\velpi-studio"
+cd /d "C:\Users\angel\VELPI STUDIO"
 echo ============================================
 echo   VELPI STUDIO
 echo ============================================

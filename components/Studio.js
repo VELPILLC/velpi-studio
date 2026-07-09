@@ -4,6 +4,8 @@ import { pickCreativeMix } from '../lib/designStyles'
 import { pickSignatureMotion } from '../lib/motionPresets'
 import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
+import ReviewPanel from './dev/ReviewPanel'
+import { isDevReviewClient } from '../lib/creative/flags.mjs'
 
 // Vibe question data — kept only so vibeSummary() can reconstruct a readable
 // summary from a LOADED project's saved vibe answers. There is no manual entry
@@ -292,6 +294,12 @@ export default function Studio() {
   const [styleId] = useState('auto')
   const [matchedStyleName, setMatchedStyleName] = useState('')
 
+  // ── Dev Review System (development only) — a build id for every generation,
+  // independent of the Creative Intelligence Layer (set unconditionally below,
+  // whether or not CIL shadow mode is on), plus the auto-saved project id. ──
+  const [reviewBuildId, setReviewBuildId] = useState(null)
+  const [reviewProjectId, setReviewProjectId] = useState(null)
+
   // ── Results UI ──
   const [showCode, setShowCode] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -353,6 +361,10 @@ export default function Studio() {
       setImagesReady(true)
       setSteps(STEP_DEFS.map(s => ({ ...s, status: 'complete' })))
       setLibraryOpen(false)
+      // A loaded project has no separate "build id" of its own — the project's
+      // id is already a stable, unique identity, so the review attaches to that.
+      setReviewProjectId(id)
+      setReviewBuildId(id)
     } catch (e) {
       setError(`Could not load that project: ${e.message}`)
     } finally {
@@ -570,6 +582,13 @@ function extractLogoColors(dataUrl) {
     if (!readyToGenerate || generating) return
     setError(null)
     setBuilt(false)
+    // A build id exists for every generation, independent of CIL — this is
+    // what the Dev Review Panel attaches reviews to. Declared as a local const
+    // (not just state) so the rest of this function can use the real value
+    // immediately instead of a stale render's state.
+    const buildId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `build_${Date.now()}`
+    setReviewBuildId(buildId)
+    setReviewProjectId(null)
     setImagesReady(false)
     setHtmlTemplate(null)
     setAnalysisData(null)
@@ -650,6 +669,67 @@ function extractLogoColors(dataUrl) {
       setBizName(analysis.business_name || '')
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
+
+      // ── CIL Stages 1→2→3→4→5 (Understanding → Strategy → Creative Director → Blueprint → Validator) — SHADOW ONLY ──
+      // Fire-and-forget: never awaited, never sets state, never touches the
+      // shipped output or the legacy pipeline. Gated by NEXT_PUBLIC_CIL_MODE
+      // (each server route re-checks CIL_MODE, so BOTH flags must be enabled).
+      // Off by default → this block is inert. Stage 5 consumes the fully
+      // assembled Blueprint (+ context) and reports; it never modifies it.
+      // Nothing downstream consumes any of them. Logs only.
+      try {
+        const cilMode = (process.env.NEXT_PUBLIC_CIL_MODE || '').toLowerCase()
+        if (cilMode && cilMode !== 'off' && cilMode !== 'legacy') {
+          // Reuse the same build id so a CDO (if one gets assembled) and this
+          // build's review always share one identity — no separate id needed.
+          const cilRunId = buildId
+          callRoute('/api/creative/understand', { scrapedData, analysis })
+            .then(u => {
+              try { console.log('[CIL:shadow] understanding', u) } catch (_) {}
+              if (!(u?.ok && u.understanding)) return
+              return callRoute('/api/creative/strategize', { understanding: u.understanding })
+                .then(s => {
+                  try { console.log('[CIL:shadow] strategy', s) } catch (_) {}
+                  if (!(s?.ok && s.strategy)) return
+                  return callRoute('/api/creative/direct', { strategy: s.strategy })
+                    .then(d => {
+                      try { console.log('[CIL:shadow] creative_director', d) } catch (_) {}
+                      if (!(d?.ok && d.director)) return
+                      return callRoute('/api/creative/blueprint', {
+                        director: d.director, strategy: s.strategy,
+                        palette: analysis.color_palette, industry: analysis.industry,
+                      }).then(b => {
+                        try { console.log('[CIL:shadow] blueprint', b) } catch (_) {}
+                        if (!(b?.ok && b.blueprint)) return
+                        return callRoute('/api/creative/validate', {
+                          blueprint: b.blueprint, director: d.director, strategy: s.strategy,
+                          palette: analysis.color_palette, industry: analysis.industry,
+                        }).then(v => {
+                          try { console.log('[CIL:shadow] validation', v) } catch (_) {}
+                          // Assemble all five stages into one versioned CDO for the dashboard.
+                          return callRoute('/api/creative/assemble', {
+                            runId: cilRunId,
+                            businessName: analysis.business_name || '',
+                            niche: analysis.industry || '',
+                            tier: s.strategy?.creative_direction?.premium_tier || '',
+                            stages: {
+                              understanding: u.understanding, strategy: s.strategy, director: d.director,
+                              blueprint: b.blueprint, seedDefaults: b.seedDefaults,
+                              validation: v?.ok ? { validation: v.validation, internal_critique: v.internal_critique, confidence: v.confidence, revisions: v.revisions } : null,
+                            },
+                            metas: {
+                              understanding: u.meta, strategy: s.meta, creative_director: d.meta,
+                              blueprint: b.meta, validation: v?.meta,
+                            },
+                          }).then(a => { try { console.log('[CIL:shadow] assembled', a?.directive?.rollup) } catch (_) {} })
+                        })
+                      })
+                    })
+                })
+            })
+            .catch(err => { try { console.warn('[CIL:shadow] chain failed:', err?.message) } catch (_) {} })
+        }
+      } catch (_) { /* shadow must never affect the run */ }
 
       const inv = analysis.image_inventory || []
       const photoSlots = inv
@@ -853,6 +933,7 @@ function extractLogoColors(dataUrl) {
         }
         const name = `${analysis.business_name || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
         const { project } = await callRoute('/api/projects', { name, data: projData })
+        setReviewProjectId(project.id)
         setProjects(prev => [{ ...project, thumb }, ...prev])
         setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
         setTimeout(() => setSavedMsg(null), 5000)
@@ -890,6 +971,15 @@ function extractLogoColors(dataUrl) {
       const { images } = await callRoute('/api/generate-images', { analysis: { ...analysisData, image_inventory: [item] } })
       const asset = (images?.assets || []).find(a => a.id === slot.id)
       if (asset?.src) setAssetsById(prev => ({ ...prev, [slot.id]: asset.src }))
+      // A 200 response can still mean this slot silently produced nothing (e.g.
+      // a billing-limit or bad-key failure on a from-scratch "generate" item has
+      // no photo to fall back to) — surface the same warning the main
+      // generation flow reads instead of leaving the click looking like a no-op.
+      if (images?.warning) setError(images.warning)
+      else if (!asset?.src) {
+        const reason = images?.meta?.failures?.find(f => f.id === slot.id)?.reason
+        setError(`Regenerate failed for "${slot.name}"${reason ? `: ${reason}` : ''}.`)
+      }
     } catch (e) {
       setError(`Regenerate failed: ${e.message}`)
     } finally {
@@ -1305,6 +1395,11 @@ function extractLogoColors(dataUrl) {
                 </span>
               </div>
             </div>
+            {/* Developer Review Panel (dev only) — below the preview, above the refine input */}
+            {isDevReviewClient() && (
+              <ReviewPanel buildId={reviewBuildId} projectId={reviewProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
+            )}
+
             {/* Refine chat */}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <input

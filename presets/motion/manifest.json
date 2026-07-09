@@ -544,6 +544,451 @@
       ],
       "summary": "The classic interactive particle network - floating dots linked by fading lines (JS; CSS port is an ambient constellation)",
       "snippet": "<style>.vm-tsparticles-links-wrap{position:relative;overflow:hidden}.vm-tsparticles-links-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.vm-tsparticles-links-svg g{animation:vm-tspl-float 12s ease-in-out infinite}.vm-tsparticles-links-svg g:nth-of-type(2){animation-delay:-4s;animation-duration:15s}.vm-tsparticles-links-svg g:nth-of-type(3){animation-delay:-8s;animation-duration:10s}.vm-tsparticles-links-svg line{stroke:color-mix(in srgb, var(--vm-c1) 28%, transparent);stroke-width:.15;animation:vm-tspl-linkfade 6s ease-in-out infinite}.vm-tsparticles-links-svg line:nth-of-type(2n){animation-delay:2s}.vm-tsparticles-links-svg line:nth-of-type(3n){animation-delay:4s}.vm-tsparticles-links-svg circle{fill:color-mix(in srgb, var(--vm-c1) 75%, white);opacity:.6}.vm-tsparticles-links-svg circle:nth-of-type(2n){fill:color-mix(in srgb, var(--vm-c2) 75%, white)}@keyframes vm-tspl-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}@keyframes vm-tspl-linkfade{0%,100%{opacity:.15}50%{opacity:.7}}@media (prefers-reduced-motion: reduce){.vm-tsparticles-links-svg g,.vm-tsparticles-links-svg line{animation:none}}</style><div class=\"vm-tsparticles-links-wrap\"><svg class=\"vm-tsparticles-links-svg\" viewBox=\"0 0 100 60\" preserveAspectRatio=\"xMidYMid slice\" aria-hidden=\"true\"><line x1=\"15\" y1=\"45\" x2=\"32\" y2=\"22\"/><line x1=\"32\" y1=\"22\" x2=\"55\" y2=\"40\"/><line x1=\"55\" y1=\"40\" x2=\"72\" y2=\"14\"/><line x1=\"72\" y1=\"14\" x2=\"88\" y2=\"35\"/><line x1=\"15\" y1=\"45\" x2=\"55\" y2=\"40\"/><line x1=\"32\" y1=\"22\" x2=\"72\" y2=\"14\"/><g><circle cx=\"15\" cy=\"45\" r=\".7\"/><circle cx=\"72\" cy=\"14\" r=\".6\"/></g><g><circle cx=\"32\" cy=\"22\" r=\".8\"/><circle cx=\"88\" cy=\"35\" r=\".6\"/></g><g><circle cx=\"55\" cy=\"40\" r=\".7\"/><circle cx=\"8\" cy=\"14\" r=\".5\"/><circle cx=\"93\" cy=\"52\" r=\".5\"/></g></svg><!-- content, position:relative;z-index:1 --></div>"
+    },
+    {
+      "id": "conic-halo",
+      "file": "inline (css-only, see snippet)",
+      "name": "Conic Halo",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "tech",
+        "saas",
+        "creative",
+        "agency",
+        "medical",
+        "finance",
+        "consulting"
+      ],
+      "summary": "A slow-rotating conic glow that keeps a soft moving halo behind the hero",
+      "snippet": "<style>.vm-conic-halo-wrap{position:relative;overflow:hidden}.vm-conic-halo-bg{position:absolute;inset:-30%;pointer-events:none;filter:blur(50px);opacity:.5;background:conic-gradient(from 0deg at 50% 45%,transparent 0deg,color-mix(in srgb,var(--vm-c1) 40%,transparent) 60deg,transparent 140deg,color-mix(in srgb,var(--vm-c2) 40%,transparent) 220deg,transparent 320deg);animation:vm-conic-spin 34s linear infinite}@keyframes vm-conic-spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.vm-conic-halo-bg{animation:none}}</style><div class=\"vm-conic-halo-wrap\"><div class=\"vm-conic-halo-bg\"></div><!-- section content here: position:relative;z-index:1 --></div>"
+    },
+    {
+      "id": "mesh-morph",
+      "file": "inline (css-only, see snippet)",
+      "name": "Mesh Morph",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "tech",
+        "saas",
+        "startup",
+        "wellness",
+        "spa",
+        "creative",
+        "ai"
+      ],
+      "summary": "Four soft color blobs that slowly morph and drift like a living mesh gradient",
+      "snippet": "<style>.vm-mesh-morph-wrap{position:relative;overflow:hidden}.vm-mesh-morph-bg{position:absolute;inset:-25%;pointer-events:none;filter:blur(70px);opacity:.5;background:radial-gradient(30% 35% at 20% 25%,var(--vm-c1),transparent 60%),radial-gradient(35% 40% at 80% 20%,var(--vm-c2),transparent 62%),radial-gradient(40% 45% at 65% 80%,var(--vm-c1),transparent 60%),radial-gradient(35% 40% at 25% 75%,var(--vm-c2),transparent 60%);animation:vm-mesh-morph 30s ease-in-out infinite alternate}@keyframes vm-mesh-morph{0%{transform:scale(1) translate(0,0)}50%{transform:scale(1.15) translate(2%,-2%)}100%{transform:scale(1.05) translate(-2%,2%)}}@media (prefers-reduced-motion:reduce){.vm-mesh-morph-bg{animation:none}}</style><div class=\"vm-mesh-morph-wrap\"><div class=\"vm-mesh-morph-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "grain-veil",
+      "file": "inline (css-only, see snippet)",
+      "name": "Grain Veil",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "photography",
+        "editorial",
+        "fashion",
+        "studio",
+        "creative",
+        "luxury",
+        "music"
+      ],
+      "summary": "A faint animated film-grain texture over a section for tactile editorial depth",
+      "snippet": "<style>.vm-grain-veil-wrap{position:relative;overflow:hidden}.vm-grain-veil-bg{position:absolute;inset:0;pointer-events:none;opacity:.09;mix-blend-mode:overlay;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\");background-size:180px 180px;animation:vm-grain-shift .6s steps(4) infinite}@keyframes vm-grain-shift{0%{background-position:0 0}25%{background-position:-40px 20px}50%{background-position:30px -30px}75%{background-position:-20px 40px}100%{background-position:0 0}}@media (prefers-reduced-motion:reduce){.vm-grain-veil-bg{animation:none}}</style><div class=\"vm-grain-veil-wrap\"><div class=\"vm-grain-veil-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "gradient-flow",
+      "file": "inline (css-only, see snippet)",
+      "name": "Gradient Flow",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "startup",
+        "saas",
+        "app",
+        "marketing",
+        "events",
+        "agency"
+      ],
+      "summary": "A wide brand-color gradient that slowly pans across the section like a slow tide",
+      "snippet": "<style>.vm-gradient-flow-wrap{position:relative;overflow:hidden}.vm-gradient-flow-bg{position:absolute;inset:0;pointer-events:none;opacity:.4;background:linear-gradient(115deg,var(--vm-c1),var(--vm-c2),var(--vm-c1));background-size:280% 280%;filter:blur(2px);animation:vm-gradient-pan 18s ease infinite}@keyframes vm-gradient-pan{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}@media (prefers-reduced-motion:reduce){.vm-gradient-flow-bg{animation:none}}</style><div class=\"vm-gradient-flow-wrap\"><div class=\"vm-gradient-flow-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "floating-orbs",
+      "file": "inline (css-only, see snippet)",
+      "name": "Floating Orbs",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "wellness",
+        "spa",
+        "salon",
+        "tech",
+        "kids",
+        "creative",
+        "childcare"
+      ],
+      "summary": "A few soft blurred brand-color orbs drifting slowly at different speeds",
+      "snippet": "<style>.vm-floating-orbs-wrap{position:relative;overflow:hidden}.vm-floating-orbs-bg{position:absolute;inset:0;pointer-events:none}.vm-floating-orbs-bg span{position:absolute;border-radius:50%;filter:blur(40px);opacity:.45}.vm-floating-orbs-bg span:nth-child(1){width:280px;height:280px;left:8%;top:15%;background:var(--vm-c1);animation:vm-orb-a 22s ease-in-out infinite alternate}.vm-floating-orbs-bg span:nth-child(2){width:220px;height:220px;right:12%;top:30%;background:var(--vm-c2);animation:vm-orb-b 26s ease-in-out infinite alternate}.vm-floating-orbs-bg span:nth-child(3){width:200px;height:200px;left:40%;bottom:5%;background:var(--vm-c1);animation:vm-orb-a 30s ease-in-out infinite alternate}@keyframes vm-orb-a{to{transform:translate(6%,-8%) scale(1.15)}}@keyframes vm-orb-b{to{transform:translate(-8%,6%) scale(1.1)}}@media (prefers-reduced-motion:reduce){.vm-floating-orbs-bg span{animation:none}}</style><div class=\"vm-floating-orbs-wrap\"><div class=\"vm-floating-orbs-bg\"><span></span><span></span><span></span></div><!-- content --></div>"
+    },
+    {
+      "id": "starfield-drift",
+      "file": "inline (css-only, see snippet)",
+      "name": "Starfield Drift",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "tech",
+        "saas",
+        "music",
+        "nightlife",
+        "esports",
+        "ai",
+        "gaming"
+      ],
+      "summary": "A faint field of tiny points slowly panning like a slow starfield behind dark heroes",
+      "snippet": "<style>.vm-starfield-drift-wrap{position:relative;overflow:hidden}.vm-starfield-drift-bg{position:absolute;inset:-50px;pointer-events:none;opacity:.5;background-image:radial-gradient(1.5px 1.5px at 20px 30px,var(--vm-c1),transparent),radial-gradient(1.5px 1.5px at 120px 80px,var(--vm-c2),transparent),radial-gradient(1px 1px at 70px 160px,var(--vm-c1),transparent),radial-gradient(1.5px 1.5px at 180px 120px,var(--vm-c2),transparent);background-size:200px 200px;animation:vm-star-pan 60s linear infinite}@keyframes vm-star-pan{to{background-position:200px 200px}}@media (prefers-reduced-motion:reduce){.vm-starfield-drift-bg{animation:none}}</style><div class=\"vm-starfield-drift-wrap\"><div class=\"vm-starfield-drift-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "diagonal-sheen",
+      "file": "inline (css-only, see snippet)",
+      "name": "Diagonal Sheen",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "luxury",
+        "real estate",
+        "auto",
+        "jewelry",
+        "finance",
+        "watches"
+      ],
+      "summary": "A single soft light bar that sweeps diagonally across the section every few seconds",
+      "snippet": "<style>.vm-diagonal-sheen-wrap{position:relative;overflow:hidden}.vm-diagonal-sheen-bg{position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 30%,color-mix(in srgb,var(--vm-c1) 30%,transparent) 48%,color-mix(in srgb,var(--vm-c2) 22%,transparent) 52%,transparent 70%);background-size:250% 250%;animation:vm-sheen-sweep 9s ease-in-out infinite}@keyframes vm-sheen-sweep{0%{background-position:120% 0}60%,100%{background-position:-40% 0}}@media (prefers-reduced-motion:reduce){.vm-diagonal-sheen-bg{animation:none;opacity:.4}}</style><div class=\"vm-diagonal-sheen-wrap\"><div class=\"vm-diagonal-sheen-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "contour-lines",
+      "file": "inline (css-only, see snippet)",
+      "name": "Contour Lines",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "outdoor",
+        "travel",
+        "architecture",
+        "consulting",
+        "wellness",
+        "finance"
+      ],
+      "summary": "Faint topographic contour rings that slowly breathe and drift behind content",
+      "snippet": "<style>.vm-contour-lines-wrap{position:relative;overflow:hidden}.vm-contour-lines-bg{position:absolute;inset:-20%;pointer-events:none;opacity:.12;background:repeating-radial-gradient(circle at 30% 40%,transparent 0 18px,var(--vm-c1) 18px 19px,transparent 19px 40px);animation:vm-contour-drift 40s ease-in-out infinite alternate}@keyframes vm-contour-drift{to{transform:translate(4%,3%) scale(1.08)}}@media (prefers-reduced-motion:reduce){.vm-contour-lines-bg{animation:none}}</style><div class=\"vm-contour-lines-wrap\"><div class=\"vm-contour-lines-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "plasma-drift",
+      "file": "inline (css-only, see snippet)",
+      "name": "Plasma Drift",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "bold",
+      "dependency": "css-only",
+      "niches": [
+        "music",
+        "nightlife",
+        "gym",
+        "esports",
+        "events",
+        "creative",
+        "festival"
+      ],
+      "summary": "Saturated brand-color plasma clouds drifting and shifting hue for high-energy heroes",
+      "snippet": "<style>.vm-plasma-drift-wrap{position:relative;overflow:hidden}.vm-plasma-drift-bg{position:absolute;inset:-30%;pointer-events:none;opacity:.55;filter:blur(48px) saturate(1.2);background:radial-gradient(40% 50% at 30% 30%,var(--vm-c1),transparent 60%),radial-gradient(45% 55% at 70% 40%,var(--vm-c2),transparent 62%),radial-gradient(50% 60% at 50% 75%,var(--vm-c1),transparent 60%);animation:vm-plasma-move 20s ease-in-out infinite alternate}@keyframes vm-plasma-move{0%{transform:translate(-3%,-2%) scale(1)}100%{transform:translate(4%,3%) scale(1.2)}}@media (prefers-reduced-motion:reduce){.vm-plasma-drift-bg{animation:none}}</style><div class=\"vm-plasma-drift-wrap\"><div class=\"vm-plasma-drift-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "scanline-glow",
+      "file": "inline (css-only, see snippet)",
+      "name": "Scanline Glow",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "background",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "tech",
+        "cybersecurity",
+        "esports",
+        "gaming",
+        "ai",
+        "streetwear"
+      ],
+      "summary": "Faint CRT scanlines with a soft highlight bar sweeping down — retro-tech energy",
+      "snippet": "<style>.vm-scanline-glow-wrap{position:relative;overflow:hidden}.vm-scanline-glow-bg{position:absolute;inset:0;pointer-events:none;opacity:.5;background:repeating-linear-gradient(0deg,transparent 0 3px,color-mix(in srgb,var(--vm-c1) 12%,transparent) 3px 4px)}.vm-scanline-glow-bg::after{content:\"\";position:absolute;left:0;right:0;height:38%;top:-40%;background:linear-gradient(transparent,color-mix(in srgb,var(--vm-c2) 30%,transparent),transparent);animation:vm-scan-move 6s linear infinite}@keyframes vm-scan-move{0%{top:-40%}100%{top:100%}}@media (prefers-reduced-motion:reduce){.vm-scanline-glow-bg::after{animation:none;display:none}}</style><div class=\"vm-scanline-glow-wrap\"><div class=\"vm-scanline-glow-bg\"></div><!-- content --></div>"
+    },
+    {
+      "id": "gradient-text-flow",
+      "file": "inline (css-only, see snippet)",
+      "name": "Gradient Text Flow",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "text-effect",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "saas",
+        "startup",
+        "creative",
+        "agency",
+        "marketing",
+        "ai"
+      ],
+      "summary": "An animated brand gradient that flows through a headline or accent word",
+      "snippet": "<style>.vm-gradient-text-flow{background:linear-gradient(100deg,var(--vm-c1),var(--vm-c2),var(--vm-c1));background-size:220% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:vm-text-flow 6s linear infinite}@keyframes vm-text-flow{to{background-position:220% center}}@media (prefers-reduced-motion:reduce){.vm-gradient-text-flow{animation:none}}</style><!-- apply class=\"vm-gradient-text-flow\" to a headline or the accent word inside it -->"
+    },
+    {
+      "id": "glitch-text",
+      "file": "inline (css-only, see snippet)",
+      "name": "Glitch Text",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "text-effect",
+      "intensity": "bold",
+      "dependency": "css-only",
+      "niches": [
+        "streetwear",
+        "music",
+        "esports",
+        "gaming",
+        "tattoo",
+        "nightlife"
+      ],
+      "summary": "A subtle chromatic RGB-split glitch that fires occasionally on a headline",
+      "snippet": "<style>.vm-glitch-text{position:relative;display:inline-block}.vm-glitch-text::before,.vm-glitch-text::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%;overflow:hidden;pointer-events:none}.vm-glitch-text::before{color:var(--vm-c1);clip-path:inset(0 0 55% 0);animation:vm-glitch-a 2.6s steps(2) infinite}.vm-glitch-text::after{color:var(--vm-c2);clip-path:inset(55% 0 0 0);animation:vm-glitch-b 3.2s steps(2) infinite}@keyframes vm-glitch-a{0%,92%,100%{transform:translate(0)}94%{transform:translate(-2px,-1px)}96%{transform:translate(2px,1px)}}@keyframes vm-glitch-b{0%,90%,100%{transform:translate(0)}93%{transform:translate(2px,1px)}97%{transform:translate(-2px,-1px)}}@media (prefers-reduced-motion:reduce){.vm-glitch-text::before,.vm-glitch-text::after{animation:none;display:none}}</style><!-- markup: <span class=\"vm-glitch-text\" data-text=\"HEADLINE\">HEADLINE</span> -->"
+    },
+    {
+      "id": "typewriter-line",
+      "file": "inline (css-only, see snippet)",
+      "name": "Typewriter Line",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "text-effect",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "tech",
+        "saas",
+        "consulting",
+        "coaching",
+        "portfolio",
+        "agency"
+      ],
+      "summary": "A single line that types itself in on load with a blinking caret",
+      "snippet": "<style>.vm-typewriter-line{display:inline-block;overflow:hidden;white-space:nowrap;border-right:2px solid var(--vm-c1);max-width:100%;animation:vm-type 3.5s steps(30,end) 1 both,vm-caret .8s step-end infinite}@keyframes vm-type{from{width:0}to{width:100%}}@keyframes vm-caret{50%{border-color:transparent}}@media (prefers-reduced-motion:reduce){.vm-typewriter-line{animation:none;width:auto;border-right:none}}</style><!-- apply class to a single-line eyebrow or sub-headline span -->"
+    },
+    {
+      "id": "underline-sweep",
+      "file": "inline (css-only, see snippet)",
+      "name": "Underline Sweep",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "text-effect",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "law",
+        "consulting",
+        "finance",
+        "medical",
+        "editorial",
+        "personal brand"
+      ],
+      "summary": "An accent underline that draws itself left-to-right under the emphasized word",
+      "snippet": "<style>.vm-underline-sweep{position:relative;display:inline}.vm-underline-sweep::after{content:\"\";position:absolute;left:0;bottom:-.08em;height:.12em;width:100%;background:linear-gradient(90deg,var(--vm-c1),var(--vm-c2));transform:scaleX(0);transform-origin:left;animation:vm-underline 1s .3s ease forwards}@keyframes vm-underline{to{transform:scaleX(1)}}@media (prefers-reduced-motion:reduce){.vm-underline-sweep::after{animation:none;transform:scaleX(1)}}</style><!-- wrap the emphasized word: <span class=\"vm-underline-sweep\">word</span> -->"
+    },
+    {
+      "id": "word-rise",
+      "file": "inline (css-only, see snippet)",
+      "name": "Word Rise",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "text-effect",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "agency",
+        "portfolio",
+        "creative",
+        "coaching",
+        "personal brand",
+        "events"
+      ],
+      "summary": "Hero words rise and fade in one after another in a staggered cascade on load",
+      "snippet": "<style>.vm-word-rise>span{display:inline-block;opacity:0;transform:translateY(0.5em);animation:vm-word-rise-in .7s cubic-bezier(.2,.7,.2,1) forwards}.vm-word-rise>span:nth-child(2){animation-delay:.08s}.vm-word-rise>span:nth-child(3){animation-delay:.16s}.vm-word-rise>span:nth-child(4){animation-delay:.24s}.vm-word-rise>span:nth-child(5){animation-delay:.32s}.vm-word-rise>span:nth-child(6){animation-delay:.4s}@keyframes vm-word-rise-in{to{opacity:1;transform:translateY(0)}}@media (prefers-reduced-motion:reduce){.vm-word-rise>span{opacity:1;transform:none;animation:none}}</style><!-- markup: <h1 class=\"vm-word-rise\"><span>Your</span> <span>headline</span> <span>here</span></h1> -->"
+    },
+    {
+      "id": "tilt-hover",
+      "file": "inline (css-only, see snippet)",
+      "name": "Tilt Hover",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "card-effect",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "saas",
+        "product",
+        "tech",
+        "ecommerce",
+        "portfolio",
+        "app"
+      ],
+      "summary": "A card that tilts into a subtle 3D perspective and lifts on hover",
+      "snippet": "<style>.vm-tilt-hover{transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s;transform-style:preserve-3d;will-change:transform}.vm-tilt-hover:hover{transform:perspective(900px) rotateX(4deg) rotateY(-6deg) translateY(-4px);box-shadow:0 24px 50px -18px color-mix(in srgb,var(--vm-c1) 55%,transparent)}@media (prefers-reduced-motion:reduce){.vm-tilt-hover{transition:none}.vm-tilt-hover:hover{transform:translateY(-3px)}}</style><!-- apply class to a feature/product card -->"
+    },
+    {
+      "id": "glow-lift",
+      "file": "inline (css-only, see snippet)",
+      "name": "Glow Lift",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "hover",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "saas",
+        "tech",
+        "startup",
+        "product",
+        "app",
+        "agency"
+      ],
+      "summary": "A card that lifts and reveals a soft brand-color glow ring on hover",
+      "snippet": "<style>.vm-glow-lift{position:relative;transition:transform .3s,box-shadow .3s}.vm-glow-lift::after{content:\"\";position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .3s;box-shadow:0 0 0 1px color-mix(in srgb,var(--vm-c1) 40%,transparent),0 18px 40px -16px color-mix(in srgb,var(--vm-c2) 60%,transparent);pointer-events:none}.vm-glow-lift:hover{transform:translateY(-5px)}.vm-glow-lift:hover::after{opacity:1}@media (prefers-reduced-motion:reduce){.vm-glow-lift{transition:none}.vm-glow-lift:hover{transform:none}}</style><!-- apply class to a card or CTA -->"
+    },
+    {
+      "id": "conic-border-rotate",
+      "file": "inline (css-only, see snippet)",
+      "name": "Conic Border",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "card-effect",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "saas",
+        "tech",
+        "ai",
+        "product",
+        "premium",
+        "startup"
+      ],
+      "summary": "A featured card ringed by a continuously rotating conic gradient border",
+      "snippet": "<style>@property --vm-cbr-a{syntax:'<angle>';initial-value:0deg;inherits:false}.vm-conic-border-rotate{position:relative;border-radius:16px;isolation:isolate}.vm-conic-border-rotate::before{content:\"\";position:absolute;inset:0;border-radius:inherit;padding:1.5px;background:conic-gradient(from var(--vm-cbr-a),var(--vm-c1),var(--vm-c2),var(--vm-c1));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:vm-cbr-spin 5s linear infinite;pointer-events:none}@keyframes vm-cbr-spin{to{--vm-cbr-a:360deg}}@media (prefers-reduced-motion:reduce){.vm-conic-border-rotate::before{animation:none}}</style><!-- apply class to the ONE featured/highlighted card -->"
+    },
+    {
+      "id": "clip-reveal",
+      "file": "inline (css-only, see snippet)",
+      "name": "Clip Reveal",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "scroll-trigger",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "photography",
+        "real estate",
+        "editorial",
+        "luxury",
+        "hospitality"
+      ],
+      "summary": "A hero image or block that unveils with a top-to-bottom curtain wipe on load",
+      "snippet": "<style>.vm-clip-reveal{clip-path:inset(0 0 100% 0);animation:vm-clip-in 1s .2s cubic-bezier(.2,.7,.2,1) forwards}@keyframes vm-clip-in{to{clip-path:inset(0 0 0 0)}}@media (prefers-reduced-motion:reduce){.vm-clip-reveal{clip-path:none;animation:none}}</style><!-- apply to a hero image or a section block for a curtain reveal -->"
+    },
+    {
+      "id": "reveal-on-scroll",
+      "file": "inline (css-only, see snippet)",
+      "name": "Reveal On Scroll",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "scroll-trigger",
+      "intensity": "medium",
+      "dependency": "css-only",
+      "niches": [
+        "consulting",
+        "agency",
+        "saas",
+        "services",
+        "portfolio",
+        "coaching"
+      ],
+      "summary": "Sections fade and rise as they scroll into view using native CSS scroll-driven animation (degrades to fully visible)",
+      "snippet": "<style>.vm-reveal-on-scroll{opacity:1}@supports (animation-timeline:view()){.vm-reveal-on-scroll{opacity:0;transform:translateY(24px);animation:vm-ros-in linear both;animation-timeline:view();animation-range:entry 0% entry 45%}@keyframes vm-ros-in{to{opacity:1;transform:none}}}@media (prefers-reduced-motion:reduce){.vm-reveal-on-scroll{opacity:1!important;transform:none!important;animation:none!important}}</style><!-- apply to each section or card; native scroll-driven, no JS, safely visible where unsupported -->"
+    },
+    {
+      "id": "parallax-scroll",
+      "file": "inline (css-only, see snippet)",
+      "name": "Parallax Scroll",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "scroll-trigger",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "real estate",
+        "hospitality",
+        "travel",
+        "luxury",
+        "photography"
+      ],
+      "summary": "A framed image that drifts vertically against the scroll for subtle depth (native scroll-driven, no JS)",
+      "snippet": "<style>.vm-parallax-scroll{opacity:1}@supports (animation-timeline:view()){.vm-parallax-scroll{animation:vm-parallax linear both;animation-timeline:view();animation-range:cover}@keyframes vm-parallax{from{transform:translateY(-6%)}to{transform:translateY(6%)}}}@media (prefers-reduced-motion:reduce){.vm-parallax-scroll{animation:none;transform:none}}</style><!-- apply to a background image INSIDE an overflow-hidden framed section -->"
+    },
+    {
+      "id": "wavy-divider",
+      "file": "inline (css-only, see snippet)",
+      "name": "Wavy Divider",
+      "source": "velpi original",
+      "license": "MIT (original work)",
+      "effect": "divider",
+      "intensity": "subtle",
+      "dependency": "css-only",
+      "niches": [
+        "wellness",
+        "spa",
+        "kids",
+        "coastal",
+        "cleaning",
+        "medical",
+        "childcare"
+      ],
+      "summary": "A soft brand-color wave edge between two sections that gently bobs",
+      "snippet": "<style>.vm-wavy-divider{position:relative;line-height:0}.vm-wavy-divider svg{display:block;width:100%;height:60px}.vm-wavy-divider .vm-wave{animation:vm-wave-bob 6s ease-in-out infinite;transform-origin:center}@keyframes vm-wave-bob{50%{transform:translateY(4px)}}@media (prefers-reduced-motion:reduce){.vm-wavy-divider .vm-wave{animation:none}}</style><div class=\"vm-wavy-divider\"><svg viewBox=\"0 0 1440 60\" preserveAspectRatio=\"none\"><path class=\"vm-wave\" d=\"M0,32 C240,60 480,4 720,30 C960,56 1200,4 1440,30 L1440,60 L0,60 Z\" fill=\"var(--vm-c1)\"/></svg></div><!-- place between two sections; fill uses --vm-c1 -->"
     }
   ]
 }
