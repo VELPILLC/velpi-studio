@@ -16,7 +16,6 @@ export async function GET(request) {
   try {
     const url = new URL(request.url)
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 50))
-    const rating = url.searchParams.get('rating') || undefined
     const niche = url.searchParams.get('niche') || undefined
     const tier = url.searchParams.get('tier') || undefined
     const since = url.searchParams.get('since') || undefined
@@ -24,18 +23,17 @@ export async function GET(request) {
 
     const dirRows = await listAssembledFull(limit, { niche, tier, since })
     // Join each directive with its reviews (N+1, bounded to <=100 for a dev export).
-    const toClientShape = row => row ? { buildId: row.run_id, rating: row.rating, flags: row.flags || [], note: row.notes || '', reviewVersion: row.review_version } : null
+    const toClientShape = row => row ? { buildId: row.run_id, scores: row.scores || {}, note: row.notes || '', reviewVersion: row.review_version } : null
     const rows = []
     for (const dirRow of dirRows) {
       const found = await getReviewsForBuild(dirRow.id).catch(() => ({ mobile: null, desktop: null }))
       const reviews = { mobile: toClientShape(found.mobile), desktop: toClientShape(found.desktop) }
-      if (rating && reviews.mobile?.rating !== rating && reviews.desktop?.rating !== rating) continue
       rows.push({ directive: dirRow.directive, reviews })
     }
 
     const metrics = computeFleetMetrics(rows.map(x => ({ rollup: x.directive?.rollup })))
     const artifact = buildBatchArtifact({
-      rows, metrics, selection: { limit, rating, niche, tier, since, includeHtml },
+      rows, metrics, selection: { limit, niche, tier, since, includeHtml },
       includeHtml, generatedAt: new Date().toISOString(),
     })
 

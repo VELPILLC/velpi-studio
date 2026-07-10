@@ -26,7 +26,7 @@ export async function GET(request) {
     let reviews = { mobile: null, desktop: null }
     if (runId) {
       const rows = await getReviewsForBuild(runId)
-      const toClientShape = r => r ? { buildId: r.run_id, projectId: r.project_id, viewport: r.viewport, rating: r.rating, flags: r.flags || [], note: r.notes || '', reviewVersion: r.review_version } : null
+      const toClientShape = r => r ? { buildId: r.run_id, projectId: r.project_id, viewport: r.viewport, scores: r.scores || {}, note: r.notes || '', reviewVersion: r.review_version } : null
       reviews = { mobile: toClientShape(rows.mobile), desktop: toClientShape(rows.desktop) }
     }
 

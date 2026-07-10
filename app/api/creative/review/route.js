@@ -6,7 +6,8 @@ import { VIEWPORTS, validateReview, mergeReview, emptyReview } from '../../../..
 import { getReview, saveReview } from '../../../../lib/creative/persistence.mjs'
 
 // Developer Review — autosave upsert + rehydrate (DEV ONLY).
-//   POST { buildId, projectId?, viewport, rating?, flags?, note? }  (partial patch)
+//   POST { buildId, projectId?, viewport, scores?, note? }  (partial patch — scores is a
+//     partial object, e.g. { layout: 4 })
 //   GET  ?buildId=&viewport=  -> existing review for that device view
 // Independent of the Creative Intelligence Layer — buildId is generated for
 // every run whether or not CIL shadow mode is on. Refuses in production.
@@ -18,7 +19,7 @@ import { getReview, saveReview } from '../../../../lib/creative/persistence.mjs'
 
 function toClientShape(row) {
   return row
-    ? { buildId: row.run_id, projectId: row.project_id, viewport: row.viewport, rating: row.rating, flags: row.flags || [], note: row.notes || '', reviewVersion: row.review_version }
+    ? { buildId: row.run_id, projectId: row.project_id, viewport: row.viewport, scores: { ...emptyReview().scores, ...(row.scores || {}) }, note: row.notes || '', reviewVersion: row.review_version, updatedAt: row.updated_at || null }
     : null
 }
 
@@ -40,7 +41,10 @@ export async function POST(request) {
 
     const merged = mergeReview(prior, patch)
     const res = await saveReview(merged)
-    return Response.json({ ok: true, review: merged, persisted: res })
+    // Reflect the DB's real updated_at when the save actually landed, rather
+    // than the pre-save (possibly stale) value merged carries.
+    const review = res?.saved && res.row?.updated_at ? { ...merged, updatedAt: res.row.updated_at } : merged
+    return Response.json({ ok: true, review, persisted: res })
   } catch (err) {
     return Response.json({ ok: false, error: err?.message || 'review save failed' })
   }

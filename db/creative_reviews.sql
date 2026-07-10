@@ -65,3 +65,33 @@ select
 from creative_reviews r
 join creative_directives d
   on d.id = r.run_id and d.stage = 'assembled';
+
+-- v4: the single love/okay/needs_work `rating` plus `flags` array is replaced
+-- by five fixed 1-5 questions (overall, layout, images, trust, copy), stored
+-- in the EXISTING `scores` jsonb column from v1 (unused since v2), e.g.
+-- { overall:4, layout:3, images:5, trust:2, copy:4 }. No new column or
+-- constraint needed. A row a v4 save never touches keeps its old rating/flags
+-- as-is; but re-rating a build+viewport that was previously reviewed under
+-- v2/v3 clears its legacy `rating`/`flags` on that upsert (saveReview always
+-- writes rating:null, flags:[] going forward) — v1/v2/v3 data only survives
+-- untouched for rows nothing has re-saved under v4.
+comment on column creative_reviews.scores is
+  'v4: { overall, layout, images, trust, copy } — each an integer 1-5 or null, one fixed question per key.';
+
+-- Re-create the training view to also surface v4's `scores` alongside the
+-- older rating/flags columns, so v4 reviews remain usable for training.
+create or replace view creative_training_rows as
+select
+  r.run_id,
+  d.niche, d.tier,
+  r.rating, r.flags, r.scores, r.notes, r.viewport, r.review_version,
+  (d.meta->'rollup'->>'passed')::bool  as directive_passed,
+  (d.meta->'rollup'->>'score')::int    as directive_score,
+  (d.meta->'rollup'->>'overall_confidence')::float as directive_confidence,
+  d.meta->'rollup'->'overrides_detected' as overrides,
+  d.directive->'design_dna'            as design_dna,
+  d.directive->'creative_direction'    as creative_direction,
+  r.created_at
+from creative_reviews r
+join creative_directives d
+  on d.id = r.run_id and d.stage = 'assembled';
