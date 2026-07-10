@@ -316,8 +316,6 @@ export default function Studio() {
   // ── Results UI ──
   const [showCode, setShowCode] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [chatInput, setChatInput] = useState('')
-  const [editing, setEditing] = useState(false)
   const [copiedHtml, setCopiedHtml] = useState(false)
   const [copiedPrompt, setCopiedPrompt] = useState(null)
   const [copiedInfo, setCopiedInfo] = useState(false)
@@ -999,25 +997,6 @@ function extractLogoColors(dataUrl) {
     }
   }
 
-  async function sendEdit() {
-    const instruction = chatInput.trim()
-    if (!instruction || editing || !htmlTemplate) return
-    setEditing(true)
-    setError(null)
-    try {
-      const { html: updated } = await callRoute('/api/edit-site', {
-        html: htmlTemplate, instruction,
-        palette: analysisData?.color_palette || [],
-      })
-      setHtmlTemplate(updated)
-      setChatInput('')
-    } catch (e) {
-      setError(e.message || 'Could not apply that change.')
-    } finally {
-      setEditing(false)
-    }
-  }
-
   function copyHtml() {
     const out = finalHtml()
     if (!out) return
@@ -1058,19 +1037,6 @@ function extractLogoColors(dataUrl) {
     }
   }
 
-  // Per-generation artifacts: the decision log and the asset manifest,
-  // downloadable as files (also persisted inside the saved project data).
-  function downloadDecisions() {
-    if (!buildReport) return
-    const blob = new Blob([buildReport], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${safeName(bizName)}-decisions.md`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
-  }
-
   // The exact payload sent to the code-generation model — full system + user text.
   function downloadPromptTrace() {
     if (!promptTrace) return
@@ -1080,26 +1046,6 @@ function extractLogoColors(dataUrl) {
     const a = document.createElement('a')
     a.href = url
     a.download = `${safeName(bizName)}-prompt-trace.txt`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
-  }
-
-  function downloadAssetsJson() {
-    const manifest = {
-      business: bizName || null,
-      generatedAt: new Date().toISOString(),
-      imageApiAttestation: imagesMeta || null,
-      logo: { detected: logoUrl || null, refined: !!refinedLogo, ghlUrl: ghlUrls.logo || null },
-      images: slots.filter(s => s.id !== 'logo').map((s, i) => ({
-        slot: i + 1, id: s.id, name: s.name, section: s.section || null,
-        prompt: s.prompt || null, generated: !!assetsById[s.id], ghlUrl: ghlUrls[s.id] || null,
-      })),
-    }
-    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${safeName(bizName)}-assets.json`
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 5000)
   }
@@ -1370,67 +1316,27 @@ function extractLogoColors(dataUrl) {
             </div>
             <div style={{
               border: `1px solid ${BORDER}`, borderRadius: 16, background: PANEL,
-              padding: 18, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap',
+              padding: 18, display: 'flex', flexDirection: 'column', gap: 10,
               boxShadow: '0 18px 60px rgba(0,0,0,0.5)',
             }}>
-              {/* Phone-scale live mini preview — tap to open the real interactive mobile view */}
-              <div
-                onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')}
-                title="Tap to preview on mobile"
-                style={{ width: 208, height: 380, borderRadius: 20, overflow: 'hidden', border: `2px solid ${BORDER}`, background: '#fff', flexShrink: 0, cursor: 'pointer', position: 'relative' }}
-              >
-                <iframe
-                  title="Mini preview"
-                  srcDoc={previewHtml()}
-                  sandbox="allow-same-origin"
-                  scrolling="yes"
-                  style={{ width: 390, height: 712, border: 'none', transform: 'scale(0.5333)', transformOrigin: 'top left', background: '#fff', pointerEvents: 'none' }}
-                />
-                <div style={{ position: 'absolute', inset: 0 }} />
-              </div>
-              {/* Actions */}
-              <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 220 }}>
-                <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.02rem', color: '#fff' }}>
-                  {bizName ? `${bizName} — website ready` : 'Website ready'}
-                </span>
-                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
-                  📱 Preview Mobile
-                </button>
-                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
-                  🖥 Preview Desktop
-                </button>
-                <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
-                  {snapping ? 'Capturing…' : '⬇ Download as Image (full page)'}
-                </button>
-                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-                  The mini view is phone-scale. Both preview modes open the real page at an accurate device viewport — not a scaled thumbnail.
-                </span>
-              </div>
+              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.02rem', color: '#fff' }}>
+                {bizName ? `${bizName} — website ready` : 'Website ready'}
+              </span>
+              <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
+                📱 Preview Mobile
+              </button>
+              <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
+                🖥 Preview Desktop
+              </button>
+              <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
+                {snapping ? 'Capturing…' : '⬇ Download as Image (full page)'}
+              </button>
             </div>
             {/* Developer Review export toolbar (dev only) — ratings themselves now
                 live inside each device preview overlay, scoped per viewport */}
             {isDevReviewClient() && (
               <ReviewExportBar buildId={reviewBuildId} projectId={reviewProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
             )}
-
-            {/* Refine chat */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <input
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') sendEdit() }}
-                disabled={editing}
-                placeholder='Refine anything — e.g. "make the hero taller"'
-                style={{ flex: 1, background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '13px 16px', fontSize: '0.92rem', fontFamily: 'var(--font-inter)', opacity: editing ? 0.6 : 1 }}
-              />
-              <button
-                onClick={sendEdit}
-                disabled={editing || !chatInput.trim()}
-                style={{ background: BLUE, border: 'none', borderRadius: 10, color: '#fff', padding: '0 20px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.05em', textTransform: 'uppercase', opacity: editing || !chatInput.trim() ? 0.5 : 1, cursor: editing || !chatInput.trim() ? 'not-allowed' : 'pointer' }}
-              >
-                {editing ? '…' : 'Send'}
-              </button>
-            </div>
 
             {/* Alternate structures — post-generation option, never upfront */}
             {altLayouts.length > 0 && (
@@ -1556,8 +1462,6 @@ function extractLogoColors(dataUrl) {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : '⧉ Copy HTML'}</button>
                 <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
-                <button onClick={downloadDecisions} style={monoBtn}>⬇ decisions.md</button>
-                <button onClick={downloadAssetsJson} style={monoBtn}>⬇ assets.json</button>
                 {promptTrace && <button onClick={downloadPromptTrace} style={monoBtn}>⬇ prompt-trace</button>}
                 <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
               </div>
