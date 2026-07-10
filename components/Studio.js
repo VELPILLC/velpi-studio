@@ -1307,13 +1307,6 @@ function extractLogoColors(dataUrl) {
 
           {/* ── 1. WEBSITE PREVIEW (the hero) ── */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-              <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>Your new website{bizName ? ` — ${bizName}` : ''}</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>📱 Preview Mobile</button>
-                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={monoBtn}>🖥 Preview Desktop</button>
-              </div>
-            </div>
             <div style={{
               border: `1px solid ${BORDER}`, borderRadius: 16, background: PANEL,
               padding: 18, display: 'flex', flexDirection: 'column', gap: 10,
@@ -1323,13 +1316,13 @@ function extractLogoColors(dataUrl) {
                 {bizName ? `${bizName} — website ready` : 'Website ready'}
               </span>
               <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
-                📱 Preview Mobile
+                Preview Mobile
               </button>
               <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
-                🖥 Preview Desktop
+                Preview Desktop
               </button>
               <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
-                {snapping ? 'Capturing…' : '⬇ Download as Image (full page)'}
+                {snapping ? 'Capturing…' : 'Download as Image (full page)'}
               </button>
             </div>
             {/* Developer Review export toolbar (dev only) — ratings themselves now
