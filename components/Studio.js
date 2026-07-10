@@ -5,7 +5,12 @@ import { pickSignatureMotion } from '../lib/motionPresets'
 import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
 import ReviewPanel from './dev/ReviewPanel'
+import ReviewExportBar from './dev/ReviewExportBar'
 import { isDevReviewClient } from '../lib/creative/flags.mjs'
+
+// Accurate device preview viewports — real widths, not scaled approximations.
+// Picked once and recorded here so every build's decisions.md is consistent.
+const PREVIEW_VIEWPORTS = { mobile: { width: 390, height: 844 }, desktop: { width: 1440, height: 900 } }
 
 // Vibe question data — kept only so vibeSummary() can reconstruct a readable
 // summary from a LOADED project's saved vibe answers. There is no manual entry
@@ -233,6 +238,11 @@ function composeReport(analysis, vibeText, chosenStyles, photoSlots, designBrief
     if (s.prompt) L.push(`   prompt: ${s.prompt}`)
   })
   L.push('')
+  L.push('--- PREVIEW VIEWPORTS ---')
+  L.push(`Mobile: ${PREVIEW_VIEWPORTS.mobile.width}x${PREVIEW_VIEWPORTS.mobile.height} (iPhone-standard Safari viewport)`)
+  L.push(`Desktop: ${PREVIEW_VIEWPORTS.desktop.width}x${PREVIEW_VIEWPORTS.desktop.height}`)
+  L.push('Fixed widths, consistent across every build — not scaled approximations.')
+  L.push('')
   L.push('===== END REPORT =====')
   return L.join('\n')
 }
@@ -265,10 +275,13 @@ export default function Studio() {
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
 
-  // ── In-app mobile preview: a real, scrollable, interactive phone-width view
-  // — not the tiny static thumbnail. Works for the active build AND for any
-  // saved Library project via a quick, non-destructive fetch. ──
-  const [mobilePreview, setMobilePreview] = useState(null) // { html, label } | null
+  // ── In-app device preview: a real, scrollable, interactive view at an
+  // accurate fixed viewport (mobile 390px / desktop 1440px) — not a scaled
+  // thumbnail. Works for the active build AND for any saved Library project
+  // via a quick, non-destructive fetch. previewMode remembers the last-used
+  // mode so reopening the preview returns to the same view. ──
+  const [devicePreview, setDevicePreview] = useState(null) // { html, label, mode } | null
+  const [previewMode, setPreviewMode] = useState('mobile') // 'mobile' | 'desktop'
   const [mobilePreviewLoadingId, setMobilePreviewLoadingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
@@ -312,6 +325,10 @@ export default function Studio() {
   useEffect(() => {
     fetch('/api/styles').then(r => r.json()).then(d => setStyles(d.styles || [])).catch(() => {})
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(d.projects || [])).catch(() => {})
+    try {
+      const saved = localStorage.getItem('velpi_preview_mode')
+      if (saved === 'mobile' || saved === 'desktop') setPreviewMode(saved)
+    } catch (_) {}
   }, [])
 
   // ── Project library: save / load / delete ──
@@ -383,10 +400,14 @@ export default function Studio() {
     }
   }
 
-  // Opens the in-app interactive mobile preview for the given HTML.
-  function openMobilePreview(html, label) {
+  // Opens the in-app interactive device preview at an accurate, fixed
+  // viewport width — not a scaled-down approximation. Remembers the mode
+  // (mobile/desktop) so reopening the preview returns to the same view.
+  function openDevicePreview(html, label, mode) {
     if (!html) return
-    setMobilePreview({ html, label: label || bizName || 'Preview' })
+    setPreviewMode(mode)
+    try { localStorage.setItem('velpi_preview_mode', mode) } catch (_) {}
+    setDevicePreview({ html, label: label || bizName || 'Preview', mode })
   }
 
   // Quick-preview a saved Library project on mobile WITHOUT loading it into
@@ -406,7 +427,7 @@ export default function Studio() {
         slots: d.slots || [],
         logoSrc: d.refinedLogo || d.logoUrl,
       })
-      openMobilePreview(html, d.bizName || project.name)
+      openDevicePreview(html, d.bizName || project.name, 'mobile')
     } catch (e) {
       setError(`Could not preview that project: ${e.message}`)
     } finally {
@@ -455,15 +476,6 @@ export default function Studio() {
       const n = slots.findIndex(s => s.id === id) + 1
       return `https://PASTE-IMAGE-${n || 'X'}-URL-HERE`
     })
-  }
-
-  function openPreview() {
-    const out = previewHtml()
-    if (!out) return
-    const blob = new Blob([out], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
 
   // Dominant brand colors from an uploaded logo (canvas sampling, grays skipped) —
@@ -1168,7 +1180,7 @@ function extractLogoColors(dataUrl) {
       </header>
 
       <div style={{ position: 'relative', zIndex: 1, padding: '26px 12px 90px' }}>
-      <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
 
         {/* ── STEP 1 — URL ── */}
         <div style={card}>
@@ -1352,8 +1364,8 @@ function extractLogoColors(dataUrl) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
               <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>Your new website{bizName ? ` — ${bizName}` : ''}</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => openMobilePreview(previewHtml(), bizName)} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>📱 Preview Mobile</button>
-                <button onClick={openPreview} style={monoBtn}>↗ Open Full Preview</button>
+                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ ...monoBtn, background: BLUE, color: '#fff' }}>📱 Preview Mobile</button>
+                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={monoBtn}>🖥 Preview Desktop</button>
               </div>
             </div>
             <div style={{
@@ -1363,7 +1375,7 @@ function extractLogoColors(dataUrl) {
             }}>
               {/* Phone-scale live mini preview — tap to open the real interactive mobile view */}
               <div
-                onClick={() => openMobilePreview(previewHtml(), bizName)}
+                onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')}
                 title="Tap to preview on mobile"
                 style={{ width: 208, height: 380, borderRadius: 20, overflow: 'hidden', border: `2px solid ${BORDER}`, background: '#fff', flexShrink: 0, cursor: 'pointer', position: 'relative' }}
               >
@@ -1381,23 +1393,24 @@ function extractLogoColors(dataUrl) {
                 <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.02rem', color: '#fff' }}>
                   {bizName ? `${bizName} — website ready` : 'Website ready'}
                 </span>
-                <button onClick={() => openMobilePreview(previewHtml(), bizName)} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
+                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
                   📱 Preview Mobile
                 </button>
-                <button onClick={openPreview} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
-                  ↗ Open Full Preview (desktop tab)
+                <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
+                  🖥 Preview Desktop
                 </button>
                 <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
                   {snapping ? 'Capturing…' : '⬇ Download as Image (full page)'}
                 </button>
                 <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-                  The mini view is phone-scale. Full preview opens in a new tab — re-open it after any change.
+                  The mini view is phone-scale. Both preview modes open the real page at an accurate device viewport — not a scaled thumbnail.
                 </span>
               </div>
             </div>
-            {/* Developer Review Panel (dev only) — below the preview, above the refine input */}
+            {/* Developer Review export toolbar (dev only) — ratings themselves now
+                live inside each device preview overlay, scoped per viewport */}
             {isDevReviewClient() && (
-              <ReviewPanel buildId={reviewBuildId} projectId={reviewProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
+              <ReviewExportBar buildId={reviewBuildId} projectId={reviewProjectId} businessName={bizName} getRenderedHtml={() => previewHtml()} />
             )}
 
             {/* Refine chat */}
@@ -1637,48 +1650,62 @@ function extractLogoColors(dataUrl) {
         </div>
       )}
 
-      {/* ── In-app interactive mobile preview — a real phone-width, scrollable,
-          tappable view of the site, not just a locked thumbnail. Works for the
-          active build and for any saved Library project. ── */}
-      {mobilePreview && (
+      {/* ── In-app interactive device preview — a real, scrollable, tappable
+          view of the site at an accurate fixed viewport (mobile 390px /
+          desktop 1440px), not a scaled thumbnail. Works for the active build
+          and for any saved Library project. The rating star lives inside the
+          frame, scoped to whichever viewport is currently open. ── */}
+      {devicePreview && (() => {
+        const isMobile = devicePreview.mode === 'mobile'
+        const vp = PREVIEW_VIEWPORTS[devicePreview.mode] || PREVIEW_VIEWPORTS.mobile
+        return (
         <div
-          onClick={() => setMobilePreview(null)}
+          onClick={() => setDevicePreview(null)}
           style={{
             position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(3, 6, 15, 0.88)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '18px 12px', backdropFilter: 'blur(4px)',
+            padding: '18px 12px', backdropFilter: 'blur(4px)', overflow: 'auto',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 400, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: vp.width + 40, marginBottom: 10 }}>
             <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.86rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              📱 {mobilePreview.label}
+              {isMobile ? '📱' : '🖥'} {devicePreview.label} · {vp.width}px
             </span>
             <button
-              onClick={e => { e.stopPropagation(); setMobilePreview(null) }}
+              onClick={e => { e.stopPropagation(); setDevicePreview(null) }}
               style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', fontSize: '0.9rem', flexShrink: 0 }}
             >✕</button>
           </div>
-          {/* Phone bezel — the iframe inside is fully interactive: real scrolling, real taps */}
+          {/* Device frame — the iframe inside is fully interactive: real scrolling, real taps.
+              Rendered at a true fixed width (never scaled); the overlay scrolls if the
+              browser window is narrower than the desktop viewport. */}
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: 'min(390px, 92vw)', height: 'min(844px, 78vh)', borderRadius: 34,
-              border: '6px solid #1a1f2c', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+              width: isMobile ? 'min(390px, 92vw)' : `${vp.width}px`,
+              height: isMobile ? 'min(844px, 78vh)' : `min(${vp.height}px, 82vh)`,
+              borderRadius: isMobile ? 34 : 10,
+              border: isMobile ? '6px solid #1a1f2c' : `1px solid ${BORDER}`,
+              background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
               overflow: 'hidden', position: 'relative', flexShrink: 0,
             }}
           >
             <iframe
-              title="Mobile preview"
-              srcDoc={mobilePreview.html}
+              title={`${devicePreview.mode} preview`}
+              srcDoc={devicePreview.html}
               sandbox="allow-same-origin"
               style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
             />
+            {isDevReviewClient() && (
+              <ReviewPanel buildId={reviewBuildId} projectId={reviewProjectId} viewport={devicePreview.mode} />
+            )}
           </div>
           <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', marginTop: 10, letterSpacing: '0.04em' }}>
-            Scroll and tap inside — this is the real mobile layout. Tap outside or ✕ to close.
+            Scroll and tap inside — this is the real {devicePreview.mode} layout. Tap outside or ✕ to close.
           </div>
         </div>
-      )}
+        )
+      })()}
       </div>
     </div>
   )

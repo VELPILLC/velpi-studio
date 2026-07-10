@@ -31,6 +31,22 @@ alter table creative_reviews add column if not exists rating text;              
 alter table creative_reviews add column if not exists flags  jsonb default '[]'::jsonb; -- ['copy','images',...]
 create index if not exists creative_reviews_rating_idx on creative_reviews (rating);
 
+-- v3: viewport-scoped ratings. A mobile rating and a desktop rating for the
+-- same build are never interchangeable — each device view gets its own row,
+-- so the upsert key widens from (run_id, reviewer) to (run_id, reviewer,
+-- viewport). Existing rows predate viewport tagging and default to 'mobile'
+-- (the only real device preview that existed before this change).
+alter table creative_reviews add column if not exists viewport text default 'mobile'; -- 'mobile' | 'desktop'
+
+-- Drop the old two-column upsert key and replace it with the three-column one.
+-- The name below is Postgres's default auto-generated name for the original
+-- inline `unique (run_id, reviewer)` — if this no-ops because the name differs
+-- on your instance, check the real name with \d creative_reviews and drop that.
+alter table creative_reviews drop constraint if exists creative_reviews_run_id_reviewer_key;
+alter table creative_reviews add constraint creative_reviews_run_id_reviewer_viewport_key unique (run_id, reviewer, viewport);
+
+create index if not exists creative_reviews_viewport_idx on creative_reviews (viewport);
+
 -- Labeled training rows: reviews (labels) joined to directive features. Only
 -- covers reviews whose build also has an assembled CDO (CIL shadow mode was on
 -- for that run) — most reviews won't, since review no longer requires CIL.
@@ -38,7 +54,7 @@ create or replace view creative_training_rows as
 select
   r.run_id,
   d.niche, d.tier,
-  r.rating, r.flags, r.notes, r.review_version,
+  r.rating, r.flags, r.notes, r.viewport, r.review_version,
   (d.meta->'rollup'->>'passed')::bool  as directive_passed,
   (d.meta->'rollup'->>'score')::int    as directive_score,
   (d.meta->'rollup'->>'overall_confidence')::float as directive_confidence,

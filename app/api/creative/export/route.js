@@ -2,9 +2,8 @@ export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
 import { isDevReviewServer } from '../../../../lib/creative/flags.mjs'
-import { getAssembledRun, getReview } from '../../../../lib/creative/persistence.mjs'
+import { getAssembledRun, getReviewsForBuild } from '../../../../lib/creative/persistence.mjs'
 import { getProject } from '../../../../lib/supabase'
-import { emptyReview } from '../../../../lib/creative/review.mjs'
 import { buildSingleArtifact } from '../../../../lib/creative/exportPackage.mjs'
 
 // "Ask ChatGPT" single-generation export (DEV ONLY).
@@ -24,12 +23,11 @@ export async function GET(request) {
     const cdoRow = runId ? await getAssembledRun(runId) : null
     const cdo = cdoRow?.directive || null
 
-    let reviewObj = null
+    let reviews = { mobile: null, desktop: null }
     if (runId) {
-      const r = await getReview(runId)
-      reviewObj = r
-        ? { buildId: r.run_id, projectId: r.project_id, rating: r.rating, flags: r.flags || [], note: r.notes || '', reviewVersion: r.review_version }
-        : emptyReview(runId, projectId)
+      const rows = await getReviewsForBuild(runId)
+      const toClientShape = r => r ? { buildId: r.run_id, projectId: r.project_id, viewport: r.viewport, rating: r.rating, flags: r.flags || [], note: r.notes || '', reviewVersion: r.review_version } : null
+      reviews = { mobile: toClientShape(rows.mobile), desktop: toClientShape(rows.desktop) }
     }
 
     let projectData = null
@@ -39,7 +37,7 @@ export async function GET(request) {
     }
 
     const artifact = buildSingleArtifact({
-      cdo, review: reviewObj, project: projectData, generatedAt: new Date().toISOString(),
+      cdo, reviews, project: projectData, generatedAt: new Date().toISOString(),
     })
 
     const safe = (artifact.business?.name || 'velpi').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40)
