@@ -96,36 +96,39 @@ function safeName(s) {
 }
 
 // Save-pipeline only: swap base64 data-URI assets for permanent Storage URLs
-// right before a project is persisted, so the /api/projects request body
-// stays small instead of bundling every enhanced/generated image's base64
-// together (that bundling is what pushed some saves past Vercel's request
-// body limit). Plain URLs (real photos kept as-is) pass through untouched.
-// Per-asset upload failures fall back to the original base64 rather than
-// blocking the whole save.
+// right before a project is persisted. The server only mints a signed upload
+// URL (small JSON); the image BYTES go straight from the browser to Supabase
+// Storage — never through a Vercel function, whose ~4.5MB request-body limit
+// is what produced 413s when base64 rode inside /api/* bodies.
+// Plain URLs (real photos kept as-is) and non-base64 data URIs (tiny SVG
+// placeholders) pass through untouched. A failed upload DROPS that asset
+// from the persisted payload instead of keeping the base64 — keeping it is
+// what re-triggered the 413 and lost the whole save; dropping costs one
+// image (recoverable via Regenerate) and the failure is reported to the
+// caller via `failed` so the UI can say so.
 async function uploadBase64Assets(assetsById, refinedLogoValue, keyPrefix) {
-  const entries = Object.entries(assetsById || {})
+  const failed = []
   const uploadOne = async (id, src) => {
-    if (typeof src !== 'string' || !src.startsWith('data:')) return [id, src]
+    const match = typeof src === 'string' ? /^data:([^;,]+);base64,/.exec(src) : null
+    if (!match) return [id, src]
     try {
-      const { url } = await callRoute('/api/upload-image', { dataUri: src, path: `${keyPrefix}-${id}` })
-      return [id, url || src]
+      const contentType = match[1]
+      const { signedUrl, publicUrl } = await callRoute('/api/upload-image', { path: `${keyPrefix}-${id}`, contentType })
+      const blob = await (await fetch(src)).blob()
+      const put = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob })
+      if (!put.ok) throw new Error(`storage PUT failed (${put.status})`)
+      return [id, publicUrl]
     } catch (_) {
-      return [id, src] // best-effort — keep the base64 for this one asset
+      failed.push(id)
+      return [id, null] // drop — never let base64 back into the save payload
     }
   }
-  const uploadedEntries = await Promise.all(entries.map(([id, src]) => uploadOne(id, src)))
-  const newAssetsById = Object.fromEntries(uploadedEntries)
 
-  let newRefinedLogo = refinedLogoValue
-  if (typeof refinedLogoValue === 'string' && refinedLogoValue.startsWith('data:')) {
-    try {
-      const { url } = await callRoute('/api/upload-image', { dataUri: refinedLogoValue, path: `${keyPrefix}-logo` })
-      newRefinedLogo = url || refinedLogoValue
-    } catch (_) {
-      newRefinedLogo = refinedLogoValue
-    }
-  }
-  return { assetsById: newAssetsById, refinedLogo: newRefinedLogo }
+  const uploadedEntries = await Promise.all(Object.entries(assetsById || {}).map(([id, src]) => uploadOne(id, src)))
+  const newAssetsById = Object.fromEntries(uploadedEntries.filter(([, src]) => src))
+
+  const [, newRefinedLogo] = await uploadOne('logo-refined', refinedLogoValue)
+  return { assetsById: newAssetsById, refinedLogo: newRefinedLogo, failed }
 }
 
 // Rasterize any uploaded image (PNG/JPG/SVG/screenshot) to PNG base64,
@@ -379,6 +382,9 @@ export default function Studio() {
       setProjects(prev => [project, ...prev])
       setSavedMsg(`Saved "${project.name}" to the library`)
       setTimeout(() => setSavedMsg(null), 3000)
+      if (uploaded.failed.length) {
+        setError(`Saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${uploaded.failed.join(', ')}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then save again.`)
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -985,6 +991,9 @@ function extractLogoColors(dataUrl) {
         setProjects(prev => [{ ...project, thumb }, ...prev])
         setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
         setTimeout(() => setSavedMsg(null), 5000)
+        if (uploaded.failed.length) {
+          setError(`Auto-saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${uploaded.failed.join(', ')}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then use Save to retry.`)
+        }
       } catch (e) {
         // Silent failure hid a missing DB table for weeks — never again.
         setError(`Auto-save to the library FAILED: ${e.message}${/table|schema/i.test(e.message) ? ' — run the projects SQL from lib/supabase.js in the Supabase SQL editor, then use the Save button.' : ' — use the Save button to retry.'}`)
