@@ -95,6 +95,39 @@ function safeName(s) {
   return (s || 'velpi').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'velpi'
 }
 
+// Save-pipeline only: swap base64 data-URI assets for permanent Storage URLs
+// right before a project is persisted, so the /api/projects request body
+// stays small instead of bundling every enhanced/generated image's base64
+// together (that bundling is what pushed some saves past Vercel's request
+// body limit). Plain URLs (real photos kept as-is) pass through untouched.
+// Per-asset upload failures fall back to the original base64 rather than
+// blocking the whole save.
+async function uploadBase64Assets(assetsById, refinedLogoValue, keyPrefix) {
+  const entries = Object.entries(assetsById || {})
+  const uploadOne = async (id, src) => {
+    if (typeof src !== 'string' || !src.startsWith('data:')) return [id, src]
+    try {
+      const { url } = await callRoute('/api/upload-image', { dataUri: src, path: `${keyPrefix}-${id}` })
+      return [id, url || src]
+    } catch (_) {
+      return [id, src] // best-effort — keep the base64 for this one asset
+    }
+  }
+  const uploadedEntries = await Promise.all(entries.map(([id, src]) => uploadOne(id, src)))
+  const newAssetsById = Object.fromEntries(uploadedEntries)
+
+  let newRefinedLogo = refinedLogoValue
+  if (typeof refinedLogoValue === 'string' && refinedLogoValue.startsWith('data:')) {
+    try {
+      const { url } = await callRoute('/api/upload-image', { dataUri: refinedLogoValue, path: `${keyPrefix}-logo` })
+      newRefinedLogo = url || refinedLogoValue
+    } catch (_) {
+      newRefinedLogo = refinedLogoValue
+    }
+  }
+  return { assetsById: newAssetsById, refinedLogo: newRefinedLogo }
+}
+
 // Rasterize any uploaded image (PNG/JPG/SVG/screenshot) to PNG base64,
 // preserving transparency. Returns { data (raw b64), preview (data uri) }.
 function fileToPng(file, maxW = 1024) {
@@ -336,9 +369,10 @@ export default function Studio() {
     setError(null)
     try {
       const name = `${bizName || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      const uploaded = await uploadBase64Assets(assetsById, refinedLogo, safeName(bizName))
       const data = {
-        bizName, analysisData, slots, assetsById, ghlUrls, htmlTemplate, buildReport,
-        vibe, refinedLogo, logoUrl, input,
+        bizName, analysisData, slots, assetsById: uploaded.assetsById, ghlUrls, htmlTemplate, buildReport,
+        vibe, refinedLogo: uploaded.refinedLogo, logoUrl, input,
         savedAt: new Date().toISOString(),
       }
       const { project } = await callRoute('/api/projects', { name, data })
@@ -922,20 +956,24 @@ function extractLogoColors(dataUrl) {
           return placeholderSvg(slot ? slot.name : tid)
         })
         const thumb = await captureThumb(substituted)
+        // Swap base64 assets for Storage URLs only in the payload that's about
+        // to be persisted — the live session (preview/export/thumb above)
+        // keeps using the base64 straight from the image API, untouched.
+        const uploaded = await uploadBase64Assets(finalAssets, logoAssetLocal, safeName(analysis.business_name))
         const projData = {
           bizName: analysis.business_name || '',
           niche: analysis.industry || '',
           sourceUrl: input.trim(),
           analysisData: analysis,
           slots: allSlots,
-          assetsById: finalAssets,
+          assetsById: uploaded.assetsById,
           ghlUrls: {},
           htmlTemplate: html,
           buildReport: report,
           promptTrace: trace || null, // the exact payload sent to the build model
           imagesMeta: imagesMetaLocal || null, // proof the image API ran (call counts)
           vibe,
-          refinedLogo: logoAssetLocal,
+          refinedLogo: uploaded.refinedLogo,
           logoUrl: scrapedData.logo || null,
           input: input.trim(),
           thumb,
