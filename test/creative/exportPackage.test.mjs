@@ -27,7 +27,9 @@ const CDO = {
   },
   rollup: { passed: true, score: 91, overall_confidence: 0.86, tokens: { input: 13000, output: 4800, total: 17800 }, latency_ms_total: 14700, overrides_detected: ['motion.intensity'] },
 }
-const REVIEW = { buildId: 'run_1', projectId: 'proj_1', rating: 'love', flags: [], note: 'strong hero', reviewVersion: 2 }
+const MOBILE_REVIEW = { buildId: 'run_1', projectId: 'proj_1', viewport: 'mobile', scores: { overall: 5, layout: 4, images: 5, trust: 4, copy: 5 }, note: 'strong hero', reviewVersion: 4 }
+const DESKTOP_REVIEW = { buildId: 'run_1', projectId: 'proj_1', viewport: 'desktop', scores: { overall: 2, layout: 2, images: 3, trust: 3, copy: 3 }, note: 'Layout & Design: nav feels cramped', reviewVersion: 4 }
+const REVIEWS = { mobile: MOBILE_REVIEW, desktop: DESKTOP_REVIEW }
 const PROJECT = { bizName: 'Amrit Palace', sourceUrl: 'https://amrit.example', htmlTemplate: '<img src="%%IMG:img_0%%"><img src="%%IMG:logo%%">', assetsById: { img_0: 'data:image/png;base64,AAA' }, refinedLogo: 'data:image/png;base64,LOGO', thumb: 'data:image/jpeg;base64,THUMB', imagesMeta: { aiCalls: 5 }, savedAt: '2026-07-07T00:01:00Z' }
 
 test('substituteTokens replaces %%IMG%% with assets/ghl/logo', () => {
@@ -38,7 +40,7 @@ test('substituteTokens replaces %%IMG%% with assets/ghl/logo', () => {
 })
 
 test('single artifact includes every required section', () => {
-  const a = buildSingleArtifact({ cdo: CDO, review: REVIEW, project: PROJECT, generatedAt: 'now' })
+  const a = buildSingleArtifact({ cdo: CDO, reviews: REVIEWS, project: PROJECT, generatedAt: 'now' })
   assert.equal(a.artifact, 'velpi-cil-review-export')
   assert.equal(a.version, EXPORT_VERSION)
   assert.equal(a.instructions, SINGLE_INSTRUCTIONS)
@@ -47,9 +49,9 @@ test('single artifact includes every required section', () => {
   assert.equal(a.defaults.seedDefaults.version, 'defaults@1.0.0')
   assert.deepEqual(a.overrides, ['motion.intensity'])
   assert.equal(a.metrics.rollup.total ?? a.metrics.rollup.tokens.total, 17800)
-  assert.equal(a.developer_review.rating, 'love')
-  assert.deepEqual(a.developer_review.flags, [])
-  assert.equal(a.developer_review.note, 'strong hero')
+  assert.deepEqual(a.developer_review.mobile.scores, { overall: 5, layout: 4, images: 5, trust: 4, copy: 5 })
+  assert.equal(a.developer_review.mobile.note, 'strong hero')
+  assert.deepEqual(a.developer_review.desktop.scores, { overall: 2, layout: 2, images: 3, trust: 3, copy: 3 })
   assert.equal(a.prompt_versions.blueprint, 'blueprint@1.0.0')
   assert.equal(a.prompt_versions.defaults, 'defaults@1.0.0')
   assert.equal(a.build.tokens.total, 17800)
@@ -57,29 +59,35 @@ test('single artifact includes every required section', () => {
 })
 
 test('single artifact renders HTML + includes thumbnail', () => {
-  const a = buildSingleArtifact({ cdo: CDO, review: REVIEW, project: PROJECT })
+  const a = buildSingleArtifact({ cdo: CDO, reviews: REVIEWS, project: PROJECT })
   assert.ok(a.html.template.includes('%%IMG:img_0%%'))
   assert.ok(a.html.rendered.includes('data:image/png;base64,AAA')) // asset substituted
   assert.ok(a.html.rendered.includes('data:image/png;base64,LOGO')) // logo substituted
   assert.equal(a.screenshots.thumbnail_dataUri, 'data:image/jpeg;base64,THUMB')
 })
 
-test('single artifact tolerates missing project and missing review', () => {
-  const a = buildSingleArtifact({ cdo: CDO, review: null, project: null })
+test('single artifact tolerates missing project and missing reviews', () => {
+  const a = buildSingleArtifact({ cdo: CDO, reviews: null, project: null })
   assert.equal(a.html, null)
   assert.equal(a.screenshots, null)
   assert.equal(a.developer_review, null)
   assert.equal(a.creative_directive.id, 'run_1')
 })
 
+test('single artifact tolerates only one viewport being rated', () => {
+  const a = buildSingleArtifact({ cdo: CDO, reviews: { mobile: MOBILE_REVIEW, desktop: null }, project: null })
+  assert.deepEqual(a.developer_review.mobile.scores, { overall: 5, layout: 4, images: 5, trust: 4, copy: 5 })
+  assert.equal(a.developer_review.desktop, null)
+})
+
 test('single artifact contains no secret-looking fields', () => {
-  const a = buildSingleArtifact({ cdo: CDO, review: REVIEW, project: PROJECT })
+  const a = buildSingleArtifact({ cdo: CDO, reviews: REVIEWS, project: PROJECT })
   const s = JSON.stringify(a).toLowerCase()
   assert.ok(!s.includes('api_key') && !s.includes('apikey') && !s.includes('anthropic_api') && !s.includes('sk-'))
 })
 
 test('batch artifact summarizes runs + carries fleet metrics', () => {
-  const rows = [{ directive: CDO, review: REVIEW }, { directive: { ...CDO, id: 'run_2', businessName: 'B2' }, review: null }]
+  const rows = [{ directive: CDO, reviews: REVIEWS }, { directive: { ...CDO, id: 'run_2', businessName: 'B2' }, reviews: null }]
   const metrics = { n: 2, validator: { pass_rate_pct: 100 } }
   const a = buildBatchArtifact({ rows, metrics, selection: { limit: 50 }, generatedAt: 'now' })
   assert.equal(a.artifact, 'velpi-cil-review-batch')
@@ -87,12 +95,13 @@ test('batch artifact summarizes runs + carries fleet metrics', () => {
   assert.equal(a.instructions, BATCH_INSTRUCTIONS)
   assert.equal(a.fleet_metrics.n, 2)
   assert.equal(a.runs[0].directive_summary.thesis, 'candlelit love letter')
-  assert.equal(a.runs[0].developer_review.rating, 'love')
+  assert.deepEqual(a.runs[0].developer_review.mobile.scores, { overall: 5, layout: 4, images: 5, trust: 4, copy: 5 })
+  assert.deepEqual(a.runs[0].developer_review.desktop.scores, { overall: 2, layout: 2, images: 3, trust: 3, copy: 3 })
   assert.equal(a.runs[1].developer_review, null)
   assert.equal(a.runs[1].business, 'B2')
 })
 
 test('batch artifact excludes HTML by default', () => {
-  const a = buildBatchArtifact({ rows: [{ directive: CDO, review: null }], metrics: {}, selection: {} })
+  const a = buildBatchArtifact({ rows: [{ directive: CDO, reviews: null }], metrics: {}, selection: {} })
   assert.ok(!('html' in a.runs[0]))
 })

@@ -1,56 +1,140 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { RATINGS, RATING_LABELS, FLAG_KEYS, FLAG_LABELS, emptyReview } from '../../lib/creative/review.mjs'
+import {
+  SCORE_KEYS, SCORE_LABELS, SCORE_QUESTIONS, SCORE_MIN, SCORE_MAX,
+  isLowScore, emptyReview,
+} from '../../lib/creative/review.mjs'
 
-// Developer Review Panel — DEV ONLY. Docked below the generated site, above the
-// Refine input. Resting state is ONE tap: Love / Okay / Needs Work. Okay/Needs
-// Work reveal a small multi-select flag row + an optional note; Love saves
-// silently and stays collapsed. No score sliders, no per-section grid — this is
-// built for a fast rate-many-builds loop, not a permanent scoreboard.
+// Developer Review Star — DEV ONLY. Lives inside the device preview overlay
+// (mobile or desktop), one instance per viewport, so a rating always belongs
+// to the device view it was given in. Resting state is a small gold star
+// whose ring reflects the saved "overall" score. Tapping it expands into a
+// one-question-at-a-time stepper: five fixed rating questions (overall,
+// layout, images, trust, copy) each answered 1-5, followed by one optional
+// free-text note screen. Low scores (<= LOW_SCORE_MAX) require a short note
+// before you can move on. Every tap autosaves (debounced) as a partial patch.
+// Rehydrates from the server on mount so a build you've already rated always
+// reopens on the first unanswered question — never a reset.
 //
-// Independent of the Creative Intelligence Layer: buildId is generated for
-// every run regardless of CIL mode, so there is nothing to configure and
-// nothing to show the user about it.
-//
-// Props: buildId (per-generation id, always present), projectId (auto-saved
-// project id), businessName, getRenderedHtml() -> html string (for the
-// optional "Ask ChatGPT" screenshot).
+// Props: buildId, projectId, viewport ('mobile'|'desktop', required).
 
-const C = { panel: '#121a2b', panel2: '#0d1524', border: '#22304a', text: '#e8eefc', dim: '#8ea0c0', muted: '#61708c', blue: '#4c8dff', green: '#39d98a', amber: '#e5c07b', red: '#ff6675' }
-const RATING_STYLE = { love: C.green, okay: C.amber, needs_work: C.red }
+const C = { panel: '#121a2b', panel2: '#0d1524', border: '#22304a', text: '#e8eefc', dim: '#8ea0c0', muted: '#61708c', gold: '#e5c07b', blue: '#4c8dff', green: '#39d98a', amber: '#e5c07b', red: '#ff6675' }
 
-export default function ReviewPanel({ buildId, projectId, businessName, getRenderedHtml }) {
-  const [review, setReview] = useState(() => emptyReview(buildId, projectId))
-  const [expanded, setExpanded] = useState(false)
+const SCORE_RANGE = []
+for (let v = SCORE_MIN; v <= SCORE_MAX; v++) SCORE_RANGE.push(v)
+
+const TOTAL_STEPS = SCORE_KEYS.length // question steps are 0..TOTAL_STEPS-1; TOTAL_STEPS itself is the final free-note screen
+
+function numberColor(n) {
+  if (n >= 4) return C.green
+  if (n === 3) return C.amber
+  return C.red
+}
+
+function emptyPerQuestionNotes() {
+  return Object.fromEntries(SCORE_KEYS.map(k => [k, '']))
+}
+
+// Compose the single opaque note string the server stores, from the
+// per-question notes (only ever populated for low-score answers) plus the
+// optional trailing free note. Always recomputed in full — never a delta.
+function composeNote(perQuestionNotes, finalNote) {
+  const lines = []
+  for (const key of SCORE_KEYS) {
+    const t = (perQuestionNotes[key] || '').trim()
+    if (t) lines.push(`${SCORE_LABELS[key]}: ${t}`)
+  }
+  const ft = (finalNote || '').trim()
+  if (ft) lines.push(ft)
+  return lines.join('\n')
+}
+
+// Best-effort inverse of composeNote for rehydration. Any line that doesn't
+// start with one of the five known "Label: " prefixes is treated as part of
+// the trailing free note (leftover lines rejoined in order). Not bulletproof
+// against coincidental prefix collisions in free text — acceptable for this
+// internal dev tool.
+function parseNote(note) {
+  const perQuestionNotes = emptyPerQuestionNotes()
+  const leftover = []
+  const lines = (note || '').split('\n')
+  for (const line of lines) {
+    let matched = false
+    for (const key of SCORE_KEYS) {
+      const prefix = `${SCORE_LABELS[key]}: `
+      if (line.startsWith(prefix)) {
+        perQuestionNotes[key] = line.slice(prefix.length)
+        matched = true
+        break
+      }
+    }
+    if (!matched && line) leftover.push(line)
+  }
+  return { perQuestionNotes, finalNote: leftover.join('\n') }
+}
+
+// Where to land after rehydrating: the first still-unanswered question, or
+// the first low score (<= LOW_SCORE_MAX) that never got its required note —
+// closing the panel right after a low tap must not let it slip through
+// silently — or the final free-note screen if all five are properly answered.
+function firstUnansweredStep(scores, perQuestionNotes) {
+  for (let i = 0; i < SCORE_KEYS.length; i++) {
+    const key = SCORE_KEYS[i]
+    const v = scores[key]
+    if (v == null) return i
+    if (isLowScore(v) && !(perQuestionNotes[key] || '').trim()) return i
+  }
+  return TOTAL_STEPS
+}
+
+export default function ReviewPanel({ buildId, projectId, viewport }) {
+  const [review, setReview] = useState(() => emptyReview(buildId, projectId, viewport))
+  const [perQuestionNotes, setPerQuestionNotes] = useState(emptyPerQuestionNotes)
+  const [finalNoteText, setFinalNoteText] = useState('')
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState(0) // 0..TOTAL_STEPS-1 = questions, TOTAL_STEPS = final free-note screen
   const [saved, setSaved] = useState('idle') // idle | saving | saved | error
   const [saveReason, setSaveReason] = useState('')
-  const [exporting, setExporting] = useState(false)
-  const [exportingReviews, setExportingReviews] = useState(false)
   const timer = useRef(null)
+  const pending = useRef({})
 
   useEffect(() => {
-    setReview(emptyReview(buildId, projectId))
-    setExpanded(false)
-    if (!buildId) return
-    fetch(`/api/creative/review?buildId=${encodeURIComponent(buildId)}`)
+    setOpen(false)
+    setStep(0)
+    if (!buildId || !viewport) return
+    fetch(`/api/creative/review?buildId=${encodeURIComponent(buildId)}&viewport=${viewport}`)
       .then(r => r.json())
       .then(d => {
         if (d?.ok && d.review) {
           setReview(d.review)
-          if (d.review.rating === 'okay' || d.review.rating === 'needs_work') setExpanded(true)
+          const { perQuestionNotes: pqn, finalNote } = parseNote(d.review.note || '')
+          setPerQuestionNotes(pqn)
+          setFinalNoteText(finalNote)
+          setStep(firstUnansweredStep(d.review.scores || {}, pqn))
         }
-      }).catch(() => {})
-  }, [buildId, projectId])
+      })
+      .catch(() => {})
+  }, [buildId, viewport])
 
-  function scheduleSave(next) {
+  function scheduleSave(patch) {
     if (!buildId && !projectId) return
+    pending.current = {
+      ...pending.current,
+      ...patch,
+      scores: patch.scores ? { ...pending.current.scores, ...patch.scores } : pending.current.scores,
+    }
     setSaved('saving')
     clearTimeout(timer.current)
     timer.current = setTimeout(async () => {
+      const toSend = pending.current
+      pending.current = {}
       try {
+        const body = { buildId, projectId, viewport }
+        if (toSend.scores) body.scores = toSend.scores
+        if (typeof toSend.note === 'string') body.note = toSend.note
         const r = await fetch('/api/creative/review', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ buildId, projectId, rating: next.rating, flags: next.flags, note: next.note }),
+          body: JSON.stringify(body),
         }).then(x => x.json())
         // Reflect the REAL persistence result — the request can be ok while the
         // DB write failed (e.g. the creative_reviews table hasn't been created).
@@ -60,152 +144,137 @@ export default function ReviewPanel({ buildId, projectId, businessName, getRende
     }, 500)
   }
 
-  function pickRating(r) {
-    const flags = r === 'love' ? [] : review.flags
-    const next = { ...review, rating: r, flags }
-    setReview(next)
-    setExpanded(r !== 'love')
-    scheduleSave(next)
+  function pickScore(key, n) {
+    setReview(prev => ({ ...prev, scores: { ...prev.scores, [key]: n } }))
+    scheduleSave({ scores: { [key]: n } })
   }
-  function toggleFlag(f) {
-    const has = review.flags.includes(f)
-    const next = { ...review, flags: has ? review.flags.filter(x => x !== f) : [...review.flags, f] }
-    setReview(next)
-    scheduleSave(next)
+  function updatePerQuestionNote(key, text) {
+    const next = { ...perQuestionNotes, [key]: text }
+    setPerQuestionNotes(next)
+    scheduleSave({ note: composeNote(next, finalNoteText) })
   }
-  function setNote(note) {
-    const next = { ...review, note }
-    setReview(next)
-    scheduleSave(next)
+  function updateFinalNote(text) {
+    setFinalNoteText(text)
+    scheduleSave({ note: composeNote(perQuestionNotes, text) })
   }
 
-  async function askChatGpt() {
-    if (exporting || (!buildId && !projectId)) return
-    setExporting(true)
-    try {
-      let fullpage = null
-      try { fullpage = await captureFullPage(getRenderedHtml ? getRenderedHtml() : null) } catch (_) {}
-      const q = new URLSearchParams()
-      if (buildId) q.set('buildId', buildId)
-      if (projectId) q.set('projectId', projectId)
-      const artifact = await fetch(`/api/creative/export?${q.toString()}`).then(r => r.json())
-      if (fullpage) artifact.screenshots = { ...(artifact.screenshots || {}), fullpage_dataUri: fullpage }
-      downloadBlob(JSON.stringify(artifact, null, 2), 'application/json', `velpi-review-${safeName(businessName)}.json`)
-      try { await navigator.clipboard?.writeText(artifact.instructions || 'Review this Velpi export.') } catch (_) {}
-      window.open('https://chat.openai.com/', '_blank', 'noopener')
-    } finally { setExporting(false) }
-  }
-
-  async function exportReviews() {
-    if (exportingReviews) return
-    setExportingReviews(true)
-    try {
-      const md = await fetch('/api/creative/export/reviews').then(r => r.text())
-      downloadBlob(md, 'text/markdown', `velpi-reviews-${new Date().toISOString().slice(0, 10)}.md`)
-    } finally { setExportingReviews(false) }
-  }
-
+  const overall = review.scores?.overall
+  const ringColor = overall == null ? 'rgba(255,255,255,0.35)' : overall >= 4 ? C.green : overall === 3 ? C.amber : C.red
   const savedLabel = { idle: '', saving: 'Saving…', saved: '✓ Saved', error: '⚠ Not saved' }[saved]
-  const tableMissing = /schema cache|does not exist|creative_reviews/i.test(saveReason || '')
+
+  const onQuestion = step < TOTAL_STEPS
+  const key = onQuestion ? SCORE_KEYS[step] : null
+  const label = onQuestion ? SCORE_LABELS[key] : null
+  const subtitle = onQuestion ? SCORE_QUESTIONS[key] : null
+  const score = onQuestion ? review.scores?.[key] : null
+  const required = onQuestion && typeof score === 'number' && isLowScore(score)
+  const noteText = onQuestion ? (perQuestionNotes[key] || '') : ''
+  const hasNoteText = !!noteText.trim()
+  const showNoteBox = onQuestion && (required || hasNoteText)
+  const canAdvance = onQuestion && typeof score === 'number' && (!isLowScore(score) || hasNoteText)
 
   return (
-    <div style={{ maxWidth: 1140, margin: '16px auto 0', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, fontFamily: 'var(--font-inter, sans-serif)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {RATINGS.map(r => {
-            const on = review.rating === r
-            return (
-              <button key={r} onClick={() => pickRating(r)} style={{
-                padding: '7px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                background: on ? `${RATING_STYLE[r]}29` : 'transparent',
-                color: on ? RATING_STYLE[r] : C.dim,
-                border: `${on ? 2 : 1}px solid ${on ? RATING_STYLE[r] : C.border}`,
-              }}>
-                {r === 'love' ? '♥ ' : r === 'needs_work' ? '⚠ ' : '~ '}{RATING_LABELS[r]}
-              </button>
-            )
-          })}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span title={saveReason} style={{ fontSize: 11, color: saved === 'error' ? C.red : C.green, minWidth: 0 }}>{savedLabel}</span>
-          <button onClick={exportReviews} disabled={exportingReviews} title="Export all saved reviews as markdown" style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.dim, borderRadius: 7, padding: '5px 10px', fontSize: 11, cursor: 'pointer', opacity: exportingReviews ? 0.6 : 1 }}>
-            {exportingReviews ? '…' : '⬇ Export Reviews'}
-          </button>
-          <button onClick={askChatGpt} disabled={exporting || (!buildId && !projectId)} style={{ background: C.blue, border: 'none', color: '#fff', borderRadius: 7, padding: '6px 11px', fontSize: 11, cursor: 'pointer', opacity: exporting ? 0.6 : 1 }}>
-            {exporting ? 'Packaging…' : 'Ask ChatGPT ↗'}
-          </button>
-        </div>
-      </div>
-
-      {saved === 'error' && (
-        <div style={{ padding: '0 14px 10px', fontSize: 11, color: C.red }}>
-          Not saved — {saveReason || 'unknown error'}.{tableMissing ? ' Run db/creative_reviews.sql in the Supabase SQL editor, then retry.' : ''}
-        </div>
+    <div style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 5, fontFamily: 'var(--font-inter, sans-serif)' }} onClick={e => e.stopPropagation()}>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          title={overall != null ? `Overall: ${overall}/${SCORE_MAX}` : 'Rate this view'}
+          style={{
+            width: 40, height: 40, borderRadius: '50%', background: C.panel, cursor: 'pointer',
+            border: `2px solid ${ringColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.4)', fontSize: 18, color: C.gold, lineHeight: 1,
+          }}
+        >★</button>
       )}
 
-      {expanded && (
-        <div style={{ padding: '0 14px 12px', borderTop: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '10px 0' }}>
-            {FLAG_KEYS.map(f => {
-              const on = review.flags.includes(f)
-              return (
-                <button key={f} onClick={() => toggleFlag(f)} style={{
-                  padding: '5px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
-                  background: on ? 'rgba(76,141,255,0.18)' : 'transparent',
-                  color: on ? C.blue : C.dim,
-                  border: `1px solid ${on ? C.blue : C.border}`,
-                }}>{FLAG_LABELS[f]}</button>
-              )
-            })}
+      {open && (
+        <div style={{ width: 270, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 11, color: C.dim, letterSpacing: '0.03em', textTransform: 'uppercase' }}>★ Rate {viewport}</span>
+              <span style={{ fontSize: 10, color: C.muted }}>
+                {onQuestion ? `Question ${step + 1} of ${TOTAL_STEPS}` : 'Additional notes'}
+              </span>
+            </div>
+            <button onClick={() => setOpen(false)} style={{ background: 'transparent', border: 'none', color: C.dim, cursor: 'pointer', fontSize: 13 }}>✕</button>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              value={review.note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="Optional note — what to fix"
-              style={{ flex: 1, background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: '7px 10px', fontSize: 12, fontFamily: 'inherit' }}
-            />
-            <button onClick={() => setExpanded(false)} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.dim, borderRadius: 7, padding: '7px 10px', fontSize: 12, cursor: 'pointer' }}>Done</button>
+
+          <div style={{ padding: '10px 10px 4px' }}>
+            {onQuestion ? (
+              <>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600, marginBottom: subtitle ? 2 : 8 }}>{label}</div>
+                {subtitle && <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>{subtitle}</div>}
+                <div style={{ display: 'flex', gap: 6, marginBottom: showNoteBox ? 8 : 0 }}>
+                  {SCORE_RANGE.map(n => {
+                    const on = score === n
+                    const nColor = numberColor(n)
+                    return (
+                      <button key={n} onClick={() => pickScore(key, n)} style={{
+                        width: 36, height: 32, borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                        background: on ? `${nColor}29` : 'transparent',
+                        color: on ? nColor : C.dim,
+                        border: `${on ? 2 : 1}px solid ${on ? nColor : C.border}`,
+                      }}>{n}</button>
+                    )
+                  })}
+                </div>
+                {showNoteBox && (
+                  <textarea
+                    value={noteText}
+                    onChange={e => updatePerQuestionNote(key, e.target.value)}
+                    placeholder={required ? "What's wrong? (required)" : 'Optional note'}
+                    rows={2}
+                    style={{ width: '100%', background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: '7px 9px', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600, marginBottom: 8 }}>Anything else?</div>
+                <textarea
+                  value={finalNoteText}
+                  onChange={e => updateFinalNote(e.target.value)}
+                  placeholder="Optional note"
+                  rows={3}
+                  style={{ width: '100%', background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: '7px 9px', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              </>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 10px 10px' }}>
+            <button
+              onClick={() => setStep(s => Math.max(0, s - 1))}
+              disabled={step === 0}
+              style={{
+                padding: '6px 10px', borderRadius: 8, fontSize: 12,
+                cursor: step === 0 ? 'not-allowed' : 'pointer',
+                background: 'transparent', color: step === 0 ? C.muted : C.dim,
+                border: `1px solid ${C.border}`, opacity: step === 0 ? 0.5 : 1,
+              }}
+            >‹ Back</button>
+            {onQuestion && (
+              <button
+                onClick={() => setStep(s => Math.min(TOTAL_STEPS, s + 1))}
+                disabled={!canAdvance}
+                style={{
+                  padding: '6px 10px', borderRadius: 8, fontSize: 12,
+                  cursor: canAdvance ? 'pointer' : 'not-allowed',
+                  background: 'transparent', color: canAdvance ? C.blue : C.muted,
+                  border: `1px solid ${canAdvance ? C.blue : C.border}`, opacity: canAdvance ? 1 : 0.5,
+                }}
+              >Next ›</button>
+            )}
+          </div>
+
+          <div style={{ padding: '0 10px 10px' }}>
+            <span title={saveReason} style={{ fontSize: 10, color: saved === 'error' ? C.red : C.green }}>{savedLabel}</span>
+            {saved === 'error' && (
+              <div style={{ marginTop: 4, fontSize: 10, color: C.red }}>Not saved — {saveReason || 'unknown error'}.</div>
+            )}
           </div>
         </div>
       )}
     </div>
   )
-}
-
-function safeName(s) { return (s || 'velpi').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) }
-
-function downloadBlob(content, type, filename) {
-  const blob = new Blob([content], { type })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 5000)
-}
-
-// Best-effort full-page screenshot for the export (returns a data URI or null).
-async function captureFullPage(html) {
-  if (!html) return null
-  const frame = document.createElement('iframe')
-  try {
-    frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:2000px;border:none;'
-    frame.setAttribute('sandbox', 'allow-same-origin')
-    document.body.appendChild(frame)
-    frame.srcdoc = html
-    await new Promise(res => { frame.onload = res })
-    await new Promise(res => setTimeout(res, 1000))
-    const doc = frame.contentDocument
-    const fullH = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
-    frame.style.height = `${Math.min(fullH + 40, 20000)}px`
-    await new Promise(res => setTimeout(res, 200))
-    const html2canvas = (await import('html2canvas')).default
-    const canvas = await html2canvas(doc.documentElement, { useCORS: true, backgroundColor: '#ffffff', windowWidth: 1440, width: 1440, height: Math.min(fullH, 20000), scale: 0.5, logging: false })
-    return canvas.toDataURL('image/jpeg', 0.7)
-  } catch (_) {
-    return null
-  } finally {
-    try { document.body.removeChild(frame) } catch (_) {}
-  }
 }

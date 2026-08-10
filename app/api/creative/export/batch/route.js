@@ -2,7 +2,7 @@ export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
 import { isDevReviewServer } from '../../../../../lib/creative/flags.mjs'
-import { listAssembledFull, getReview } from '../../../../../lib/creative/persistence.mjs'
+import { listAssembledFull, getReviewsForBuild } from '../../../../../lib/creative/persistence.mjs'
 import { computeFleetMetrics } from '../../../../../lib/creative/metrics.mjs'
 import { buildBatchArtifact } from '../../../../../lib/creative/exportPackage.mjs'
 
@@ -16,27 +16,24 @@ export async function GET(request) {
   try {
     const url = new URL(request.url)
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 50))
-    const rating = url.searchParams.get('rating') || undefined
     const niche = url.searchParams.get('niche') || undefined
     const tier = url.searchParams.get('tier') || undefined
     const since = url.searchParams.get('since') || undefined
     const includeHtml = url.searchParams.get('includeHtml') === 'true'
 
     const dirRows = await listAssembledFull(limit, { niche, tier, since })
-    // Join each directive with its review (N+1, bounded to <=100 for a dev export).
+    // Join each directive with its reviews (N+1, bounded to <=100 for a dev export).
+    const toClientShape = row => row ? { buildId: row.run_id, scores: row.scores || {}, note: row.notes || '', reviewVersion: row.review_version } : null
     const rows = []
-    for (const row of dirRows) {
-      const review = await getReview(row.id).catch(() => null)
-      const r = review
-        ? { buildId: review.run_id, rating: review.rating, flags: review.flags || [], note: review.notes || '', reviewVersion: review.review_version }
-        : null
-      if (rating && (!r || r.rating !== rating)) continue
-      rows.push({ directive: row.directive, review: r })
+    for (const dirRow of dirRows) {
+      const found = await getReviewsForBuild(dirRow.id).catch(() => ({ mobile: null, desktop: null }))
+      const reviews = { mobile: toClientShape(found.mobile), desktop: toClientShape(found.desktop) }
+      rows.push({ directive: dirRow.directive, reviews })
     }
 
     const metrics = computeFleetMetrics(rows.map(x => ({ rollup: x.directive?.rollup })))
     const artifact = buildBatchArtifact({
-      rows, metrics, selection: { limit, rating, niche, tier, since, includeHtml },
+      rows, metrics, selection: { limit, niche, tier, since, includeHtml },
       includeHtml, generatedAt: new Date().toISOString(),
     })
 
