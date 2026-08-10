@@ -128,6 +128,61 @@ async function uploadBase64Assets(assetsById, refinedLogoValue, keyPrefix) {
   return { assetsById: newAssetsById, refinedLogo: newRefinedLogo, failed }
 }
 
+// Trim fully-transparent margins off a PNG data URI and return the tight
+// content crop (+ a small even margin) with its true content dimensions.
+// The refine model letterboxes logos inside its fixed API canvases
+// (1536x1024 / 1024x1024) — without this trim, a 4:1 wordmark lives inside a
+// 1.5:1 file and every height-based header sizing renders it tiny with huge
+// invisible padding. The TRIMMED image is what the app stores, displays,
+// exports, and measures.
+function trimTransparentPng(dataUri) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        const ctx = c.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const d = ctx.getImageData(0, 0, c.width, c.height).data
+        let minX = c.width, maxX = -1, minY = c.height, maxY = -1
+        for (let y = 0; y < c.height; y++) {
+          for (let x = 0; x < c.width; x++) {
+            if (d[(y * c.width + x) * 4 + 3] > 8) {
+              if (x < minX) minX = x
+              if (x > maxX) maxX = x
+              if (y < minY) minY = y
+              if (y > maxY) maxY = y
+            }
+          }
+        }
+        if (maxX < 0) return resolve({ uri: dataUri, width: c.width, height: c.height }) // fully transparent — leave as-is
+        const margin = Math.round(Math.max(maxX - minX, maxY - minY) * 0.03)
+        const sx = Math.max(0, minX - margin), sy = Math.max(0, minY - margin)
+        const sw = Math.min(c.width - sx, maxX - minX + 1 + margin * 2)
+        const sh = Math.min(c.height - sy, maxY - minY + 1 + margin * 2)
+        const out = document.createElement('canvas')
+        out.width = sw
+        out.height = sh
+        out.getContext('2d').drawImage(c, sx, sy, sw, sh, 0, 0, sw, sh)
+        resolve({ uri: out.toDataURL('image/png'), width: sw, height: sh })
+      } catch (e) { reject(e) }
+    }
+    img.onerror = () => reject(new Error('Could not load the refined logo for trimming.'))
+    img.src = dataUri
+  })
+}
+
+function classifyLogoShape(width, height) {
+  if (!width || !height) return { shape: 'unknown', ratio: null }
+  const ratio = +(width / height).toFixed(2)
+  if (ratio >= 2) return { shape: 'wide', ratio }
+  if (ratio >= 0.8 && ratio <= 1.25) return { shape: 'square', ratio }
+  if (ratio > 1.25) return { shape: 'landscape', ratio }
+  return { shape: 'tall', ratio }
+}
+
 // Rasterize any uploaded image (PNG/JPG/SVG/screenshot) to PNG base64,
 // preserving transparency. Returns { data (raw b64), preview (data uri) }.
 function fileToPng(file, maxW = 1024) {
@@ -313,6 +368,7 @@ export default function Studio() {
   const logoInputRef = useRef(null)
   const [vibe, setVibe] = useState({})              // question id -> up to 2 selected options
   const [refinedLogo, setRefinedLogo] = useState(null) // data uri after refinement
+  const [logoMeta, setLogoMeta] = useState(null) // { shape, ratio, width, height } probed from the source logo
 
   // ── Pipeline ──
   const [generating, setGenerating] = useState(false)
@@ -331,6 +387,7 @@ export default function Studio() {
   const [reportOpen, setReportOpen] = useState(false)
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
+  const [makingPdf, setMakingPdf] = useState(false)
 
   // ── In-app device preview: a real, scrollable, interactive view at an
   // accurate fixed viewport (mobile 390px / desktop 1440px) — not a scaled
@@ -396,7 +453,7 @@ export default function Studio() {
       const uploaded = await uploadBase64Assets(assetsById, refinedLogo, safeName(bizName))
       const data = {
         bizName, analysisData, slots, assetsById: uploaded.assetsById, ghlUrls, htmlTemplate, buildReport,
-        vibe, refinedLogo: uploaded.refinedLogo, logoUrl, input,
+        vibe, refinedLogo: uploaded.refinedLogo, logoUrl, logoMeta, input,
         structureLock: readStructureLock(analysisData?._source?.domain || '') || null,
         savedAt: new Date().toISOString(),
       }
@@ -432,6 +489,7 @@ export default function Studio() {
       setBuildReport(d.buildReport || '')
       setVibe(d.vibe || {})
       setRefinedLogo(d.refinedLogo || null)
+      setLogoMeta(d.logoMeta || null)
       setLogoUrl(d.logoUrl || null)
       setInput(d.input || '')
       setBuilt(!!d.htmlTemplate)
@@ -598,14 +656,22 @@ function extractLogoColors(dataUrl) {
     }
   }
 
-  // Capture the whole rendered mockup as ONE tall PNG you can scroll through.
-  async function downloadFullImage() {
+  // Render the mockup in a hidden iframe at a REAL browser viewport
+  // (1440x900) and capture its entire scrollable height — the way a
+  // full-page screenshot extension does. The iframe is deliberately NEVER
+  // resized to the page height: the old code did, which re-based every
+  // vh unit against the huge new "viewport" (an 88vh hero suddenly became
+  // thousands of px), growing the page far past the already-measured
+  // height — that mismatch is exactly why captures came out truncated.
+  // Instead the viewport stays 900px tall (vh keeps meaning what it means
+  // in a real browser) and html2canvas is told the full document height
+  // to draw, with windowHeight pinned to the real viewport.
+  async function captureFullPageCanvas() {
     const out = previewHtml()
-    if (!out || snapping) return
-    setSnapping(true)
+    if (!out) return null
     const frame = document.createElement('iframe')
     try {
-      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:2000px;border:none;'
+      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:900px;border:none;'
       frame.setAttribute('sandbox', 'allow-same-origin')
       document.body.appendChild(frame)
       frame.srcdoc = out
@@ -613,13 +679,25 @@ function extractLogoColors(dataUrl) {
       await new Promise(res => setTimeout(res, 1200)) // let fonts/images settle
       const doc = frame.contentDocument
       const fullH = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
-      frame.style.height = `${Math.min(fullH + 40, 30000)}px`
-      await new Promise(res => setTimeout(res, 300))
       const html2canvas = (await import('html2canvas')).default
       const canvas = await html2canvas(doc.documentElement, {
         useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
-        windowWidth: 1440, width: 1440, height: Math.min(fullH, 30000), scale: 1, logging: false,
+        windowWidth: 1440, windowHeight: 900, width: 1440, height: Math.min(fullH, 40000),
+        scale: 1, logging: false,
       })
+      return canvas
+    } finally {
+      try { document.body.removeChild(frame) } catch (_) {}
+    }
+  }
+
+  // Capture the whole rendered mockup as ONE tall PNG you can scroll through.
+  async function downloadFullImage() {
+    if (!htmlTemplate || snapping) return
+    setSnapping(true)
+    try {
+      const canvas = await captureFullPageCanvas()
+      if (!canvas) return
       const a = document.createElement('a')
       a.href = canvas.toDataURL('image/png')
       a.download = `${safeName(bizName)}-mockup-fullpage.png`
@@ -627,8 +705,66 @@ function extractLogoColors(dataUrl) {
     } catch (e) {
       setError(`Could not capture the full-page image: ${e.message}. The Open Full Preview tab + your browser's full-page screenshot works as a fallback.`)
     } finally {
-      try { document.body.removeChild(frame) } catch (_) {}
       setSnapping(false)
+    }
+  }
+
+  // PRIMARY download: the full mockup as a single-page PDF (one continuous
+  // page at the site's real height — made for sharing a finished mockup
+  // without pasting HTML anywhere). Image-based by design: it's a visual
+  // proof, the deployable artifact stays the HTML.
+  async function downloadPdf() {
+    if (!htmlTemplate || makingPdf) return
+    setMakingPdf(true)
+    setError(null)
+    try {
+      const canvas = await captureFullPageCanvas()
+      if (!canvas) return
+      const { jsPDF } = await import('jspdf')
+      const w = canvas.width
+      const h = canvas.height
+      const pdf = new jsPDF({
+        orientation: h >= w ? 'portrait' : 'landscape',
+        unit: 'px',
+        format: [w, h],
+        hotfixes: ['px_scaling'],
+        compress: true,
+      })
+      // JPEG keeps a tall-page PDF at a shareable size; the backdrop is
+      // already flattened to white by the capture.
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, w, h)
+      pdf.save(`${safeName(bizName)}-mockup.pdf`)
+    } catch (e) {
+      setError(`Could not create the PDF: ${e.message}`)
+    } finally {
+      setMakingPdf(false)
+    }
+  }
+
+  // GHL header export — only offered for horizontal (wide) logos: GHL renders
+  // header logos inside a fixed-height container and squishes anything tall,
+  // so the export keeps height small relative to width. Square logos don't
+  // need this; their existing 1:1 transparent PNG already fits GHL as-is.
+  async function downloadGhlHeaderLogo() {
+    const src = refinedLogo || assetsById.logo || logo?.preview
+    if (!src) return
+    try {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Could not load the logo image.')); img.src = src })
+      const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1)
+      const targetH = 120 // small height, crisp at GHL's ~40-60px render
+      const targetW = Math.round(targetH * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = targetW
+      canvas.height = targetH
+      canvas.getContext('2d').drawImage(img, 0, 0, targetW, targetH)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png') // preserves alpha
+      a.download = `${safeName(bizName)}-logo-ghl-header.png`
+      a.click()
+    } catch (e) {
+      setError(`GHL header export failed: ${e.message}`)
     }
   }
 
@@ -646,6 +782,7 @@ function extractLogoColors(dataUrl) {
       const png = await fileToPng(file)
       setLogo(png)
       setRefinedLogo(null)
+      setLogoMeta(null)
       setLogoPalette(await extractLogoColors(png.preview))
     } catch (e) {
       setError(e.message)
@@ -695,14 +832,26 @@ function extractLogoColors(dataUrl) {
       // parallel with everything else — it never blocks the build.
       mark('logo', 'active')
       let logoAssetLocal = null // local mirror for auto-save
+      let logoMetaLocal = null // measured shape/ratio — drives header sizing in the build
       const refinePayload = logo
         ? { b64: logo.data, instructions: logoNotes.trim() }
         : (scrapedData.logo ? { url: scrapedData.logo, instructions: logoNotes.trim() } : null)
       const refineP = refinePayload
         ? callRoute('/api/refine-logo', refinePayload)
-            .then(res => {
+            .then(async res => {
+              if (res.logoMeta) { logoMetaLocal = res.logoMeta; setLogoMeta(res.logoMeta) }
               if (res.b64) {
-                const uri = `data:image/png;base64,${res.b64}`
+                let uri = `data:image/png;base64,${res.b64}`
+                // Trim the API's transparent letterbox and re-measure from the
+                // CONTENT — the trimmed asset + its true ratio are what header
+                // sizing must be based on, or a wide lockup inside a 1.5:1
+                // canvas renders tiny no matter what CSS asks for.
+                try {
+                  const trimmed = await trimTransparentPng(uri)
+                  uri = trimmed.uri
+                  const contentMeta = { ...classifyLogoShape(trimmed.width, trimmed.height), width: trimmed.width, height: trimmed.height }
+                  if (contentMeta.shape !== 'unknown') { logoMetaLocal = contentMeta; setLogoMeta(contentMeta) }
+                } catch (_) { /* trim is an enhancement — untrimmed still works */ }
                 logoAssetLocal = uri
                 setRefinedLogo(uri)
                 setAssetsById(prev => ({ ...prev, logo: uri }))
@@ -893,6 +1042,10 @@ function extractLogoColors(dataUrl) {
       mark('copy', 'complete')
 
       mark('build', 'active')
+      // The logo's measured geometry drives header sizing in the build prompt.
+      // Refinement runs in parallel and is in practice long done by now (one
+      // image op vs analyze+brief+copy); awaiting is ~free and never rejects.
+      await refineP
       const buildSlots = [
         { id: 'logo', name: 'Logo', section: 'header' },
         ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
@@ -906,6 +1059,7 @@ function extractLogoColors(dataUrl) {
         motion: motionPreset,
         sectionRefs,
         structure, // the deterministic skeleton — same on every regeneration
+        logoMeta: logoMetaLocal, // measured shape/ratio — wide wordmarks size by ratio
       }
       lastRunRef.current = buildPayload // kept for alternate-layout rebuilds
       const { html, trace } = await callRoute('/api/build-site', buildPayload)
@@ -999,6 +1153,7 @@ function extractLogoColors(dataUrl) {
           vibe,
           refinedLogo: uploaded.refinedLogo,
           logoUrl: scrapedData.logo || null,
+          logoMeta: logoMetaLocal,
           input: input.trim(),
           thumb,
           structureLock: structPlan.lock || null,
@@ -1504,6 +1659,9 @@ function extractLogoColors(dataUrl) {
                         {src && (
                           <button onClick={() => downloadImage(src, `${i + 1}-${safeName(s.name)}.png`)} title="Download" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>⬇</button>
                         )}
+                        {s.id === 'logo' && src && (logoMeta?.shape === 'wide' || logoMeta?.shape === 'landscape') && (
+                          <button onClick={downloadGhlHeaderLogo} title="Transparent PNG sized for GoHighLevel's fixed-height header container" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>⬇ GHL header</button>
+                        )}
                         <label style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem', cursor: 'pointer' }}>
                           ⇧ Replace
                           <input type="file" accept="image/*,.svg" onChange={e => { replaceAsset(s.id, e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
@@ -1559,8 +1717,11 @@ function extractLogoColors(dataUrl) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={downloadPdf} disabled={makingPdf} style={{ ...monoBtn, background: BLUE, borderColor: BLUE, color: '#fff', opacity: makingPdf ? 0.6 : 1 }}>
+                  {makingPdf ? 'Rendering PDF…' : '⬇ Download PDF'}
+                </button>
                 <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : (allLinked ? '⧉ Copy Final HTML' : '⧉ Copy HTML (draft)')}</button>
-                <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
+                <button onClick={downloadHtml} style={monoBtn}>⬇ HTML file</button>
                 {promptTrace && <button onClick={downloadPromptTrace} style={monoBtn}>⬇ prompt-trace</button>}
                 <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
               </div>
