@@ -3,13 +3,16 @@ export const maxDuration = 300
 
 // Executes STEP 4 (image sourcing) decisions made during analysis:
 //   action "keep"     -> use the real photo URL as-is
+//   action "reuse"    -> use a cross-project asset-library image (reuse_url)
 //   action "enhance"  -> gpt-image-1 EDIT the real photo with the enhancement prompt
 //   action "generate" -> gpt-image-1 GENERATE a new photo from the generation prompt
 // Returns assets in inventory order so build-site can place each in its section.
 
-// Cap total AI image operations (enhance + generate) per run for speed/cost.
-// The analyze step plans 5-8 site images, so the cap matches the top of that range.
-const MAX_AI_OPS = 8
+// Runaway guard on AI image operations (enhance + generate) per run — NOT a
+// design ceiling. The analyze step plans 5-8 images by default and may go to
+// 12 by judgment; the budget follows whatever it planned, capped only well
+// above that range so a malformed inventory can't burn unbounded API calls.
+const MAX_AI_OPS = 14
 
 function assetId(item, i) {
   if (/logo/i.test(item.what || '') || item.section === 'header') return 'logo'
@@ -95,7 +98,12 @@ export async function POST(request) {
       const isLogo = id === 'logo'
       const base = { id, role: item.what || '', section: item.section || '', prompt: item.prompt || '' }
 
-      if (isLogo || item.action === 'keep' || (item.source === 'real' && item.action !== 'enhance' && item.action !== 'generate')) {
+      // Library reuse (decided by the analyze model when a listed candidate
+      // genuinely fits): straight passthrough of the library URL, no AI op.
+      if (!isLogo && item.action === 'reuse' && /^https?:\/\//.test(item.reuse_url || '')) {
+        return { passthrough: { ...base, kind: 'library', src: item.reuse_url } }
+      }
+      if (isLogo || item.action === 'keep' || (item.source === 'real' && item.action !== 'enhance' && item.action !== 'generate' && item.action !== 'reuse')) {
         return { passthrough: item.url ? { ...base, kind: isLogo ? 'logo' : 'photo', src: item.url } : null }
       }
       if (!hasOpenAI) {
@@ -187,6 +195,7 @@ export async function POST(request) {
       generated: assets.filter(a => a.kind === 'generated').length,
       enhanced: assets.filter(a => a.kind === 'enhanced').length,
       keptOriginal: assets.filter(a => a.kind === 'photo').length,
+      reusedFromLibrary: assets.filter(a => a.kind === 'library').length,
       logo: assets.some(a => a.kind === 'logo'),
       failures, // per-slot failure reasons so the UI can say WHY, not just "failed"
       at: new Date().toISOString(),

@@ -1,8 +1,5 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { pickCreativeMix } from '../lib/designStyles'
-import { pickSignatureMotion } from '../lib/motionPresets'
-import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
 import ReviewPanel from './dev/ReviewPanel'
 import ReviewExportBar from './dev/ReviewExportBar'
@@ -182,6 +179,30 @@ async function downloadImage(src, filename) {
 function slotIdFor(item, i) {
   if (/logo/i.test(item.what || '') || item.section === 'header') return 'logo'
   return `img_${item.slot != null ? item.slot : i}`
+}
+
+// Structure locks — the record that makes "regenerate = refine, not reroll".
+// Keyed per domain; captured from the first successful run's /api/plan-structure
+// result and sent back on every later regeneration of the same input so the
+// skeleton (section order, blueprints, design systems, motion) never rerolls.
+// Also stored inside each saved project, so loading a project restores its lock.
+const STRUCTURE_LOCKS_KEY = 'velpi_structure_locks_v1'
+function readStructureLock(domain) {
+  if (!domain) return null
+  try {
+    const all = JSON.parse(localStorage.getItem(STRUCTURE_LOCKS_KEY) || '{}')
+    return all[domain] || null
+  } catch (_) {
+    return null
+  }
+}
+function writeStructureLock(domain, lock) {
+  if (!domain || !lock) return
+  try {
+    const all = JSON.parse(localStorage.getItem(STRUCTURE_LOCKS_KEY) || '{}')
+    all[domain] = lock
+    localStorage.setItem(STRUCTURE_LOCKS_KEY, JSON.stringify(all))
+  } catch (_) {}
 }
 
 function placeholderSvg(text) {
@@ -376,6 +397,7 @@ export default function Studio() {
       const data = {
         bizName, analysisData, slots, assetsById: uploaded.assetsById, ghlUrls, htmlTemplate, buildReport,
         vibe, refinedLogo: uploaded.refinedLogo, logoUrl, input,
+        structureLock: readStructureLock(analysisData?._source?.domain || '') || null,
         savedAt: new Date().toISOString(),
       }
       const { project } = await callRoute('/api/projects', { name, data })
@@ -416,6 +438,9 @@ export default function Studio() {
       setImagesReady(true)
       setSteps(STEP_DEFS.map(s => ({ ...s, status: 'complete' })))
       setLibraryOpen(false)
+      // Restore the project's structure lock so regenerating this business
+      // (even from a different day/browser state) keeps its exact skeleton.
+      if (d.structureLock?.domain) writeStructureLock(d.structureLock.domain, d.structureLock)
       // A loaded project has no separate "build id" of its own — the project's
       // id is already a stable, unique identity, so the review attaches to that.
       setReviewProjectId(id)
@@ -788,38 +813,35 @@ function extractLogoColors(dataUrl) {
         .map(x => ({ id: x.id, name: x.item.what || x.id, section: x.item.section || '', prompt: x.item.prompt || '' }))
       setSlots([...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }])
 
-      // Anti-repetition memory: the key choices of the last 5 generations force
-      // variation — a combination can't repeat inside that window.
-      let genHistory = []
-      try { genHistory = JSON.parse(localStorage.getItem('velpi_gen_history') || '[]') } catch (_) {}
-      const avoidMotionIds = genHistory.map(h => h.motionId).filter(Boolean)
-      const avoidMixSigs = genHistory.map(h => h.mixSig).filter(Boolean)
-
-      let chosenStyles = []
+      // Deterministic structure plan — regenerate = refine, not reroll.
+      // A lock captured on this domain's first run pins the whole skeleton
+      // (section order, per-section blueprints, design systems, motion);
+      // without a lock, choices are seeded by the domain so the same input
+      // still resolves the same way. Randomness is gone from structure.
+      const siteDomain = analysis._source?.domain || scrapedData.domain || ''
+      const priorLock = readStructureLock(siteDomain)
       const manual = styles.find(s => s.id === styleId)
-      if (manual) chosenStyles = [manual]
-      else if (styleId === 'auto') {
-        // Creative mix: niche anchor + vibe carrier + wildcard — vibe answers
-        // change the blend, so the same industry doesn't always look the same.
-        chosenStyles = pickCreativeMix(
-          styles,
-          `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`,
-          `${vibeText} ${analysis.tone || ''} ${analysis.brand?.brand_personality || ''} ${analysis.brand?.design_language || ''}`,
-          3,
-          avoidMixSigs,
-        )
+      const structPlan = await callRoute('/api/plan-structure', {
+        analysis,
+        vibe: vibeText,
+        lock: priorLock,
+        manualStyleId: manual ? manual.id : null,
+      })
+      const chosenStyles = structPlan.styles || []
+      const motionPreset = structPlan.motion || null
+      const sectionRefs = structPlan.sectionRefs || []
+      const structure = { sectionOrder: structPlan.sectionOrder || [], sectionMap: structPlan.sectionMap || {} }
+      // Persist the lock immediately — this run's structure IS the contract
+      // every later regeneration of this input refines within.
+      if (structPlan.lock) writeStructureLock(siteDomain, structPlan.lock)
+      // Align the analysis's own section keys with the (possibly locked)
+      // order so downstream copy generation writes for the same skeleton.
+      if (structure.sectionOrder.length) {
+        analysis.sections = structure.sectionOrder
+        analysis.layout = { ...(analysis.layout || {}), section_order: structure.sectionOrder }
       }
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
-
-      // Signature motion — its own selection pass, separate from styles:
-      // ONE background/motion treatment, intensity matched to the niche + vibe,
-      // never repeating a recent generation's effect.
-      const motionPreset = pickSignatureMotion(analysis, vibeText, avoidMotionIds)
-
-      // Structural references — harvested section patterns matching the
-      // persuasion flow, studied by the builder (never copied verbatim).
-      const sectionRefs = pickSectionReferences(analysis, 4)
 
       // Design brief — a creative director fuses brand + vibe + the matched
       // systems into ONE committed spec before any HTML is written.
@@ -830,6 +852,10 @@ function extractLogoColors(dataUrl) {
           analysis, vibe: vibeText,
           styleMds: chosenStyles.map(s => s.content),
           motion: motionPreset ? { name: motionPreset.name, summary: motionPreset.summary, effect: motionPreset.effect, intensity: motionPreset.intensity } : null,
+          blueprintAssignments: Object.entries(structure.sectionMap).map(([sec, refId]) => {
+            const ref = sectionRefs.find(r => r.id === refId)
+            return `${sec}: ${ref?.name || refId}`
+          }),
         })
         designBrief = res.brief || ''
         mark('brief', 'complete')
@@ -879,6 +905,7 @@ function extractLogoColors(dataUrl) {
         brief: designBrief,
         motion: motionPreset,
         sectionRefs,
+        structure, // the deterministic skeleton — same on every regeneration
       }
       lastRunRef.current = buildPayload // kept for alternate-layout rebuilds
       const { html, trace } = await callRoute('/api/build-site', buildPayload)
@@ -937,18 +964,9 @@ function extractLogoColors(dataUrl) {
         mark('images', 'complete')
       }
 
-      // Record this generation's key choices in the anti-repetition memory.
-      try {
-        const entry = {
-          motionId: motionPreset?.id || null,
-          mixSig: chosenStyles.map(s => s.id).sort().join('+') || null,
-          palette0: (analysis.color_palette || [])[0] || null,
-          hero: (analysis.layout?.section_order || [])[0] || null,
-          at: new Date().toISOString(),
-        }
-        const nextHistory = [entry, ...genHistory].slice(0, 5)
-        localStorage.setItem('velpi_gen_history', JSON.stringify(nextHistory))
-      } catch (_) {}
+      // (The old anti-repetition memory is gone on purpose: same-input
+      // regenerations must KEEP their structure, not be forced to vary —
+      // cross-business variety now comes from per-domain seeding instead.)
 
       // AUTO-SAVE — every generation lands in the library automatically with a
       // thumbnail and a shareable /preview/{id} URL. Best-effort: never blocks.
@@ -983,6 +1001,7 @@ function extractLogoColors(dataUrl) {
           logoUrl: scrapedData.logo || null,
           input: input.trim(),
           thumb,
+          structureLock: structPlan.lock || null,
           savedAt: new Date().toISOString(),
         }
         const name = `${analysis.business_name || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
@@ -991,6 +1010,25 @@ function extractLogoColors(dataUrl) {
         setProjects(prev => [{ ...project, thumb }, ...prev])
         setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
         setTimeout(() => setSavedMsg(null), 5000)
+        // Index this run's uploaded images into the cross-project asset
+        // library (fire-and-forget; upsert-by-url, so re-saves are harmless).
+        // Future generations see these as reuse candidates during analysis.
+        try {
+          const records = Object.entries(uploaded.assetsById)
+            .filter(([id, src]) => id !== 'logo' && typeof src === 'string' && /^https?:\/\//.test(src))
+            .map(([id, src]) => {
+              const slot = allSlots.find(s => s.id === id)
+              return {
+                url: src,
+                subject: slot?.name || id,
+                section: slot?.section || '',
+                niche: analysis.niche || analysis.industry || '',
+                business: analysis.business_name || '',
+                tags: [analysis.industry, analysis.niche, slot?.section, ...(slot?.name || '').split(/[^a-zA-Z]+/)].filter(w => w && w.length > 3),
+              }
+            })
+          if (records.length) callRoute('/api/asset-library', { records }).catch(() => {})
+        } catch (_) {}
         if (uploaded.failed.length) {
           setError(`Auto-saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${uploaded.failed.join(', ')}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then use Save to retry.`)
         }
@@ -1074,6 +1112,14 @@ function extractLogoColors(dataUrl) {
       const { html } = await callRoute('/api/build-site', { ...lastRunRef.current, forcedLayout: alt })
       if (html) {
         setHtmlTemplate(html)
+        // A deliberately chosen alternate structure UPDATES the lock — this is
+        // the one sanctioned way structure changes; regenerations then keep it.
+        const dom = lastRunRef.current?.analysis?._source?.domain
+        if (dom && alt.section_order?.length) {
+          const lock = readStructureLock(dom)
+          if (lock) writeStructureLock(dom, { ...lock, sectionOrder: alt.section_order })
+          if (lastRunRef.current.structure) lastRunRef.current.structure = { ...lastRunRef.current.structure, sectionOrder: alt.section_order }
+        }
         setSavedMsg(`Rebuilt with the "${alt.name}" structure — open the preview to see it`)
         setTimeout(() => setSavedMsg(null), 4000)
       }
@@ -1486,21 +1532,34 @@ function extractLogoColors(dataUrl) {
             </div>
           </div>
 
-          {/* ── 3. EXPORT — always available; link status is info, not a lock ── */}
+          {/* ── 3. FINALIZE & EXPORT — swapping in GHL media URLs is the standard
+                 path to a production file, not an afterthought. Export is never
+                 locked, but the steps make the expected flow explicit. ── */}
           <div style={{ ...card, maxWidth: 'none', border: `1px solid ${allLinked ? 'rgba(57,217,138,0.5)' : BORDER}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 3 }}>
-                  {allLinked ? '✓ Production-ready export' : 'Export'}
+              <div style={{ minWidth: 260 }}>
+                <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 6 }}>
+                  {allLinked ? '✓ Finalized — production-ready' : 'Finalize & Export'}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                  {[
+                    { n: 1, text: 'Images generated', done: imagesReady },
+                    { n: 2, text: `GHL media URLs linked ${linkedCount}/${slots.length}`, done: allLinked },
+                    { n: 3, text: 'Export final HTML', done: false },
+                  ].map(step => (
+                    <span key={step.n} style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', letterSpacing: '0.04em', padding: '3px 9px', borderRadius: 99, border: `1px solid ${step.done ? 'rgba(57,217,138,0.5)' : BORDER}`, color: step.done ? GREEN : 'rgba(255,255,255,0.55)' }}>
+                      {step.done ? '✓' : step.n}. {step.text}
+                    </span>
+                  ))}
                 </div>
                 <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                   {allLinked
-                    ? 'Every asset is linked. This HTML deploys to GoHighLevel with zero manual edits.'
-                    : `${slots.length - linkedCount} asset${slots.length - linkedCount === 1 ? '' : 's'} still using the AI-generated image directly (bigger file) — paste a GoHighLevel media URL per slot for a lighter, production-ready export.`}
+                    ? 'Every slot points at a GoHighLevel media URL. This HTML deploys to GHL with zero manual edits.'
+                    : `Standard path: upload each image above to your GoHighLevel media library and paste its URL per slot — ${slots.length - linkedCount} slot${slots.length - linkedCount === 1 ? '' : 's'} left. Exporting now embeds the AI images directly (works, but heavier and not production-final).`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : '⧉ Copy HTML'}</button>
+                <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : (allLinked ? '⧉ Copy Final HTML' : '⧉ Copy HTML (draft)')}</button>
                 <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
                 {promptTrace && <button onClick={downloadPromptTrace} style={monoBtn}>⬇ prompt-trace</button>}
                 <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
