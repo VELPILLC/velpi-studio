@@ -96,12 +96,14 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
 - DESKTOP-FIRST, MOBILE-SAFE CONTRACT (the page is DESIGNED on a ~1440px canvas; it must NEVER break on a phone):
   * Author base CSS for desktop — each section at its blueprint's container width and proportions on a 1440px viewport — then adapt downward with @media (max-width: 1024px) and (max-width: 767px). The blueprints are written desktop-first with max-width collapses; follow the same pattern when re-expressing them.
   * Desktop carries the creative polish: full grid ratios, layered composition, generous rhythm. Mobile needs to be clean, readable, and complete — not creatively equal, never broken.
+  * DESKTOP MUST READ AS DESKTOP — the #1 failure mode to avoid is a page that looks like a blown-up phone screen at 1440px: a nav with no links, full-width stacked text, one narrow centered column everywhere. Even when a section's blueprint is a centered composition, at desktop widths its content sits in a measured container (roughly 640-880px for a centered hero's text block, line lengths 40-60ch) with deliberate surrounding space — never an edge-to-edge phone stack scaled up.
+  * DESKTOP NAV LINK LIST — HARD REQUIREMENT: at ≥768px the nav ALWAYS shows a visible link list (4-6 anchor links to real section ids — give every section an id) alongside the logo and the single CTA. The list hides ONLY inside the @media (max-width: 767px) query. A nav that renders just a logo and a CTA at desktop width is a BROKEN OUTPUT — the mobile-nav rule below describes what mobile hides, it is never permission to omit the links.
   * Fluid type with clamp() on display sizes (e.g. hero clamp(2.4rem, 6vw, 5.5rem)) so headlines scale down without overflowing.
   * MOBILE SAFETY — hard requirements, checked before you finish, never sacrificed for the desktop design:
     - Absolutely no horizontal scroll at 390px — every oversized/overlapping element gets max-width: 100% and overflow guards; grids and columns collapse to a single column.
     - Sections run edge-to-edge on mobile with a minimal text inset (12-16px); no boxed-in cards floating in wide margins.
     - CTAs go full-width on mobile with tap height ≥ 52px; body text never renders below 16px on mobile (nav labels/fine print can go to 13px minimum). A desktop base size below 16px does NOT satisfy this by accident — write the explicit override in the mobile media query (e.g. inside @media (max-width: 767px): .velpi-page p, .velpi-page li { font-size: 1rem; }) so every paragraph and list item is provably ≥ 16px on a phone. And make the floor actually WIN: place that override at the END of the final mobile media query, and never set a MORE SPECIFIC mobile p/li size below 1rem (a .velpi-page .card li { font-size: .9rem } written for desktop silently defeats the generic floor — bump those component sizes to ≥ 1rem inside the mobile query too). A server-side floor is ALSO appended after your CSS enforcing 1rem on every mobile p/li — so any p/li that is genuinely fine print (legal lines, photo captions) must carry class="fine" to keep its small size (the floor exempts p.fine/li.fine at 13px); body copy left small will simply be forced larger, possibly breaking your layout — size it right yourself.
-    - MOBILE NAV — no JavaScript means no hamburger toggle, so don't attempt one: on mobile the nav shows ONLY the logo and that SAME single nav CTA button described above (never a second, mobile-only CTA element) — the full link list hides via the @media (max-width: 767px) query while that one CTA stays visible. Keep the mobile bar compact (~56-64px tall).
+    - MOBILE NAV — no JavaScript means no hamburger toggle, so don't attempt one: on mobile the nav shows ONLY the logo and that SAME single nav CTA button described above (never a second, mobile-only CTA element) — the full link list REQUIRED by the desktop rule above still exists in the markup and hides via the @media (max-width: 767px) query while that one CTA stays visible. This rule REMOVES nothing from the desktop nav — it only hides the links below 768px. Keep the mobile bar compact (~56-64px tall).
     - Any cluster of small tap targets (footer links, social icons, nav items) keeps at least 8px of real spacing between adjacent targets.
 - LEGIBILITY & CONTRAST — NON-NEGOTIABLE, CHECK EVERY SECTION BEFORE YOU FINISH: text color must always have strong contrast against whatever is directly behind it, no exceptions.
   * White or near-white text is ONLY allowed on a dark surface: a dark solid section background, or a photo with a real dark scrim (e.g. linear-gradient with black/near-black at 45%+ opacity) behind it. Never place white/near-white text on a light page background, a light photo, or an unscrimmed light image — it becomes invisible.
@@ -244,6 +246,50 @@ ${imageBudgetBlock}`
       html = html.slice(0, lastStyleClose) + TYPE_FLOOR + html.slice(lastStyleClose)
     }
 
+    // Desktop nav-link backstop. The prompt REQUIRES a desktop link list in
+    // the nav, but the mobile-nav rule ("shows only logo + CTA") proved
+    // seductive enough that models sometimes emit a linkless nav — which is
+    // the single loudest "mobile site on desktop" tell. Deterministic repair:
+    // if the nav holds fewer than 3 in-page anchors, inject a link list built
+    // from the real section ids (adding ids derived from section classes
+    // where missing), placed before the nav's CTA, hidden under 768px. Runs
+    // BEFORE the contrast pass so injected links get contrast-checked too.
+    let navLinksInjected = false
+    try {
+      const navMatch = /<nav\b[^>]*>[\s\S]*?<\/nav>/i.exec(html)
+      if (navMatch) {
+        const nav = navMatch[0]
+        const inPageAnchors = (nav.match(/<a\b[^>]*href="#[^"]+"[^>]*>/gi) || []).length
+        if (inPageAnchors < 3 && !nav.includes('velpi-nav-links')) {
+          // Ensure sections have ids (derive from the first class token).
+          html = html.replace(/<section\b(?![^>]*\bid=)([^>]*\bclass="([a-zA-Z0-9_-]+)[^"]*")/gi, (m, attrs, cls) => {
+            const id = cls.replace(/-section$/, '').toLowerCase()
+            return `<section id="${id}"${attrs}`
+          })
+          const ids = [...html.matchAll(/<section\b[^>]*\bid="([^"]+)"/gi)].map(m => m[1])
+          const usable = [...new Set(ids)].filter(id => !/hero/i.test(id)).slice(0, 5)
+          if (usable.length >= 3) {
+            const label = id => id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+            const linksHtml = `<div class="velpi-nav-links">${usable.map(id => `<a href="#${id}">${label(id)}</a>`).join('')}</div>`
+            const freshNav = /<nav\b[^>]*>[\s\S]*?<\/nav>/i.exec(html)[0]
+            // Place before the nav's last anchor (the CTA) so flex layouts
+            // read logo | links | CTA; fall back to just before </nav>.
+            const lastAnchorIdx = freshNav.lastIndexOf('<a')
+            const patchedNav = lastAnchorIdx > 0
+              ? freshNav.slice(0, lastAnchorIdx) + linksHtml + freshNav.slice(lastAnchorIdx)
+              : freshNav.replace(/<\/nav>$/i, `${linksHtml}</nav>`)
+            html = html.replace(freshNav, patchedNav)
+            const NAV_CSS = '\n/* velpi: server-injected desktop nav links */\n.velpi-page .velpi-nav-links{display:flex;gap:1.75rem;align-items:center;margin:0 1.5rem}\n.velpi-page .velpi-nav-links a{color:inherit;text-decoration:none;font-size:0.95rem;opacity:0.85}\n.velpi-page .velpi-nav-links a:hover{opacity:1}\n@media (max-width:767px){.velpi-page .velpi-nav-links{display:none}}\n'
+            const styleClose = html.lastIndexOf('</style>')
+            if (styleClose !== -1) html = html.slice(0, styleClose) + NAV_CSS + html.slice(styleClose)
+            navLinksInjected = true
+          }
+        }
+      }
+    } catch (e) {
+      console.error('nav-link backstop failed (non-fatal):', e.message)
+    }
+
     // Contrast pass — activates the critique-then-surgically-fix PATTERN the
     // dormant critique-site/enhance-site routes established, scoped to
     // interactive-element contrast only. Detection is deterministic (parses
@@ -269,7 +315,7 @@ ${imageBudgetBlock}`
     // trace: the EXACT payload sent to the model — persisted with the project
     // and downloadable, so "what was actually in the prompt" is answerable
     // with an artifact instead of code archaeology.
-    return Response.json({ html, trace: { system: SYSTEM, user }, contrastFixes })
+    return Response.json({ html, trace: { system: SYSTEM, user }, contrastFixes, navLinksInjected })
   } catch (err) {
     console.error('build-site error:', err)
     return Response.json({ error: `Mockup build failed: ${err.message}` }, { status: 500 })
