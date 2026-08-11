@@ -25,7 +25,7 @@ CONCEPT: a name + two sentences capturing the big idea (e.g. "Golden Hour Author
 PALETTE MAP: every color with its exact hex and role — page background, section alternates, headline ink, body text, primary CTA, accents. Only the brand's real palette plus tints/shades, white, and one near-black.
 TYPE SYSTEM: the exact Google Fonts pairing (display + body), weights, and the scale (hero/h2/h3/body sizes with clamp() values for fluid mobile-first sizing).
 HERO CONCEPT: precisely what the hero is — image treatment, composition, headline attitude, CTA placement.
-SECTION TREATMENTS: for each section in the persuasion flow, one line — its background treatment, layout pattern, and focal element. Alternate rhythm deliberately.
+SECTION TREATMENTS: for each section in the persuasion flow, one line — its background treatment and focal element. NOTE: each section's layout STRUCTURE is already fixed by an assigned blueprint (listed in the input when available) — specify surface, mood, and emphasis WITHIN that structure, never a different composition. Alternate rhythm deliberately.
 SIGNATURE DETAILS: 3-5 specific touches that make this site unmistakable (oversized numerals, pull-quotes, border treatments, image crops, hover behaviors).
 SIGNATURE MOTION: exactly ONE motion/background treatment for the whole site — you are given a pre-selected preset matched to the niche's intensity; state where it lives (hero backdrop, section interlude, headline) and how it supports the vibe. You may overrule the preset with "none — stillness serves this brand" if motion would cheapen it. Never specify more than one motion treatment.
 MOBILE BEHAVIOR: how the design lands on a 390px phone — edge-to-edge moments, full-width CTAs, type scale floor.
@@ -34,12 +34,13 @@ Steal the STRONGEST ideas from the reference systems and fuse them so the result
 
 export async function POST(request) {
   try {
-    const { analysis, vibe, styleMds, motion } = await request.json()
+    const { analysis, vibe, styleMds, motion, blueprintAssignments } = await request.json()
     if (!analysis) {
       return Response.json({ error: 'Missing analysis for the design brief.' }, { status: 400 })
     }
 
     const user = `BUSINESS: ${analysis.business_name || ''} — ${analysis.industry || ''}${analysis.niche ? ` (${analysis.niche})` : ''}
+${Array.isArray(blueprintAssignments) && blueprintAssignments.length ? `FIXED SECTION BLUEPRINTS (structure already decided — brief the treatment WITHIN each): ${blueprintAssignments.join(' | ')}` : ''}
 TONE: ${analysis.tone || ''}
 BRAND PALETTE (locked): ${(analysis.color_palette || []).join(', ')}
 BRAND ANALYSIS: ${JSON.stringify(analysis.brand || {}, null, 1)}

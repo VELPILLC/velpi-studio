@@ -2,6 +2,7 @@
 export const maxDuration = 300
 
 import { callClaude, parseJson, stripFences } from '../../../lib/claude'
+import { findAssetCandidates } from '../../../lib/assetLibrary'
 
 const REPAIR_SYSTEM = `You are given text that was supposed to be a single valid JSON object but failed to parse. The single most common cause: a stray, UNESCAPED double-quote mark inside a string value — usually a reviewer's own quoted word or aside (e.g. their annual "checkup" or a "nickname") that got left as a literal " instead of \\" (or a single quote). Scan every string value for this first and fix any you find. The next most common cause is truncation (cut off mid-response) — if that's what happened instead, complete it sensibly using the surrounding context (never invent new facts — only close out the structure). Return ONLY the corrected, complete, valid JSON object with the exact same content and meaning. No markdown, no commentary, no explanation — JSON only.`
 
@@ -20,15 +21,16 @@ const INDUSTRY_PATTERNS = `INDUSTRY STRUCTURE PATTERNS — apply the matching on
 const SYSTEM = `You are a senior brand and web strategist analyzing a business website that was crawled across multiple pages. Work this process:
 
 STEP — RECON: extract EVERY piece of real information, exhaustively — business name, every phone number, every email address, every physical address/location, hours, social media links, nav structure, every service/menu item with prices when shown, every review/quote with attribution, taglines, delivery platforms, credentials, years in business. Miss nothing — the user reads this extraction directly.
-STEP — DIRECTION: commit to ONE highest-end creative direction appropriate to THIS industry (never a generic template) and name the single feeling a visitor should have within 3 seconds.
+STEP — DIRECTION: commit to ONE highest-end creative direction appropriate to THIS industry (never a generic template) and name the single feeling a visitor should have within 3 seconds. Also decide the page's MODE by judgment: "funnel" (one linear persuasion path, minimal nav, one repeated action — fits urgent/single-service/offer-driven businesses), "website" (fuller informational structure — fits browse-heavy, menu/portfolio, multi-service businesses), or "hybrid". Choose what converts best for THIS business, not a house default.
 STEP — INFER THE VIBE YOURSELF: the creator does not configure feel/look/CTA — YOU determine all three (inferred_vibe) from what you can see: the crawled copy's tone and vocabulary → feel; their existing imagery, palette, and niche norms → look; the business type's natural money action → primary_cta. If the creator DID provide manual vibe selections (in the user message), align inferred_vibe with them instead of contradicting them.
 STEP — CONVERSION STRATEGY: think like a direct-response strategist about THIS business before any design happens:
   1. The ONE primary action that makes this business money (call, book, quote, order, visit) and the strongest secondary action.
   2. The top 3 objections THIS specific customer has before acting — and which REAL extracted fact answers each (a review, years in business, a credential, a guarantee, pricing). Never manufacture an answer.
   3. A proof map: every piece of real proof (each review, credential, stat) assigned to the exact section where it converts hardest — proof belongs NEXT TO the CTA it supports, not quarantined in its own section.
   4. The honest offer/hook: from the real facts, why act now (same-day service, free consult, seasonal relevance). If no urgency exists, use clarity of value instead — never fake scarcity.
-  5. The persuasion flow: order the sections as attention → problem/desire → proof → offer → action, and say in one line what job each section does.
-STEP — IMAGE PLAN: plan between 5 and 8 photographic images for the new site — the hero is mandatory; spend the rest on whichever sections most need visual weight so nothing reads as a bare color block. Distribute images across AT LEAST 5 different sections — never pile 3+ into one gallery/collage while leaving trust, services, reviews, or contact with zero imagery. For each image, write a complete, standalone image-generation prompt that specifies FOUR things: the SUBJECT (what is in the image and what is happening), what STAYS THE SAME (the business's real mood, setting, industry authenticity), what CHANGES (crisp, modern, professional, well-lit, photorealistic), and the THEME LOCK — reference this site's real or chosen palette (see EXISTING PALETTE below, or the palette you commit to) and its 3-second feeling, so every image — real or generated — is graded and lit like it belongs to the same shoot. Each prompt must be detailed enough to hand to any image generator on its own. No text, logos, or watermarks in any image. NEVER put a real person's name in a "generate" prompt (image APIs refuse to depict named individuals and the slot fails every retry) — describe people by role only: "the owner", "a technician", "the two-person team". For "enhance" prompts on real photos, refer to "the same person/people", never by name.
+  5. The persuasion flow: order the sections as attention → problem/desire → proof → offer → action, and say in one line what job each section does. Shape the flow to the MODE you chose: a funnel page runs one tight linear path; a website mode breathes with informational sections; hybrid blends them.
+  6. Apply proven direct-response and funnel principles BY JUDGMENT, never as a checklist: sharp positioning, a value proposition stated in the visitor's language, offer presented with its value obvious, objections answered where they arise, proof adjacent to asks, one unmistakable primary action, messaging a stranger understands in seconds. Trust and credibility sections (reviews, credentials, guarantees, badges, legitimacy signals) appear when THIS business/niche genuinely needs them to convert — a licensed contractor lives on credentials, a beloved chowder counter on reviews — and are omitted where they'd be filler.
+STEP — IMAGE PLAN: plan the photographic images for the new site — typically 5 to 8, but this is a DEFAULT, not a ceiling: go up to 12 when more images genuinely make THIS site better (a portfolio-heavy contractor, a menu-rich restaurant, a gallery-driven venue), and stay lean when fewer serve the design — never pad to hit a number. The hero is mandatory; spend the rest on whichever sections most need visual weight so nothing reads as a bare color block. Distribute images across AT LEAST 5 different sections — never pile 3+ into one gallery/collage while leaving trust, services, reviews, or contact with zero imagery. For each image, write a complete, standalone image-generation prompt that specifies FOUR things: the SUBJECT (what is in the image and what is happening), what STAYS THE SAME (the business's real mood, setting, industry authenticity), what CHANGES (crisp, modern, professional, well-lit, photorealistic), and the THEME LOCK — reference this site's real or chosen palette (see EXISTING PALETTE below, or the palette you commit to) and its 3-second feeling, so every image — real or generated — is graded and lit like it belongs to the same shoot. Each prompt must be detailed enough to hand to any image generator on its own. No text, logos, or watermarks in any image. NEVER put a real person's name in a "generate" prompt (image APIs refuse to depict named individuals and the slot fails every retry) — describe people by role only: "the owner", "a technician", "the two-person team". For "enhance" prompts on real photos, refer to "the same person/people", never by name.
 
 ${INDUSTRY_PATTERNS}
 
@@ -41,6 +43,7 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
   "target_customer": "string",
   "tone": "string",
   "design_direction": "one committed creative direction for the highest-end version of a site in THIS industry",
+  "page_mode": "funnel | website | hybrid — the structure that converts best for THIS business",
   "target_feeling": "the single feeling a visitor should have within 3 seconds",
   "inferred_vibe": {
     "feel": "the feel this brand should give off, inferred from the crawled copy's tone + niche norms (e.g. 'Luxurious & refined', 'Warm & welcoming', 'Bold & high-energy', 'Minimal & modern', 'Classic & trusted', 'Editorial & artistic')",
@@ -101,14 +104,16 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
       "source": "none",
       "action": "generate",
       "url": null,
+      "reuse_url": null,
       "prompt": "Subject: ... Keep the same: ... Change: ..."
     }
   ]
 }
 
 Rules:
-- image_inventory must contain between 5 and 8 photographic items (never fewer than 5, never more than 8) — choose the count based on how many sections genuinely benefit from a real image, and spread them across at least 5 different sections rather than clustering most into one gallery — plus ONE optional logo item FIRST (section "header", action "keep", with the logo URL) only if a logo URL was provided.
-- REUSE REAL PHOTOS AGGRESSIVELY — AND ALWAYS ENHANCE + THEME THEM: when an image URL or its alt text clearly indicates a real photograph of the business (team, owner, storefront, interior, work examples, food, community events — e.g. uploads paths, descriptive alts), assign it to the matching slot with source:"real", action:"enhance" — NEVER "keep" for photographic slots; every real photo gets a professional retouch pass AND a color-grade toward this site's palette/mood so it never looks like a bare stock photo dropped onto a themed page. If the real photo is especially plain, poorly lit, or generic (a flat product shot, a dim phone photo, a cluttered background), push the prompt further — restyle its lighting and color grade decisively toward the theme rather than a light touch-up, keeping only the real subject and setting. The prompt must stay authentic (same people, place, composition) while directing: people → cinematic professional lighting; buildings → straightened, aligned verticals, clean; backgrounds → subtly evened out. Real photos of the actual business ALWAYS beat generated stand-ins. Use source:"none", action:"generate" only when no plausible real photo fits the slot — generated images must match the same palette/mood so they're indistinguishable in tone from the enhanced real photos.
+- image_inventory contains at least 5 photographic items and typically 5-8; go up to 12 when more genuinely improves this specific site, never padding to reach a count — choose the count from how many sections genuinely benefit from a real image, and spread them across at least 5 different sections rather than clustering most into one gallery — plus ONE optional logo item FIRST (section "header", action "keep", with the logo URL) only if a logo URL was provided.
+- REUSABLE ASSET LIBRARY: when an "AVAILABLE LIBRARY IMAGES" list is provided in the input, you may set action:"reuse" with reuse_url:"<that image's url>" for a slot where a listed image GENUINELY fits this business's subject, niche, and mood — judged per-slot, never to save effort. Fresh "generate"/"enhance" remains the default; real photos of THIS business always beat library reuse; if nothing truly fits, generate. A reused image must never look like another business's identity (no other brand's storefronts, staff, or products presented as this business's own — generic subject matter only: textures, ingredients, ambiance, generic scenes). Still write a full prompt for reuse slots (used as fallback if the library image is unavailable).
+- REUSE REAL PHOTOS AGGRESSIVELY — AND ALWAYS ENHANCE + THEME THEM: when an image URL or its alt text clearly indicates a real photograph of the business (team, owner, storefront, interior, work examples, food, community events — e.g. uploads paths, descriptive alts), assign it to the matching slot with source:"real", action:"enhance" — NEVER "keep" for photographic slots; every real photo gets a professional retouch pass AND a color-grade toward this site's palette/mood so it never looks like a bare stock photo dropped onto a themed page. If the real photo is especially plain, poorly lit, or generic (a flat product shot, a dim phone photo, a cluttered background), push the prompt further — restyle its lighting and color grade decisively toward the theme rather than a light touch-up, keeping only the real subject and setting. The prompt must stay authentic (same people, place, composition) while directing: people → cinematic professional lighting; buildings → straightened, aligned verticals, clean; backgrounds → subtly evened out. Real photos of the actual business ALWAYS beat generated stand-ins. GENERATE IS A LAST RESORT, checked slot-by-slot: before assigning action:"generate" to ANY slot, re-scan the ENTIRE "IMAGES FOUND ON SITE" list (judge each by its URL path and alt text) for a real photograph that plausibly serves that slot — if one plausibly fits, assign it with action:"enhance" instead; the retouch-and-theme pass closes most quality gaps, and a real-but-imperfect photo keeps the mockup honest to the business in a way a synthetic image can't. Only generate when nothing real fits the slot's subject at all, and begin that slot's prompt with a one-line reason no site image fit. Generated images must match the same palette/mood so they're indistinguishable in tone from the enhanced real photos.
 - Never invent the business name, hours, phone, address, or reviews — only use what appears in the crawled content.
 - Keep the provided palette if present; otherwise infer a tasteful 2-4 color palette.
 - BRAND CONTINUITY: if the existing website has an established palette and design language, the new site must feel like an ELEVATED version of the same brand — never a different brand. Extract the brand block as completely as the content allows.
@@ -121,6 +126,21 @@ export async function POST(request) {
       return Response.json({ error: 'Missing scraped data to analyze.' }, { status: 400 })
     }
 
+    // Cross-project asset library: surface previously generated images whose
+    // tags match this site's scraped signals, so the model can choose reuse
+    // per-slot (action:"reuse") instead of regenerating from scratch. Fully
+    // best-effort — an empty/missing library changes nothing.
+    let libraryBlock = ''
+    try {
+      const candidates = await findAssetCandidates(
+        `${scrapedData.title || ''} ${scrapedData.description || ''} ${(scrapedData.content || '').slice(0, 4000)}`,
+        12,
+      )
+      if (candidates.length) {
+        libraryBlock = `\nAVAILABLE LIBRARY IMAGES (previously generated for other projects — reuse ONLY where one genuinely fits this business; see the REUSABLE ASSET LIBRARY rule):\n${candidates.map((c, i) => `${i + 1}. ${c.url} — ${c.subject || 'image'}${c.niche ? ` (${c.niche})` : ''}${Array.isArray(c.tags) && c.tags.length ? ` [${c.tags.slice(0, 6).join(', ')}]` : ''}`).join('\n')}\n`
+      }
+    } catch (_) { /* library is optional */ }
+
     const user = `Analyze this crawled website (${scrapedData.pagesCrawled || 1} page(s)) and return the JSON analysis.
 ${vibe ? `\nCREATOR'S VIBE SELECTIONS (multiple-choice answers from the person commissioning this site — fold these directly into design_direction, target_feeling, and tone; they outrank your own instincts): ${vibe}\n` : ''}
 TITLE: ${scrapedData.title || '(none)'}
@@ -129,8 +149,9 @@ DOMAIN: ${scrapedData.domain || '(none)'}
 EXISTING PALETTE: ${(scrapedData.palette || []).join(', ') || '(none — infer one)'}
 LOGO URL: ${scrapedData.logo || '(none)'}
 
-IMAGES FOUND ON SITE (${(scrapedData.images || []).length}) — url plus alt text when the site provided one:
-${(scrapedData.images || []).slice(0, 30).map((im, i) => typeof im === 'string' ? `${i + 1}. ${im}` : `${i + 1}. ${im.url}${im.alt ? ` — alt: "${im.alt}"` : ''}`).join('\n') || '(none)'}
+IMAGES FOUND ON SITE (${(scrapedData.images || []).length}) — url plus alt text when the site provided one; scan this whole list before ever choosing action:"generate":
+${(scrapedData.images || []).slice(0, 40).map((im, i) => typeof im === 'string' ? `${i + 1}. ${im}` : `${i + 1}. ${im.url}${im.alt ? ` — alt: "${im.alt}"` : ''}`).join('\n') || '(none)'}
+${libraryBlock}
 
 FULL CRAWLED CONTENT:
 ${(scrapedData.content || '').slice(0, 36000)}`
@@ -177,10 +198,13 @@ ${(scrapedData.content || '').slice(0, 36000)}`
         })
       }
     }
-    // Cap photographic items at 8 (defensive) and renumber slots.
+    // Cap photographic items at 12 (defensive runaway guard, NOT a design
+    // ceiling — the prompt's default range is 5-8, extended by judgment) and
+    // renumber slots.
     const logoItems = analysis.image_inventory.filter(im => /logo/i.test(im.what || '') || im.section === 'header')
-    const photoItems = analysis.image_inventory.filter(im => !logoItems.includes(im)).slice(0, 8)
+    const photoItems = analysis.image_inventory.filter(im => !logoItems.includes(im)).slice(0, 12)
     analysis.image_inventory = [...logoItems.slice(0, 1), ...photoItems].map((im, i) => ({ ...im, slot: i }))
+    if (!['funnel', 'website', 'hybrid'].includes(analysis.page_mode)) analysis.page_mode = 'hybrid'
 
     if (!analysis.color_palette || !analysis.color_palette.length) {
       analysis.color_palette = scrapedData.palette || ['#2990fa', '#0a1628']

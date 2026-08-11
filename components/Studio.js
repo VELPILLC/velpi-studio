@@ -1,8 +1,5 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { pickCreativeMix } from '../lib/designStyles'
-import { pickSignatureMotion } from '../lib/motionPresets'
-import { pickSectionReferences } from '../lib/sectionPresets'
 import LightningBackground from './LightningBackground'
 import ReviewPanel from './dev/ReviewPanel'
 import ReviewExportBar from './dev/ReviewExportBar'
@@ -131,6 +128,61 @@ async function uploadBase64Assets(assetsById, refinedLogoValue, keyPrefix) {
   return { assetsById: newAssetsById, refinedLogo: newRefinedLogo, failed }
 }
 
+// Trim fully-transparent margins off a PNG data URI and return the tight
+// content crop (+ a small even margin) with its true content dimensions.
+// The refine model letterboxes logos inside its fixed API canvases
+// (1536x1024 / 1024x1024) — without this trim, a 4:1 wordmark lives inside a
+// 1.5:1 file and every height-based header sizing renders it tiny with huge
+// invisible padding. The TRIMMED image is what the app stores, displays,
+// exports, and measures.
+function trimTransparentPng(dataUri) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        const ctx = c.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const d = ctx.getImageData(0, 0, c.width, c.height).data
+        let minX = c.width, maxX = -1, minY = c.height, maxY = -1
+        for (let y = 0; y < c.height; y++) {
+          for (let x = 0; x < c.width; x++) {
+            if (d[(y * c.width + x) * 4 + 3] > 8) {
+              if (x < minX) minX = x
+              if (x > maxX) maxX = x
+              if (y < minY) minY = y
+              if (y > maxY) maxY = y
+            }
+          }
+        }
+        if (maxX < 0) return resolve({ uri: dataUri, width: c.width, height: c.height }) // fully transparent — leave as-is
+        const margin = Math.round(Math.max(maxX - minX, maxY - minY) * 0.03)
+        const sx = Math.max(0, minX - margin), sy = Math.max(0, minY - margin)
+        const sw = Math.min(c.width - sx, maxX - minX + 1 + margin * 2)
+        const sh = Math.min(c.height - sy, maxY - minY + 1 + margin * 2)
+        const out = document.createElement('canvas')
+        out.width = sw
+        out.height = sh
+        out.getContext('2d').drawImage(c, sx, sy, sw, sh, 0, 0, sw, sh)
+        resolve({ uri: out.toDataURL('image/png'), width: sw, height: sh })
+      } catch (e) { reject(e) }
+    }
+    img.onerror = () => reject(new Error('Could not load the refined logo for trimming.'))
+    img.src = dataUri
+  })
+}
+
+function classifyLogoShape(width, height) {
+  if (!width || !height) return { shape: 'unknown', ratio: null }
+  const ratio = +(width / height).toFixed(2)
+  if (ratio >= 2) return { shape: 'wide', ratio }
+  if (ratio >= 0.8 && ratio <= 1.25) return { shape: 'square', ratio }
+  if (ratio > 1.25) return { shape: 'landscape', ratio }
+  return { shape: 'tall', ratio }
+}
+
 // Rasterize any uploaded image (PNG/JPG/SVG/screenshot) to PNG base64,
 // preserving transparency. Returns { data (raw b64), preview (data uri) }.
 function fileToPng(file, maxW = 1024) {
@@ -182,6 +234,30 @@ async function downloadImage(src, filename) {
 function slotIdFor(item, i) {
   if (/logo/i.test(item.what || '') || item.section === 'header') return 'logo'
   return `img_${item.slot != null ? item.slot : i}`
+}
+
+// Structure locks — the record that makes "regenerate = refine, not reroll".
+// Keyed per domain; captured from the first successful run's /api/plan-structure
+// result and sent back on every later regeneration of the same input so the
+// skeleton (section order, blueprints, design systems, motion) never rerolls.
+// Also stored inside each saved project, so loading a project restores its lock.
+const STRUCTURE_LOCKS_KEY = 'velpi_structure_locks_v1'
+function readStructureLock(domain) {
+  if (!domain) return null
+  try {
+    const all = JSON.parse(localStorage.getItem(STRUCTURE_LOCKS_KEY) || '{}')
+    return all[domain] || null
+  } catch (_) {
+    return null
+  }
+}
+function writeStructureLock(domain, lock) {
+  if (!domain || !lock) return
+  try {
+    const all = JSON.parse(localStorage.getItem(STRUCTURE_LOCKS_KEY) || '{}')
+    all[domain] = lock
+    localStorage.setItem(STRUCTURE_LOCKS_KEY, JSON.stringify(all))
+  } catch (_) {}
 }
 
 function placeholderSvg(text) {
@@ -292,6 +368,7 @@ export default function Studio() {
   const logoInputRef = useRef(null)
   const [vibe, setVibe] = useState({})              // question id -> up to 2 selected options
   const [refinedLogo, setRefinedLogo] = useState(null) // data uri after refinement
+  const [logoMeta, setLogoMeta] = useState(null) // { shape, ratio, width, height } probed from the source logo
 
   // ── Pipeline ──
   const [generating, setGenerating] = useState(false)
@@ -310,6 +387,7 @@ export default function Studio() {
   const [reportOpen, setReportOpen] = useState(false)
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
+  const [makingPdf, setMakingPdf] = useState(false)
 
   // ── In-app device preview: a real, scrollable, interactive view at an
   // accurate fixed viewport (mobile 390px / desktop 1440px) — not a scaled
@@ -375,7 +453,8 @@ export default function Studio() {
       const uploaded = await uploadBase64Assets(assetsById, refinedLogo, safeName(bizName))
       const data = {
         bizName, analysisData, slots, assetsById: uploaded.assetsById, ghlUrls, htmlTemplate, buildReport,
-        vibe, refinedLogo: uploaded.refinedLogo, logoUrl, input,
+        vibe, refinedLogo: uploaded.refinedLogo, logoUrl, logoMeta, input,
+        structureLock: readStructureLock(analysisData?._source?.domain || '') || null,
         savedAt: new Date().toISOString(),
       }
       const { project } = await callRoute('/api/projects', { name, data })
@@ -410,12 +489,16 @@ export default function Studio() {
       setBuildReport(d.buildReport || '')
       setVibe(d.vibe || {})
       setRefinedLogo(d.refinedLogo || null)
+      setLogoMeta(d.logoMeta || null)
       setLogoUrl(d.logoUrl || null)
       setInput(d.input || '')
       setBuilt(!!d.htmlTemplate)
       setImagesReady(true)
       setSteps(STEP_DEFS.map(s => ({ ...s, status: 'complete' })))
       setLibraryOpen(false)
+      // Restore the project's structure lock so regenerating this business
+      // (even from a different day/browser state) keeps its exact skeleton.
+      if (d.structureLock?.domain) writeStructureLock(d.structureLock.domain, d.structureLock)
       // A loaded project has no separate "build id" of its own — the project's
       // id is already a stable, unique identity, so the review attaches to that.
       setReviewProjectId(id)
@@ -573,14 +656,22 @@ function extractLogoColors(dataUrl) {
     }
   }
 
-  // Capture the whole rendered mockup as ONE tall PNG you can scroll through.
-  async function downloadFullImage() {
+  // Render the mockup in a hidden iframe at a REAL browser viewport
+  // (1440x900) and capture its entire scrollable height — the way a
+  // full-page screenshot extension does. The iframe is deliberately NEVER
+  // resized to the page height: the old code did, which re-based every
+  // vh unit against the huge new "viewport" (an 88vh hero suddenly became
+  // thousands of px), growing the page far past the already-measured
+  // height — that mismatch is exactly why captures came out truncated.
+  // Instead the viewport stays 900px tall (vh keeps meaning what it means
+  // in a real browser) and html2canvas is told the full document height
+  // to draw, with windowHeight pinned to the real viewport.
+  async function captureFullPageCanvas() {
     const out = previewHtml()
-    if (!out || snapping) return
-    setSnapping(true)
+    if (!out) return null
     const frame = document.createElement('iframe')
     try {
-      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:2000px;border:none;'
+      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:900px;border:none;'
       frame.setAttribute('sandbox', 'allow-same-origin')
       document.body.appendChild(frame)
       frame.srcdoc = out
@@ -588,13 +679,25 @@ function extractLogoColors(dataUrl) {
       await new Promise(res => setTimeout(res, 1200)) // let fonts/images settle
       const doc = frame.contentDocument
       const fullH = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
-      frame.style.height = `${Math.min(fullH + 40, 30000)}px`
-      await new Promise(res => setTimeout(res, 300))
       const html2canvas = (await import('html2canvas')).default
       const canvas = await html2canvas(doc.documentElement, {
         useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
-        windowWidth: 1440, width: 1440, height: Math.min(fullH, 30000), scale: 1, logging: false,
+        windowWidth: 1440, windowHeight: 900, width: 1440, height: Math.min(fullH, 40000),
+        scale: 1, logging: false,
       })
+      return canvas
+    } finally {
+      try { document.body.removeChild(frame) } catch (_) {}
+    }
+  }
+
+  // Capture the whole rendered mockup as ONE tall PNG you can scroll through.
+  async function downloadFullImage() {
+    if (!htmlTemplate || snapping) return
+    setSnapping(true)
+    try {
+      const canvas = await captureFullPageCanvas()
+      if (!canvas) return
       const a = document.createElement('a')
       a.href = canvas.toDataURL('image/png')
       a.download = `${safeName(bizName)}-mockup-fullpage.png`
@@ -602,8 +705,66 @@ function extractLogoColors(dataUrl) {
     } catch (e) {
       setError(`Could not capture the full-page image: ${e.message}. The Open Full Preview tab + your browser's full-page screenshot works as a fallback.`)
     } finally {
-      try { document.body.removeChild(frame) } catch (_) {}
       setSnapping(false)
+    }
+  }
+
+  // PRIMARY download: the full mockup as a single-page PDF (one continuous
+  // page at the site's real height — made for sharing a finished mockup
+  // without pasting HTML anywhere). Image-based by design: it's a visual
+  // proof, the deployable artifact stays the HTML.
+  async function downloadPdf() {
+    if (!htmlTemplate || makingPdf) return
+    setMakingPdf(true)
+    setError(null)
+    try {
+      const canvas = await captureFullPageCanvas()
+      if (!canvas) return
+      const { jsPDF } = await import('jspdf')
+      const w = canvas.width
+      const h = canvas.height
+      const pdf = new jsPDF({
+        orientation: h >= w ? 'portrait' : 'landscape',
+        unit: 'px',
+        format: [w, h],
+        hotfixes: ['px_scaling'],
+        compress: true,
+      })
+      // JPEG keeps a tall-page PDF at a shareable size; the backdrop is
+      // already flattened to white by the capture.
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, w, h)
+      pdf.save(`${safeName(bizName)}-mockup.pdf`)
+    } catch (e) {
+      setError(`Could not create the PDF: ${e.message}`)
+    } finally {
+      setMakingPdf(false)
+    }
+  }
+
+  // GHL header export — only offered for horizontal (wide) logos: GHL renders
+  // header logos inside a fixed-height container and squishes anything tall,
+  // so the export keeps height small relative to width. Square logos don't
+  // need this; their existing 1:1 transparent PNG already fits GHL as-is.
+  async function downloadGhlHeaderLogo() {
+    const src = refinedLogo || assetsById.logo || logo?.preview
+    if (!src) return
+    try {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Could not load the logo image.')); img.src = src })
+      const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1)
+      const targetH = 120 // small height, crisp at GHL's ~40-60px render
+      const targetW = Math.round(targetH * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = targetW
+      canvas.height = targetH
+      canvas.getContext('2d').drawImage(img, 0, 0, targetW, targetH)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png') // preserves alpha
+      a.download = `${safeName(bizName)}-logo-ghl-header.png`
+      a.click()
+    } catch (e) {
+      setError(`GHL header export failed: ${e.message}`)
     }
   }
 
@@ -621,6 +782,7 @@ function extractLogoColors(dataUrl) {
       const png = await fileToPng(file)
       setLogo(png)
       setRefinedLogo(null)
+      setLogoMeta(null)
       setLogoPalette(await extractLogoColors(png.preview))
     } catch (e) {
       setError(e.message)
@@ -670,14 +832,26 @@ function extractLogoColors(dataUrl) {
       // parallel with everything else — it never blocks the build.
       mark('logo', 'active')
       let logoAssetLocal = null // local mirror for auto-save
+      let logoMetaLocal = null // measured shape/ratio — drives header sizing in the build
       const refinePayload = logo
         ? { b64: logo.data, instructions: logoNotes.trim() }
         : (scrapedData.logo ? { url: scrapedData.logo, instructions: logoNotes.trim() } : null)
       const refineP = refinePayload
         ? callRoute('/api/refine-logo', refinePayload)
-            .then(res => {
+            .then(async res => {
+              if (res.logoMeta) { logoMetaLocal = res.logoMeta; setLogoMeta(res.logoMeta) }
               if (res.b64) {
-                const uri = `data:image/png;base64,${res.b64}`
+                let uri = `data:image/png;base64,${res.b64}`
+                // Trim the API's transparent letterbox and re-measure from the
+                // CONTENT — the trimmed asset + its true ratio are what header
+                // sizing must be based on, or a wide lockup inside a 1.5:1
+                // canvas renders tiny no matter what CSS asks for.
+                try {
+                  const trimmed = await trimTransparentPng(uri)
+                  uri = trimmed.uri
+                  const contentMeta = { ...classifyLogoShape(trimmed.width, trimmed.height), width: trimmed.width, height: trimmed.height }
+                  if (contentMeta.shape !== 'unknown') { logoMetaLocal = contentMeta; setLogoMeta(contentMeta) }
+                } catch (_) { /* trim is an enhancement — untrimmed still works */ }
                 logoAssetLocal = uri
                 setRefinedLogo(uri)
                 setAssetsById(prev => ({ ...prev, logo: uri }))
@@ -788,38 +962,35 @@ function extractLogoColors(dataUrl) {
         .map(x => ({ id: x.id, name: x.item.what || x.id, section: x.item.section || '', prompt: x.item.prompt || '' }))
       setSlots([...photoSlots, { id: 'logo', name: 'Logo', section: 'header', prompt: '' }])
 
-      // Anti-repetition memory: the key choices of the last 5 generations force
-      // variation — a combination can't repeat inside that window.
-      let genHistory = []
-      try { genHistory = JSON.parse(localStorage.getItem('velpi_gen_history') || '[]') } catch (_) {}
-      const avoidMotionIds = genHistory.map(h => h.motionId).filter(Boolean)
-      const avoidMixSigs = genHistory.map(h => h.mixSig).filter(Boolean)
-
-      let chosenStyles = []
+      // Deterministic structure plan — regenerate = refine, not reroll.
+      // A lock captured on this domain's first run pins the whole skeleton
+      // (section order, per-section blueprints, design systems, motion);
+      // without a lock, choices are seeded by the domain so the same input
+      // still resolves the same way. Randomness is gone from structure.
+      const siteDomain = analysis._source?.domain || scrapedData.domain || ''
+      const priorLock = readStructureLock(siteDomain)
       const manual = styles.find(s => s.id === styleId)
-      if (manual) chosenStyles = [manual]
-      else if (styleId === 'auto') {
-        // Creative mix: niche anchor + vibe carrier + wildcard — vibe answers
-        // change the blend, so the same industry doesn't always look the same.
-        chosenStyles = pickCreativeMix(
-          styles,
-          `${analysis.industry || ''} ${analysis.niche || ''} ${analysis.primary_service || ''}`,
-          `${vibeText} ${analysis.tone || ''} ${analysis.brand?.brand_personality || ''} ${analysis.brand?.design_language || ''}`,
-          3,
-          avoidMixSigs,
-        )
+      const structPlan = await callRoute('/api/plan-structure', {
+        analysis,
+        vibe: vibeText,
+        lock: priorLock,
+        manualStyleId: manual ? manual.id : null,
+      })
+      const chosenStyles = structPlan.styles || []
+      const motionPreset = structPlan.motion || null
+      const sectionRefs = structPlan.sectionRefs || []
+      const structure = { sectionOrder: structPlan.sectionOrder || [], sectionMap: structPlan.sectionMap || {} }
+      // Persist the lock immediately — this run's structure IS the contract
+      // every later regeneration of this input refines within.
+      if (structPlan.lock) writeStructureLock(siteDomain, structPlan.lock)
+      // Align the analysis's own section keys with the (possibly locked)
+      // order so downstream copy generation writes for the same skeleton.
+      if (structure.sectionOrder.length) {
+        analysis.sections = structure.sectionOrder
+        analysis.layout = { ...(analysis.layout || {}), section_order: structure.sectionOrder }
       }
       setMatchedStyleName(chosenStyles.map(s => s.name).join('  +  '))
       mark('analyze', 'complete')
-
-      // Signature motion — its own selection pass, separate from styles:
-      // ONE background/motion treatment, intensity matched to the niche + vibe,
-      // never repeating a recent generation's effect.
-      const motionPreset = pickSignatureMotion(analysis, vibeText, avoidMotionIds)
-
-      // Structural references — harvested section patterns matching the
-      // persuasion flow, studied by the builder (never copied verbatim).
-      const sectionRefs = pickSectionReferences(analysis, 4)
 
       // Design brief — a creative director fuses brand + vibe + the matched
       // systems into ONE committed spec before any HTML is written.
@@ -830,6 +1001,10 @@ function extractLogoColors(dataUrl) {
           analysis, vibe: vibeText,
           styleMds: chosenStyles.map(s => s.content),
           motion: motionPreset ? { name: motionPreset.name, summary: motionPreset.summary, effect: motionPreset.effect, intensity: motionPreset.intensity } : null,
+          blueprintAssignments: Object.entries(structure.sectionMap).map(([sec, refId]) => {
+            const ref = sectionRefs.find(r => r.id === refId)
+            return `${sec}: ${ref?.name || refId}`
+          }),
         })
         designBrief = res.brief || ''
         mark('brief', 'complete')
@@ -867,6 +1042,10 @@ function extractLogoColors(dataUrl) {
       mark('copy', 'complete')
 
       mark('build', 'active')
+      // The logo's measured geometry drives header sizing in the build prompt.
+      // Refinement runs in parallel and is in practice long done by now (one
+      // image op vs analyze+brief+copy); awaiting is ~free and never rejects.
+      await refineP
       const buildSlots = [
         { id: 'logo', name: 'Logo', section: 'header' },
         ...photoSlots.map(s => ({ id: s.id, name: s.name, section: s.section })),
@@ -879,6 +1058,8 @@ function extractLogoColors(dataUrl) {
         brief: designBrief,
         motion: motionPreset,
         sectionRefs,
+        structure, // the deterministic skeleton — same on every regeneration
+        logoMeta: logoMetaLocal, // measured shape/ratio — wide wordmarks size by ratio
       }
       lastRunRef.current = buildPayload // kept for alternate-layout rebuilds
       const { html, trace } = await callRoute('/api/build-site', buildPayload)
@@ -937,18 +1118,9 @@ function extractLogoColors(dataUrl) {
         mark('images', 'complete')
       }
 
-      // Record this generation's key choices in the anti-repetition memory.
-      try {
-        const entry = {
-          motionId: motionPreset?.id || null,
-          mixSig: chosenStyles.map(s => s.id).sort().join('+') || null,
-          palette0: (analysis.color_palette || [])[0] || null,
-          hero: (analysis.layout?.section_order || [])[0] || null,
-          at: new Date().toISOString(),
-        }
-        const nextHistory = [entry, ...genHistory].slice(0, 5)
-        localStorage.setItem('velpi_gen_history', JSON.stringify(nextHistory))
-      } catch (_) {}
+      // (The old anti-repetition memory is gone on purpose: same-input
+      // regenerations must KEEP their structure, not be forced to vary —
+      // cross-business variety now comes from per-domain seeding instead.)
 
       // AUTO-SAVE — every generation lands in the library automatically with a
       // thumbnail and a shareable /preview/{id} URL. Best-effort: never blocks.
@@ -981,8 +1153,10 @@ function extractLogoColors(dataUrl) {
           vibe,
           refinedLogo: uploaded.refinedLogo,
           logoUrl: scrapedData.logo || null,
+          logoMeta: logoMetaLocal,
           input: input.trim(),
           thumb,
+          structureLock: structPlan.lock || null,
           savedAt: new Date().toISOString(),
         }
         const name = `${analysis.business_name || 'Untitled'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
@@ -991,6 +1165,25 @@ function extractLogoColors(dataUrl) {
         setProjects(prev => [{ ...project, thumb }, ...prev])
         setSavedMsg(`Auto-saved to the library — shareable at /preview/${project.id}`)
         setTimeout(() => setSavedMsg(null), 5000)
+        // Index this run's uploaded images into the cross-project asset
+        // library (fire-and-forget; upsert-by-url, so re-saves are harmless).
+        // Future generations see these as reuse candidates during analysis.
+        try {
+          const records = Object.entries(uploaded.assetsById)
+            .filter(([id, src]) => id !== 'logo' && typeof src === 'string' && /^https?:\/\//.test(src))
+            .map(([id, src]) => {
+              const slot = allSlots.find(s => s.id === id)
+              return {
+                url: src,
+                subject: slot?.name || id,
+                section: slot?.section || '',
+                niche: analysis.niche || analysis.industry || '',
+                business: analysis.business_name || '',
+                tags: [analysis.industry, analysis.niche, slot?.section, ...(slot?.name || '').split(/[^a-zA-Z]+/)].filter(w => w && w.length > 3),
+              }
+            })
+          if (records.length) callRoute('/api/asset-library', { records }).catch(() => {})
+        } catch (_) {}
         if (uploaded.failed.length) {
           setError(`Auto-saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${uploaded.failed.join(', ')}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then use Save to retry.`)
         }
@@ -1074,6 +1267,14 @@ function extractLogoColors(dataUrl) {
       const { html } = await callRoute('/api/build-site', { ...lastRunRef.current, forcedLayout: alt })
       if (html) {
         setHtmlTemplate(html)
+        // A deliberately chosen alternate structure UPDATES the lock — this is
+        // the one sanctioned way structure changes; regenerations then keep it.
+        const dom = lastRunRef.current?.analysis?._source?.domain
+        if (dom && alt.section_order?.length) {
+          const lock = readStructureLock(dom)
+          if (lock) writeStructureLock(dom, { ...lock, sectionOrder: alt.section_order })
+          if (lastRunRef.current.structure) lastRunRef.current.structure = { ...lastRunRef.current.structure, sectionOrder: alt.section_order }
+        }
         setSavedMsg(`Rebuilt with the "${alt.name}" structure — open the preview to see it`)
         setTimeout(() => setSavedMsg(null), 4000)
       }
@@ -1458,6 +1659,9 @@ function extractLogoColors(dataUrl) {
                         {src && (
                           <button onClick={() => downloadImage(src, `${i + 1}-${safeName(s.name)}.png`)} title="Download" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>⬇</button>
                         )}
+                        {s.id === 'logo' && src && (logoMeta?.shape === 'wide' || logoMeta?.shape === 'landscape') && (
+                          <button onClick={downloadGhlHeaderLogo} title="Transparent PNG sized for GoHighLevel's fixed-height header container" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>⬇ GHL header</button>
+                        )}
                         <label style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem', cursor: 'pointer' }}>
                           ⇧ Replace
                           <input type="file" accept="image/*,.svg" onChange={e => { replaceAsset(s.id, e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
@@ -1486,22 +1690,38 @@ function extractLogoColors(dataUrl) {
             </div>
           </div>
 
-          {/* ── 3. EXPORT — always available; link status is info, not a lock ── */}
+          {/* ── 3. FINALIZE & EXPORT — swapping in GHL media URLs is the standard
+                 path to a production file, not an afterthought. Export is never
+                 locked, but the steps make the expected flow explicit. ── */}
           <div style={{ ...card, maxWidth: 'none', border: `1px solid ${allLinked ? 'rgba(57,217,138,0.5)' : BORDER}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 3 }}>
-                  {allLinked ? '✓ Production-ready export' : 'Export'}
+              <div style={{ minWidth: 260 }}>
+                <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 6 }}>
+                  {allLinked ? '✓ Finalized — production-ready' : 'Finalize & Export'}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                  {[
+                    { n: 1, text: 'Images generated', done: imagesReady },
+                    { n: 2, text: `GHL media URLs linked ${linkedCount}/${slots.length}`, done: allLinked },
+                    { n: 3, text: 'Export final HTML', done: false },
+                  ].map(step => (
+                    <span key={step.n} style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', letterSpacing: '0.04em', padding: '3px 9px', borderRadius: 99, border: `1px solid ${step.done ? 'rgba(57,217,138,0.5)' : BORDER}`, color: step.done ? GREEN : 'rgba(255,255,255,0.55)' }}>
+                      {step.done ? '✓' : step.n}. {step.text}
+                    </span>
+                  ))}
                 </div>
                 <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                   {allLinked
-                    ? 'Every asset is linked. This HTML deploys to GoHighLevel with zero manual edits.'
-                    : `${slots.length - linkedCount} asset${slots.length - linkedCount === 1 ? '' : 's'} still using the AI-generated image directly (bigger file) — paste a GoHighLevel media URL per slot for a lighter, production-ready export.`}
+                    ? 'Every slot points at a GoHighLevel media URL. This HTML deploys to GHL with zero manual edits.'
+                    : `Standard path: upload each image above to your GoHighLevel media library and paste its URL per slot — ${slots.length - linkedCount} slot${slots.length - linkedCount === 1 ? '' : 's'} left. Exporting now embeds the AI images directly (works, but heavier and not production-final).`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : '⧉ Copy HTML'}</button>
-                <button onClick={downloadHtml} style={monoBtn}>⬇ Download</button>
+                <button onClick={downloadPdf} disabled={makingPdf} style={{ ...monoBtn, background: BLUE, borderColor: BLUE, color: '#fff', opacity: makingPdf ? 0.6 : 1 }}>
+                  {makingPdf ? 'Rendering PDF…' : '⬇ Download PDF'}
+                </button>
+                <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : (allLinked ? '⧉ Copy Final HTML' : '⧉ Copy HTML (draft)')}</button>
+                <button onClick={downloadHtml} style={monoBtn}>⬇ HTML file</button>
                 {promptTrace && <button onClick={downloadPromptTrace} style={monoBtn}>⬇ prompt-trace</button>}
                 <button onClick={() => setShowCode(v => !v)} style={monoBtn}>{showCode ? 'Hide code' : '</> Code'}</button>
               </div>
