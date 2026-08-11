@@ -235,6 +235,26 @@ function slotIdFor(item, i) {
   return `img_${item.slot != null ? item.slot : i}`
 }
 
+// Collapsible shell used ONLY for Library-loaded projects: the working
+// sections (assets, steps, finalize) fold away so a loaded project opens
+// straight to the preview — the on-the-spot pitch view — while everything
+// stays one tap away. Fresh live generations never get this wrapper.
+function CollapseCard({ title, cardStyle, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', cursor: 'pointer' }}
+      >
+        <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.88rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>{title}</span>
+        <span style={{ color: '#2990fa', fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div style={{ padding: '0 18px 18px' }}>{children}</div>}
+    </div>
+  )
+}
+
 // Structure locks — the record that makes "regenerate = refine, not reroll".
 // Keyed per domain; captured from the first successful run's /api/plan-structure
 // result and sent back on every later regeneration of the same input so the
@@ -407,6 +427,17 @@ export default function Studio() {
   // ── Project library ──
   const [projects, setProjects] = useState([])
   const [libraryOpen, setLibraryOpen] = useState(false)
+  // ── Intake: 'url' (has a website — crawl it) | 'manual' (no website —
+  // guided intake; every field individually skippable). Built for the
+  // walk-in pitch: enter what you know, generate on the spot. ──
+  const [intakeMode, setIntakeMode] = useState('url')
+  const [manualIntake, setManualIntake] = useState({ bizName: '', services: '', address: '', phone: '', hours: '', offers: '', freeform: '' })
+  const [intakePhotos, setIntakePhotos] = useState([]) // [{ data, preview, name }] — no cap
+  const intakePhotoInputRef = useRef(null)
+  // ── Library-load presentation: collapsed working sections + source line.
+  // Applies ONLY to projects loaded from the Library, never to live runs. ──
+  const [loadedFromLibrary, setLoadedFromLibrary] = useState(false)
+  const [loadedSource, setLoadedSource] = useState('')
   const [savingProject, setSavingProject] = useState(false)
   const [savedMsg, setSavedMsg] = useState(null)
   const [loadingProjectId, setLoadingProjectId] = useState(null)
@@ -495,6 +526,11 @@ export default function Studio() {
       // Restore the project's structure lock so regenerating this business
       // (even from a different day/browser state) keeps its exact skeleton.
       if (d.structureLock?.domain) writeStructureLock(d.structureLock.domain, d.structureLock)
+      // Library-load presentation: collapsed working sections, source line
+      // visible, preview front and center — the hand-over-the-phone view.
+      setLoadedFromLibrary(true)
+      setLoadedSource(d.sourceUrl || d.input || '')
+      setDetailsOpen(false)
       // A loaded project has no separate "build id" of its own — the project's
       // id is already a stable, unique identity, so the review attaches to that.
       setReviewProjectId(id)
@@ -569,10 +605,58 @@ export default function Studio() {
     }
   }
 
-  // The logo is auto-detected from the website and refined automatically —
-  // uploading one is now just an optional override.
-  const readyToGenerate = !!input.trim() && !!logo
-  const missing = [!input.trim() && 'website URL', !logo && 'business logo'].filter(Boolean)
+  // ── Manual-intake helpers (the "no website yet" path) ──
+  const setIntakeField = (k, v) => setManualIntake(prev => ({ ...prev, [k]: v }))
+
+  async function onIntakePhotos(fileList) {
+    const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'))
+    for (const f of files) {
+      try {
+        const png = await fileToPng(f, 1536)
+        setIntakePhotos(prev => [...prev, png])
+      } catch (_) { /* skip unreadable files, keep the rest */ }
+    }
+  }
+
+  // Build the same scrapedData shape the crawler produces, from whatever the
+  // creator typed — gaps are fine; every downstream stage already treats
+  // missing facts as "omit". Uploaded photos ride as uploaded://N pseudo-urls
+  // (tiny in the analyze prompt) and are swapped for their real data URIs
+  // right before image processing.
+  function syntheticScrapeFromIntake() {
+    const mi = manualIntake
+    const L = ['OWNER-PROVIDED BUSINESS INFO — no existing website; this content came directly from the business owner during intake. Missing details are simply unknown: never invent them.']
+    if (mi.bizName.trim()) L.push(`Business name: ${mi.bizName.trim()}`)
+    if (mi.services.trim()) L.push(`Services / offerings: ${mi.services.trim()}`)
+    if (mi.address.trim()) L.push(`Address / location: ${mi.address.trim()}`)
+    if (mi.phone.trim()) L.push(`Phone: ${mi.phone.trim()}`)
+    if (mi.hours.trim()) L.push(`Hours: ${mi.hours.trim()}`)
+    if (mi.offers.trim()) L.push(`Offers / promotions: ${mi.offers.trim()}`)
+    if (mi.freeform.trim()) L.push(`About the business (owner's own words):\n${mi.freeform.trim()}`)
+    return {
+      url: '',
+      domain: `${safeName(mi.bizName || 'new-business')}.manual`,
+      pagesCrawled: 0,
+      title: mi.bizName.trim() || 'New business',
+      description: mi.services.trim() || '',
+      content: L.join('\n'),
+      images: intakePhotos.map((p, i) => ({ url: `uploaded://${i + 1}`, alt: `Owner-provided photo: ${p.name || `photo ${i + 1}`}` })),
+      logo: null,
+      palette: [],
+      paletteFromCache: false,
+    }
+  }
+
+  // Readiness per intake path. The logo stays required in both — it locks
+  // the brand theme. Manual needs at least a name or a description to work
+  // from; everything else is genuinely skippable.
+  const manualHasSubstance = !!manualIntake.bizName.trim() || !!manualIntake.freeform.trim()
+  const readyToGenerate = intakeMode === 'manual'
+    ? (!!logo && manualHasSubstance)
+    : (!!input.trim() && !!logo)
+  const missing = intakeMode === 'manual'
+    ? [!manualHasSubstance && 'business name (or a short description)', !logo && 'business logo'].filter(Boolean)
+    : [!input.trim() && 'website URL', !logo && 'business logo'].filter(Boolean)
 
   // Reconstructs a readable vibe summary — only ever populated by loading a
   // project saved before manual vibe entry was removed. Fresh runs are fully
@@ -825,6 +909,8 @@ function extractLogoColors(dataUrl) {
     setMatchedStyleName('')
     setShowCode(false)
     setDetailsOpen(false)
+    setLoadedFromLibrary(false) // live runs never get the collapsed Library view
+    setLoadedSource('')
     setGenerating(true)
 
     const statuses = {}
@@ -835,9 +921,14 @@ function extractLogoColors(dataUrl) {
     }
 
     try {
-      // Crawl first — the logo is auto-detected from the site itself.
+      // Source material: crawl the existing site, or — on the "no website"
+      // path — assemble the same shape from the guided intake. Everything
+      // downstream is source-agnostic.
+      const isManualIntake = intakeMode === 'manual'
       mark('crawl', 'active')
-      const { scrapedData } = await callRoute('/api/scrape', { input: input.trim() })
+      const { scrapedData } = isManualIntake
+        ? { scrapedData: syntheticScrapeFromIntake() }
+        : await callRoute('/api/scrape', { input: input.trim() })
       mark('crawl', 'complete')
 
       // Logo: uploaded override wins; otherwise the icon detected on the site.
@@ -893,6 +984,19 @@ function extractLogoColors(dataUrl) {
       mark('analyze', 'active')
       const manualVibe = vibeSummary()
       const { analysis } = await callRoute('/api/analyze', { scrapedData, vibe: manualVibe })
+
+      // Manual intake: swap the uploaded://N pseudo-urls the analyzer planned
+      // with for the real photo data URIs, so the image step can enhance the
+      // owner's actual photos (fetch() handles data: URLs server-side).
+      if (isManualIntake && intakePhotos.length) {
+        for (const item of analysis.image_inventory || []) {
+          const m = /^uploaded:\/\/(\d+)$/.exec(item.url || '')
+          if (m) {
+            const p = intakePhotos[Number(m[1]) - 1]
+            if (p) item.url = p.preview
+          }
+        }
+      }
 
       // Vibe is INFERRED, not asked: when the creator touched nothing in
       // Customize, the agent's own read of the business (copy tone → feel,
@@ -1154,7 +1258,7 @@ function extractLogoColors(dataUrl) {
         const projData = {
           bizName: analysis.business_name || '',
           niche: analysis.industry || '',
-          sourceUrl: input.trim(),
+          sourceUrl: isManualIntake ? '(no website — manual intake)' : input.trim(),
           analysisData: analysis,
           slots: allSlots,
           assetsById: uploaded.assetsById,
@@ -1352,6 +1456,11 @@ function extractLogoColors(dataUrl) {
     padding: '9px 16px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.72rem', letterSpacing: '0.05em',
   }
   const card = { width: '100%', background: PANEL, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 18 }
+  // Library-load treatment: fold a section into a dropdown when the project
+  // came from the Library; render it untouched during live generation.
+  const wrapLib = (title, node) => loadedFromLibrary
+    ? <CollapseCard title={title} cardStyle={{ ...card, maxWidth: 'none', padding: 0 }}>{node}</CollapseCard>
+    : node
   const stepBadge = (done) => ({
     width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1389,20 +1498,101 @@ function extractLogoColors(dataUrl) {
       <div style={{ position: 'relative', zIndex: 1, padding: '26px 12px 90px' }}>
       <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
 
-        {/* ── STEP 1 — URL ── */}
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={stepBadge(!!input.trim())}>{input.trim() ? '✓' : '1'}</span>
-            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Website</span>
-          </div>
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            disabled={generating}
-            placeholder="Paste the business website URL"
-            style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '14px 16px', fontSize: '1rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', opacity: generating ? 0.6 : 1 }}
-          />
+        {/* ── Intake path: has a website (crawl) vs no website (guided intake) ── */}
+        <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          {[['url', '🌐 Has a website'], ['manual', '✍️ No website yet']].map(([m, labelText]) => (
+            <button
+              key={m}
+              onClick={() => !generating && setIntakeMode(m)}
+              style={{
+                flex: 1, padding: '12px 0', borderRadius: 12,
+                background: intakeMode === m ? 'rgba(41,144,250,0.16)' : 'transparent',
+                border: `1px solid ${intakeMode === m ? BLUE : BORDER}`,
+                color: intakeMode === m ? '#fff' : 'rgba(255,255,255,0.55)',
+                fontFamily: 'var(--font-inter)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
+              }}
+            >{labelText}</button>
+          ))}
         </div>
+
+        {/* ── STEP 1 — source: URL, or guided intake ── */}
+        {intakeMode === 'url' ? (
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <span style={stepBadge(!!input.trim())}>{input.trim() ? '✓' : '1'}</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Website</span>
+            </div>
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              disabled={generating}
+              placeholder="Paste the business website URL"
+              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '14px 16px', fontSize: '1rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', opacity: generating ? 0.6 : 1 }}
+            />
+          </div>
+        ) : (
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <span style={stepBadge(manualHasSubstance)}>{manualHasSubstance ? '✓' : '1'}</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Tell me about the business</span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+              Every field is optional — skip anything you don't know. The more you add, the more complete the site.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+              {[
+                ['bizName', 'Business name'],
+                ['services', 'Services / offerings (comma-separated is fine)'],
+                ['address', 'Address / area served'],
+                ['phone', 'Phone'],
+                ['hours', 'Hours'],
+                ['offers', 'Offers / promotions'],
+              ].map(([k, ph]) => (
+                <input
+                  key={k}
+                  value={manualIntake[k]}
+                  onChange={e => setIntakeField(k, e.target.value)}
+                  disabled={generating}
+                  placeholder={ph}
+                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
+                />
+              ))}
+            </div>
+            <textarea
+              value={manualIntake.freeform}
+              onChange={e => setIntakeField('freeform', e.target.value)}
+              disabled={generating}
+              placeholder="Anything else — what makes this business special, its story, who it serves, the vibe you want…"
+              rows={4}
+              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8, resize: 'vertical' }}
+            />
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => !generating && intakePhotoInputRef.current?.click()}
+                  style={{ background: 'transparent', border: `1px dashed ${BORDER}`, color: 'rgba(255,255,255,0.7)', borderRadius: 10, padding: '9px 14px', fontFamily: 'var(--font-inter)', fontSize: '0.8rem', cursor: 'pointer' }}
+                >📷 Add photos of the business{intakePhotos.length ? ` (${intakePhotos.length})` : ''}</button>
+                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)' }}>
+                  As many as you like — they become the site's real imagery.
+                </span>
+                <input ref={intakePhotoInputRef} type="file" accept="image/*" multiple onChange={e => { onIntakePhotos(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+              </div>
+              {intakePhotos.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {intakePhotos.map((p, i) => (
+                    <div key={i} style={{ position: 'relative', width: 62, height: 62, borderRadius: 8, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
+                      <img src={p.preview} alt={p.name || `photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <button
+                        onClick={() => setIntakePhotos(prev => prev.filter((_, j) => j !== i))}
+                        style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.6rem', lineHeight: 1, cursor: 'pointer' }}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── STEP 2 — Logo (required) ── */}
         <div style={card}>
@@ -1451,68 +1641,6 @@ function extractLogoColors(dataUrl) {
         </div>
 
 
-        {/* ── Library (saved builds — load & keep refining) ── */}
-        {projects.length > 0 && (
-          <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-            <button
-              onClick={() => setLibraryOpen(v => !v)}
-              style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
-            >
-              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
-                📁 Library <span style={{ color: 'rgba(255,255,255,0.4)' }}>({projects.length} saved)</span>
-              </span>
-              <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{libraryOpen ? '▲' : '▼'}</span>
-            </button>
-            {libraryOpen && (
-              <div style={{ padding: '0 14px 14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-                {projects.map(p => (
-                  <div key={p.id} style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
-                    <a href={`/preview/${p.id}`} target="_blank" rel="noreferrer" title="Open live preview" style={{ display: 'block', aspectRatio: '4/5', background: '#0d1626', position: 'relative' }}>
-                      {p.thumb ? (
-                        <img src={p.thumb} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
-                      ) : (
-                        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', opacity: 0.3 }}>🖥</span>
-                      )}
-                    </a>
-                    <div style={{ padding: '8px 10px' }}>
-                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>
-                        {p.niche ? `${p.niche} · ` : ''}{p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}
-                      </div>
-                      <div style={{ display: 'flex', gap: 5, marginBottom: confirmDeleteId === p.id ? 5 : 0 }}>
-                        <button onClick={() => loadProject(p.id)} disabled={!!loadingProjectId} style={{ ...monoBtn, flex: 1, padding: '5px 0', fontSize: '0.58rem', opacity: loadingProjectId ? 0.5 : 1 }}>
-                          {loadingProjectId === p.id ? '…' : 'Load'}
-                        </button>
-                        <button
-                          onClick={() => quickPreviewProjectMobile(p)}
-                          disabled={!!mobilePreviewLoadingId}
-                          title="Preview on mobile"
-                          style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem', opacity: mobilePreviewLoadingId ? 0.5 : 1 }}
-                        >{mobilePreviewLoadingId === p.id ? '…' : '📱'}</button>
-                        <button
-                          onClick={() => { try { navigator.clipboard?.writeText(`${window.location.origin}/preview/${p.id}`) } catch (_) {}; setSavedMsg('Preview link copied'); setTimeout(() => setSavedMsg(null), 2000) }}
-                          title="Copy shareable preview link"
-                          style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem' }}
-                        >⧉</button>
-                        <button onClick={() => setConfirmDeleteId(p.id)} title="Delete" style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '5px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem' }}>
-                          ✕
-                        </button>
-                      </div>
-                      {confirmDeleteId === p.id && (
-                        <div style={{ display: 'flex', gap: 5, alignItems: 'center', background: 'rgba(255,68,85,0.08)', border: '1px solid rgba(255,68,85,0.35)', borderRadius: 8, padding: '5px 7px' }}>
-                          <span style={{ flex: 1, fontFamily: 'var(--font-inter)', fontSize: '0.62rem', color: '#ff9aa5' }}>Delete for good?</span>
-                          <button onClick={() => removeProject(p.id)} style={{ background: '#ff4455', border: 'none', color: '#fff', borderRadius: 6, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem' }}>Delete</button>
-                          <button onClick={() => setConfirmDeleteId(null)} style={{ background: 'transparent', border: `1px solid ${BORDER}`, color: '#fff', borderRadius: 6, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem' }}>Cancel</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── GENERATE ── */}
         <button
           onClick={runGeneration}
@@ -1539,32 +1667,62 @@ function extractLogoColors(dataUrl) {
           </div>
         )}
 
-        {/* ── Progress ── */}
-        {(generating || steps.some(s => s.status !== 'pending')) && (
-          <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {steps.map(step => (
-              <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 2px' }}>
-                <StatusDot status={step.status} />
-                <span style={{
-                  fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.03em',
-                  color: step.status === 'active' ? BLUE : step.status === 'complete' ? '#fff' : step.status === 'error' ? '#ff6675' : 'rgba(255,255,255,0.4)',
-                }}>
-                  {step.label}
-                </span>
-              </div>
-            ))}
-            {matchedStyleName && (
-              <div style={{ marginTop: 6, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: BLUE, letterSpacing: '0.04em', lineHeight: 1.6 }}>
-                ✦ Style: {matchedStyleName}
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── Progress — live checkmark list during/after a fresh run; folded
+            into a dropdown when a Library project is loaded ── */}
+        {(generating || steps.some(s => s.status !== 'pending')) && (() => {
+          const progressInner = (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {steps.map(step => (
+                <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 2px' }}>
+                  <StatusDot status={step.status} />
+                  <span style={{
+                    fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.76rem', letterSpacing: '0.03em',
+                    color: step.status === 'active' ? BLUE : step.status === 'complete' ? '#fff' : step.status === 'error' ? '#ff6675' : 'rgba(255,255,255,0.4)',
+                  }}>
+                    {step.label}
+                  </span>
+                </div>
+              ))}
+              {matchedStyleName && (
+                <div style={{ marginTop: 6, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.64rem', color: BLUE, letterSpacing: '0.04em', lineHeight: 1.6 }}>
+                  ✦ Style: {matchedStyleName}
+                </div>
+              )}
+            </div>
+          )
+          return loadedFromLibrary
+            ? <CollapseCard title="✓ Generation steps" cardStyle={card}>{progressInner}</CollapseCard>
+            : <div style={card}>{progressInner}</div>
+        })()}
       </div>
 
       {/* ══ RESULTS — preview first, everything else follows ══ */}
       {built && (
         <div style={{ maxWidth: 1140, margin: '26px auto 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* ── Library-load banner: where this came from + proof the refined
+              logo persisted with the project (never re-uploaded) ── */}
+          {loadedFromLibrary && (
+            <div style={{ ...card, maxWidth: 'none', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              {(refinedLogo || assetsById.logo || logoUrl) && (
+                <div style={{ background: '#101c30', borderRadius: 8, padding: 6, flexShrink: 0 }}>
+                  <img src={refinedLogo || assetsById.logo || logoUrl} alt="Saved logo" style={{ height: 34, width: 'auto', maxWidth: 150, objectFit: 'contain', display: 'block' }} />
+                </div>
+              )}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                  Loaded from Library — refined logo &amp; assets restored
+                </div>
+                {loadedSource && (
+                  <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.66rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 3 }}>
+                    Source: {/^https?:/i.test(loadedSource)
+                      ? <a href={loadedSource} target="_blank" rel="noreferrer" style={{ color: BLUE, textDecoration: 'none' }}>{loadedSource}</a>
+                      : loadedSource}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── 1. WEBSITE PREVIEW (the hero) ── */}
           <div>
@@ -1628,8 +1786,8 @@ function extractLogoColors(dataUrl) {
               per generation (saved in project data, downloadable as decisions.md
               from the Export row). */}
 
-          {/* ── 2. ASSETS ── */}
-          <div style={{ ...card, maxWidth: 'none' }}>
+          {/* ── 2. ASSETS — collapsed into a dropdown when loaded from Library ── */}
+          {wrapLib('🖼 Assets & image links', <div style={{ ...card, maxWidth: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
               <span style={{ ...label, color: 'rgba(255,255,255,0.55)' }}>
                 Assets ({slots.length}){!imagesReady && generating ? ' — generating…' : ''}{imagesMeta ? ` — API verified: ${imagesMeta.generated} generated · ${imagesMeta.enhanced} enhanced · ${imagesMeta.keptOriginal} kept` : ''}
@@ -1701,12 +1859,13 @@ function extractLogoColors(dataUrl) {
                 )
               })}
             </div>
-          </div>
+          </div>)}
 
           {/* ── 3. FINALIZE & EXPORT — swapping in GHL media URLs is the standard
                  path to a production file, not an afterthought. Export is never
-                 locked, but the steps make the expected flow explicit. ── */}
-          <div style={{ ...card, maxWidth: 'none', border: `1px solid ${allLinked ? 'rgba(57,217,138,0.5)' : BORDER}` }}>
+                 locked, but the steps make the expected flow explicit.
+                 Collapsed into a dropdown when loaded from Library. ── */}
+          {wrapLib('📦 Finalize & Export', <div style={{ ...card, maxWidth: 'none', border: `1px solid ${allLinked ? 'rgba(57,217,138,0.5)' : BORDER}` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
               <div style={{ minWidth: 260 }}>
                 <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', marginBottom: 6 }}>
@@ -1744,7 +1903,7 @@ function extractLogoColors(dataUrl) {
                 {finalHtml()}
               </pre>
             )}
-          </div>
+          </div>)}
 
           {/* ── 4. PROJECT DETAILS (collapsed) ── */}
           {analysisData && (
@@ -1811,6 +1970,72 @@ function extractLogoColors(dataUrl) {
             >
               {savingProject ? 'Saving…' : '💾 Save to Library'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Library — deliberately at the very BOTTOM of the page (out of the
+          pitch flow: the main screen is Generate; past work lives below the
+          fold, one scroll away). ── */}
+      {projects.length > 0 && (
+        <div style={{ maxWidth: 1140, margin: `${built ? '40px' : '38vh'} auto 0`, padding: '0 12px 40px' }}>
+          <div style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden' }}>
+            <button
+              onClick={() => setLibraryOpen(v => !v)}
+              style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: 'rgba(255,255,255,0.75)' }}>
+                📁 Library <span style={{ color: 'rgba(255,255,255,0.4)' }}>({projects.length} saved)</span>
+              </span>
+              <span style={{ color: BLUE, fontSize: '0.65rem', fontFamily: 'var(--font-ibm-plex-mono)' }}>{libraryOpen ? '▲' : '▼'}</span>
+            </button>
+            {libraryOpen && (
+              <div style={{ padding: '0 14px 14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                {projects.map(p => (
+                  <div key={p.id} style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
+                    <a href={`/preview/${p.id}`} target="_blank" rel="noreferrer" title="Open live preview" style={{ display: 'block', aspectRatio: '4/5', background: '#0d1626', position: 'relative' }}>
+                      {p.thumb ? (
+                        <img src={p.thumb} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+                      ) : (
+                        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', opacity: 0.3 }}>🖥</span>
+                      )}
+                    </a>
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.76rem', color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.54rem', color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>
+                        {p.niche ? `${p.niche} · ` : ''}{p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 5, marginBottom: confirmDeleteId === p.id ? 5 : 0 }}>
+                        <button onClick={() => loadProject(p.id)} disabled={!!loadingProjectId} style={{ ...monoBtn, flex: 1, padding: '5px 0', fontSize: '0.58rem', opacity: loadingProjectId ? 0.5 : 1 }}>
+                          {loadingProjectId === p.id ? '…' : 'Load'}
+                        </button>
+                        <button
+                          onClick={() => quickPreviewProjectMobile(p)}
+                          disabled={!!mobilePreviewLoadingId}
+                          title="Preview on mobile"
+                          style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem', opacity: mobilePreviewLoadingId ? 0.5 : 1 }}
+                        >{mobilePreviewLoadingId === p.id ? '…' : '📱'}</button>
+                        <button
+                          onClick={() => { try { navigator.clipboard?.writeText(`${window.location.origin}/preview/${p.id}`) } catch (_) {}; setSavedMsg('Preview link copied'); setTimeout(() => setSavedMsg(null), 2000) }}
+                          title="Copy shareable preview link"
+                          style={{ ...monoBtn, padding: '5px 9px', fontSize: '0.58rem' }}
+                        >⧉</button>
+                        <button onClick={() => setConfirmDeleteId(p.id)} title="Delete" style={{ background: 'transparent', border: '1px solid rgba(255,68,85,0.4)', color: '#ff6675', borderRadius: 8, padding: '5px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.58rem' }}>
+                          ✕
+                        </button>
+                      </div>
+                      {confirmDeleteId === p.id && (
+                        <div style={{ display: 'flex', gap: 5, alignItems: 'center', background: 'rgba(255,68,85,0.08)', border: '1px solid rgba(255,68,85,0.35)', borderRadius: 8, padding: '5px 7px' }}>
+                          <span style={{ flex: 1, fontFamily: 'var(--font-inter)', fontSize: '0.62rem', color: '#ff9aa5' }}>Delete for good?</span>
+                          <button onClick={() => removeProject(p.id)} style={{ background: '#ff4455', border: 'none', color: '#fff', borderRadius: 6, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem' }}>Delete</button>
+                          <button onClick={() => setConfirmDeleteId(null)} style={{ background: 'transparent', border: `1px solid ${BORDER}`, color: '#fff', borderRadius: 6, padding: '4px 9px', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem' }}>Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
