@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import LightningBackground from './LightningBackground'
-import ReviewPanel from './dev/ReviewPanel'
 import ReviewExportBar from './dev/ReviewExportBar'
 import { isDevReviewClient } from '../lib/creative/flags.mjs'
 
@@ -389,12 +388,9 @@ export default function Studio() {
   const [snapping, setSnapping] = useState(false)
   const [makingPdf, setMakingPdf] = useState(false)
 
-  // ── In-app device preview: a real, scrollable, interactive view at an
-  // accurate fixed viewport (mobile 390px / desktop 1440px) — not a scaled
-  // thumbnail. Works for the active build AND for any saved Library project
-  // via a quick, non-destructive fetch. previewMode remembers the last-used
-  // mode so reopening the preview returns to the same view. ──
-  const [devicePreview, setDevicePreview] = useState(null) // { html, label, mode } | null
+  // ── Device previews open the dedicated /device-preview page (new tab) —
+  // works for the active build AND for any saved Library project via a
+  // quick, non-destructive fetch. previewMode remembers the last-used mode. ──
   const [previewMode, setPreviewMode] = useState('mobile') // 'mobile' | 'desktop'
   const [mobilePreviewLoadingId, setMobilePreviewLoadingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
@@ -521,14 +517,31 @@ export default function Studio() {
     }
   }
 
-  // Opens the in-app interactive device preview at an accurate, fixed
-  // viewport width — not a scaled-down approximation. Remembers the mode
-  // (mobile/desktop) so reopening the preview returns to the same view.
+  // Opens the dedicated /device-preview PAGE in a new tab (popup/modal
+  // previews are gone — a page renders the exact HTML a client would see,
+  // with no height clamping). The HTML travels via a postMessage handshake:
+  // the new tab announces readiness, this tab answers with the payload.
   function openDevicePreview(html, label, mode) {
     if (!html) return
     setPreviewMode(mode)
     try { localStorage.setItem('velpi_preview_mode', mode) } catch (_) {}
-    setDevicePreview({ html, label: label || bizName || 'Preview', mode })
+    const payload = {
+      type: 'velpi-preview-html',
+      html,
+      label: label || bizName || 'Preview',
+      buildId: reviewBuildId || null,
+      projectId: reviewProjectId || null,
+    }
+    const win = window.open(`/device-preview?mode=${mode}`, '_blank')
+    if (!win) { setError('The preview tab was blocked — allow popups for this site.'); return }
+    const onReady = e => {
+      if (e.origin !== window.location.origin || e.data?.type !== 'velpi-preview-ready') return
+      try { win.postMessage(payload, window.location.origin) } catch (_) {}
+      window.removeEventListener('message', onReady)
+    }
+    window.addEventListener('message', onReady)
+    // Safety: stop listening after a minute so stale listeners never stack.
+    setTimeout(() => window.removeEventListener('message', onReady), 60000)
   }
 
   // Quick-preview a saved Library project on mobile WITHOUT loading it into
@@ -1814,62 +1827,9 @@ function extractLogoColors(dataUrl) {
         </div>
       )}
 
-      {/* ── In-app interactive device preview — a real, scrollable, tappable
-          view of the site at an accurate fixed viewport (mobile 390px /
-          desktop 1440px), not a scaled thumbnail. Works for the active build
-          and for any saved Library project. The rating star lives inside the
-          frame, scoped to whichever viewport is currently open. ── */}
-      {devicePreview && (() => {
-        const isMobile = devicePreview.mode === 'mobile'
-        const vp = PREVIEW_VIEWPORTS[devicePreview.mode] || PREVIEW_VIEWPORTS.mobile
-        return (
-        <div
-          onClick={() => setDevicePreview(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(3, 6, 15, 0.88)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '18px 12px', backdropFilter: 'blur(4px)', overflow: 'auto',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: vp.width + 40, marginBottom: 10 }}>
-            <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.86rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {isMobile ? '📱' : '🖥'} {devicePreview.label} · {vp.width}px
-            </span>
-            <button
-              onClick={e => { e.stopPropagation(); setDevicePreview(null) }}
-              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', fontSize: '0.9rem', flexShrink: 0 }}
-            >✕</button>
-          </div>
-          {/* Device frame — the iframe inside is fully interactive: real scrolling, real taps.
-              Rendered at a true fixed width (never scaled); the overlay scrolls if the
-              browser window is narrower than the desktop viewport. */}
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: isMobile ? 'min(390px, 92vw)' : `${vp.width}px`,
-              height: isMobile ? 'min(844px, 78vh)' : `min(${vp.height}px, 82vh)`,
-              borderRadius: isMobile ? 34 : 10,
-              border: isMobile ? '6px solid #1a1f2c' : `1px solid ${BORDER}`,
-              background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
-              overflow: 'hidden', position: 'relative', flexShrink: 0,
-            }}
-          >
-            <iframe
-              title={`${devicePreview.mode} preview`}
-              srcDoc={devicePreview.html}
-              sandbox="allow-same-origin"
-              style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
-            />
-            {isDevReviewClient() && (
-              <ReviewPanel buildId={reviewBuildId} projectId={reviewProjectId} viewport={devicePreview.mode} />
-            )}
-          </div>
-          <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', marginTop: 10, letterSpacing: '0.04em' }}>
-            Scroll and tap inside — this is the real {devicePreview.mode} layout. Tap outside or ✕ to close.
-          </div>
-        </div>
-        )
-      })()}
+      {/* Device previews open the dedicated /device-preview page in a new
+          tab — the popup/modal is gone (its height-clamped frame was the
+          popup-vs-page divergence). */}
       </div>
     </div>
   )
