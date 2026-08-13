@@ -80,7 +80,7 @@ async function captureFullPage(html) {
     const fullH = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
     frame.style.height = `${Math.min(fullH + 40, 20000)}px`
     await new Promise(res => setTimeout(res, 200))
-    const html2canvas = (await import('html2canvas')).default
+    const html2canvas = (await import('html2canvas-pro')).default
     const canvas = await html2canvas(doc.documentElement, { useCORS: true, backgroundColor: '#ffffff', windowWidth: 1440, width: 1440, height: Math.min(fullH, 20000), scale: 0.5, logging: false })
     return canvas.toDataURL('image/jpeg', 0.7)
   } catch (_) {
