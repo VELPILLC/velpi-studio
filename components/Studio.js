@@ -740,7 +740,7 @@ function extractLogoColors(dataUrl) {
       frame.srcdoc = substitutedHtml
       await new Promise(res => { frame.onload = res })
       await new Promise(res => setTimeout(res, 900))
-      const html2canvas = (await import('html2canvas')).default
+      const html2canvas = (await import('html2canvas-pro')).default
       const canvas = await html2canvas(frame.contentDocument.documentElement, {
         useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
         windowWidth: 1024, width: 1024, height: 1280, scale: 0.35, logging: false,
@@ -776,7 +776,7 @@ function extractLogoColors(dataUrl) {
       await new Promise(res => setTimeout(res, 1200)) // let fonts/images settle
       const doc = frame.contentDocument
       const fullH = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0)
-      const html2canvas = (await import('html2canvas')).default
+      const html2canvas = (await import('html2canvas-pro')).default
       const canvas = await html2canvas(doc.documentElement, {
         useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
         windowWidth: 1440, windowHeight: 900, width: 1440, height: Math.min(fullH, 40000),

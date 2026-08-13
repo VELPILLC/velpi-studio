@@ -2,7 +2,7 @@
 export const maxDuration = 300
 
 import { callClaude, stripFences } from '../../../lib/claude'
-import { findAndFixContrastIssues } from '../../../lib/contrastFix'
+import { findAndFixContrastIssues } from '../../../lib/contrastFix.mjs'
 
 const SYSTEM = `You are an elite web designer. You produce ONE mockup at a time. Commit to a single direction and execute it at the highest level — never produce multiple versions and never hedge between styles.
 

@@ -7,15 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npm run test:creative && npm run test:director",
+    "test": "npm run test:creative && npm run test:director && npm run test:contrast",
     "test:director": "node --test test/director/checks.test.mjs test/director/engine.test.mjs",
+    "test:contrast": "node --test test/contrast/contrastFix.test.mjs",
     "test:creative": "node --test test/creative/understanding.test.mjs test/creative/strategy.test.mjs test/creative/director.test.mjs test/creative/defaults.test.mjs test/creative/blueprint.test.mjs test/creative/validator.test.mjs test/creative/assembler.test.mjs test/creative/metrics.test.mjs test/creative/review.test.mjs test/creative/exportPackage.test.mjs test/creative/claudeRetry.test.mjs test/creative/reviewExport.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@mendable/firecrawl-js": "^1.29.1",
     "@supabase/supabase-js": "^2.106.1",
-    "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.3.6",
     "jspdf": "^4.2.1",
     "next": "^14.2.35",
     "openai": "^4.77.0",
