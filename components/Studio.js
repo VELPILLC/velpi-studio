@@ -432,8 +432,48 @@ export default function Studio() {
   // walk-in pitch: enter what you know, generate on the spot. ──
   const [intakeMode, setIntakeMode] = useState('url')
   const [manualIntake, setManualIntake] = useState({ bizName: '', services: '', address: '', phone: '', hours: '', offers: '', freeform: '' })
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false) // "Tell me more" accordion — closed by default; photos alone are enough
   const [intakePhotos, setIntakePhotos] = useState([]) // [{ data, preview, name }] — no cap
   const intakePhotoInputRef = useRef(null)
+
+  // ── Drag-and-drop uploads. dragZone names the zone a file drag is currently
+  // over ('logo' | 'intake' | 'asset:<slotId>') so only that zone highlights.
+  // Click-to-browse stays untouched — drops are an additional path into the
+  // same onFiles handlers the hidden <input>s use. ──
+  const [dragZone, setDragZone] = useState(null)
+  const isFileDrag = e => Array.from(e.dataTransfer?.types || []).includes('Files')
+  const dropZoneProps = (zone, onFiles, disabled) => ({
+    onDragOver: e => {
+      if (!isFileDrag(e) || disabled) return // no preventDefault → drop falls through to the window guard, which swallows it
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+      if (dragZone !== zone) setDragZone(zone)
+    },
+    onDragLeave: e => {
+      if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return // still inside the zone
+      setDragZone(z => (z === zone ? null : z))
+    },
+    onDrop: e => {
+      if (!isFileDrag(e)) return
+      e.preventDefault()
+      setDragZone(null)
+      if (!disabled) onFiles(e.dataTransfer.files)
+    },
+  })
+  // A file dropped anywhere OUTSIDE a designated zone must do nothing — without
+  // this guard the browser navigates away to open the dropped file.
+  useEffect(() => {
+    const guard = e => e.preventDefault()
+    const clear = () => setDragZone(null)
+    window.addEventListener('dragover', guard)
+    window.addEventListener('drop', guard)
+    window.addEventListener('dragend', clear)
+    return () => {
+      window.removeEventListener('dragover', guard)
+      window.removeEventListener('drop', guard)
+      window.removeEventListener('dragend', clear)
+    }
+  }, [])
   // ── Library-load presentation: collapsed working sections + source line.
   // Applies ONLY to projects loaded from the Library, never to live runs. ──
   const [loadedFromLibrary, setLoadedFromLibrary] = useState(false)
@@ -648,14 +688,15 @@ export default function Studio() {
   }
 
   // Readiness per intake path. The logo stays required in both — it locks
-  // the brand theme. Manual needs at least a name or a description to work
-  // from; everything else is genuinely skippable.
-  const manualHasSubstance = !!manualIntake.bizName.trim() || !!manualIntake.freeform.trim()
+  // the brand theme. Manual needs SOMETHING to work from — photos alone are
+  // enough (the text accordion can stay closed); everything else is
+  // genuinely skippable.
+  const manualHasSubstance = intakePhotos.length > 0 || !!manualIntake.bizName.trim() || !!manualIntake.freeform.trim()
   const readyToGenerate = intakeMode === 'manual'
     ? (!!logo && manualHasSubstance)
     : (!!input.trim() && !!logo)
   const missing = intakeMode === 'manual'
-    ? [!manualHasSubstance && 'business name (or a short description)', !logo && 'business logo'].filter(Boolean)
+    ? [!manualHasSubstance && 'photos (or a business name / short description)', !logo && 'business logo'].filter(Boolean)
     : [!input.trim() && 'website URL', !logo && 'business logo'].filter(Boolean)
 
   // Reconstructs a readable vibe summary — only ever populated by loading a
@@ -1532,58 +1573,38 @@ function extractLogoColors(dataUrl) {
           </div>
         ) : (
           <div style={card}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={stepBadge(manualHasSubstance)}>{manualHasSubstance ? '✓' : '1'}</span>
-              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Tell me about the business</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Photos of the business</span>
             </div>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-              Every field is optional — skip anything you don't know. The more you add, the more complete the site.
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-              {[
-                ['bizName', 'Business name'],
-                ['services', 'Services / offerings (comma-separated is fine)'],
-                ['address', 'Address / area served'],
-                ['phone', 'Phone'],
-                ['hours', 'Hours'],
-                ['offers', 'Offers / promotions'],
-              ].map(([k, ph]) => (
-                <input
-                  key={k}
-                  value={manualIntake[k]}
-                  onChange={e => setIntakeField(k, e.target.value)}
-                  disabled={generating}
-                  placeholder={ph}
-                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
-                />
-              ))}
-            </div>
-            <textarea
-              value={manualIntake.freeform}
-              onChange={e => setIntakeField('freeform', e.target.value)}
-              disabled={generating}
-              placeholder="Anything else — what makes this business special, its story, who it serves, the vibe you want…"
-              rows={4}
-              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8, resize: 'vertical' }}
-            />
-            <div style={{ marginTop: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => !generating && intakePhotoInputRef.current?.click()}
-                  style={{ background: 'transparent', border: `1px dashed ${BORDER}`, color: 'rgba(255,255,255,0.7)', borderRadius: 10, padding: '9px 14px', fontFamily: 'var(--font-inter)', fontSize: '0.8rem', cursor: 'pointer' }}
-                >📷 Add photos of the business{intakePhotos.length ? ` (${intakePhotos.length})` : ''}</button>
-                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)' }}>
-                  As many as you like — they become the site's real imagery.
-                </span>
-                <input ref={intakePhotoInputRef} type="file" accept="image/*" multiple onChange={e => { onIntakePhotos(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+            {/* Primary action: a large, obvious drop zone. Photos alone are
+                enough to generate — the text accordion below never has to open. */}
+            <div
+              onClick={() => !generating && intakePhotoInputRef.current?.click()}
+              {...dropZoneProps('intake', onIntakePhotos, generating)}
+              style={{
+                cursor: generating ? 'default' : 'pointer', textAlign: 'center',
+                padding: intakePhotos.length ? '18px 16px' : '34px 16px', borderRadius: 12,
+                border: `2px dashed ${dragZone === 'intake' ? BLUE : intakePhotos.length ? 'rgba(57,217,138,0.5)' : 'rgba(41,144,250,0.45)'}`,
+                background: dragZone === 'intake' ? 'rgba(41,144,250,0.12)' : BG,
+                transition: 'background 0.15s ease, border-color 0.15s ease',
+              }}
+            >
+              <div style={{ fontSize: '1.6rem', lineHeight: 1, marginBottom: 8 }}>📷</div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', color: '#fff' }}>
+                {dragZone === 'intake' ? 'Drop the photos here' : intakePhotos.length ? `${intakePhotos.length} photo${intakePhotos.length === 1 ? '' : 's'} added — drop or click to add more` : 'Drag & drop photos of the business'}
               </div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                {dragZone === 'intake' ? 'Several at once is fine.' : "or click to browse — as many as you like, they become the site's real imagery"}
+              </div>
+              <input ref={intakePhotoInputRef} type="file" accept="image/*" multiple onChange={e => { onIntakePhotos(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
               {intakePhotos.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12, justifyContent: 'center' }}>
                   {intakePhotos.map((p, i) => (
                     <div key={i} style={{ position: 'relative', width: 62, height: 62, borderRadius: 8, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
                       <img src={p.preview} alt={p.name || `photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       <button
-                        onClick={() => setIntakePhotos(prev => prev.filter((_, j) => j !== i))}
+                        onClick={e => { e.stopPropagation(); setIntakePhotos(prev => prev.filter((_, j) => j !== i)) }}
                         style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.6rem', lineHeight: 1, cursor: 'pointer' }}
                       >✕</button>
                     </div>
@@ -1591,6 +1612,52 @@ function extractLogoColors(dataUrl) {
                 </div>
               )}
             </div>
+            {/* Optional details — collapsed accordion; every field stays
+                individually optional, exactly as before. */}
+            <button
+              onClick={() => setMoreInfoOpen(o => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', marginTop: 12, background: 'transparent', border: 'none', padding: '4px 2px', cursor: 'pointer', color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-inter)', fontSize: '0.84rem', fontWeight: 600, textAlign: 'left' }}
+            >
+              <span style={{ display: 'inline-block', transform: moreInfoOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease', fontSize: '0.7rem' }}>▶</span>
+              Tell me more about the business (optional)
+              {!moreInfoOpen && (manualIntake.bizName.trim() || manualIntake.freeform.trim()) && (
+                <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', color: GREEN }}>✓ has details</span>
+              )}
+            </button>
+            {moreInfoOpen && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+                  Every field is optional — skip anything you don't know. The more you add, the more complete the site.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+                  {[
+                    ['bizName', 'Business name'],
+                    ['services', 'Services / offerings (comma-separated is fine)'],
+                    ['address', 'Address / area served'],
+                    ['phone', 'Phone'],
+                    ['hours', 'Hours'],
+                    ['offers', 'Offers / promotions'],
+                  ].map(([k, ph]) => (
+                    <input
+                      key={k}
+                      value={manualIntake[k]}
+                      onChange={e => setIntakeField(k, e.target.value)}
+                      disabled={generating}
+                      placeholder={ph}
+                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
+                    />
+                  ))}
+                </div>
+                <textarea
+                  value={manualIntake.freeform}
+                  onChange={e => setIntakeField('freeform', e.target.value)}
+                  disabled={generating}
+                  placeholder="Anything else — what makes this business special, its story, who it serves, the vibe you want…"
+                  rows={4}
+                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8, resize: 'vertical' }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1603,16 +1670,15 @@ function extractLogoColors(dataUrl) {
           </div>
           <div
             onClick={() => !generating && logoInputRef.current?.click()}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); if (!generating) onLogoFile(e.dataTransfer.files) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: generating ? 'default' : 'pointer', background: BG, border: `1.5px dashed ${logo ? 'rgba(57,217,138,0.5)' : 'rgba(255,138,138,0.5)'}`, borderRadius: 10, padding: 10 }}
+            {...dropZoneProps('logo', onLogoFile, generating)}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: generating ? 'default' : 'pointer', background: dragZone === 'logo' ? 'rgba(41,144,250,0.12)' : BG, border: `1.5px dashed ${dragZone === 'logo' ? BLUE : logo ? 'rgba(57,217,138,0.5)' : 'rgba(255,138,138,0.5)'}`, borderRadius: 10, padding: 10, transition: 'background 0.15s ease, border-color 0.15s ease' }}
           >
             <div style={{ width: 54, height: 54, borderRadius: 8, background: '#101c30', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               {logo ? <img src={logo.preview} alt="logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ opacity: 0.3 }}>✦</span>}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.86rem', color: '#fff' }}>
-                {logo ? `${logo.name} — tap to change` : 'Upload the business logo (PNG, SVG, or a screenshot)'}
+                {dragZone === 'logo' ? 'Drop it here to set the logo' : logo ? `${logo.name} — tap to change, or drop a new file` : 'Upload the business logo (PNG, SVG, or a screenshot) — click or drag & drop'}
               </div>
               <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
                 {logo ? 'Auto-refined for the build — upscaled, cleaned, theme colors extracted.' : 'Required before you can generate — used to lock the brand theme and refine into a premium mark.'}
@@ -1806,8 +1872,13 @@ function extractLogoColors(dataUrl) {
               {slots.map((s, i) => {
                 const src = s.id === 'logo' ? (refinedLogo || assetsById.logo || logo?.preview || null) : assetsById[s.id]
                 const linked = !!ghlUrls[s.id]?.trim()
+                const dz = dragZone === `asset:${s.id}`
                 return (
-                  <div key={s.id} style={{ background: BG, border: `1px solid ${linked ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    key={s.id}
+                    {...dropZoneProps(`asset:${s.id}`, files => replaceAsset(s.id, files), false)}
+                    style={{ background: dz ? 'rgba(41,144,250,0.1)' : BG, border: dz ? `1px dashed ${BLUE}` : `1px solid ${linked ? 'rgba(57,217,138,0.5)' : BORDER}`, borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', transition: 'background 0.15s ease, border-color 0.15s ease' }}
+                  >
                     <div style={{ width: 86, height: 62, borderRadius: 8, overflow: 'hidden', background: '#101c30', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <img src={src || placeholderSvg(s.name)} alt={s.name} style={{ width: '100%', height: '100%', objectFit: s.id === 'logo' ? 'contain' : 'cover', display: 'block' }} />
                       {((!src && !imagesReady && generating) || regenIds[s.id]) && (
@@ -1823,8 +1894,8 @@ function extractLogoColors(dataUrl) {
                         <span style={{ ...label, fontSize: '0.6rem', color: BLUE }}>{i + 1}. {s.name}</span>
                         {linked && <span style={{ color: GREEN, fontSize: '0.68rem' }}>✓ linked</span>}
                       </div>
-                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem', color: 'rgba(255,255,255,0.4)' }}>
-                        {i + 1}-{safeName(s.name)}.png{s.section ? ` · ${s.section}` : ''}
+                      <div style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.56rem', color: dz ? BLUE : 'rgba(255,255,255,0.4)' }}>
+                        {dz ? '⇧ drop image to replace this asset' : `${i + 1}-${safeName(s.name)}.png${s.section ? ` · ${s.section}` : ''}`}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                         {src && (
@@ -1833,7 +1904,7 @@ function extractLogoColors(dataUrl) {
                         {s.id === 'logo' && src && (logoMeta?.shape === 'wide' || logoMeta?.shape === 'landscape') && (
                           <button onClick={downloadGhlHeaderLogo} title="Transparent PNG sized for GoHighLevel's fixed-height header container" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem' }}>⬇ GHL header</button>
                         )}
-                        <label style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem', cursor: 'pointer' }}>
+                        <label title="Click to browse, or drag an image anywhere onto this row" style={{ ...monoBtn, padding: '3px 9px', fontSize: '0.58rem', cursor: 'pointer' }}>
                           ⇧ Replace
                           <input type="file" accept="image/*,.svg" onChange={e => { replaceAsset(s.id, e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                         </label>
