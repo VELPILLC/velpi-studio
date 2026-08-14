@@ -432,6 +432,7 @@ export default function Studio() {
   // walk-in pitch: enter what you know, generate on the spot. ──
   const [intakeMode, setIntakeMode] = useState('url')
   const [manualIntake, setManualIntake] = useState({ bizName: '', services: '', address: '', phone: '', hours: '', offers: '', freeform: '' })
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false) // "Tell me more" accordion — closed by default; photos alone are enough
   const [intakePhotos, setIntakePhotos] = useState([]) // [{ data, preview, name }] — no cap
   const intakePhotoInputRef = useRef(null)
 
@@ -687,14 +688,15 @@ export default function Studio() {
   }
 
   // Readiness per intake path. The logo stays required in both — it locks
-  // the brand theme. Manual needs at least a name or a description to work
-  // from; everything else is genuinely skippable.
-  const manualHasSubstance = !!manualIntake.bizName.trim() || !!manualIntake.freeform.trim()
+  // the brand theme. Manual needs SOMETHING to work from — photos alone are
+  // enough (the text accordion can stay closed); everything else is
+  // genuinely skippable.
+  const manualHasSubstance = intakePhotos.length > 0 || !!manualIntake.bizName.trim() || !!manualIntake.freeform.trim()
   const readyToGenerate = intakeMode === 'manual'
     ? (!!logo && manualHasSubstance)
     : (!!input.trim() && !!logo)
   const missing = intakeMode === 'manual'
-    ? [!manualHasSubstance && 'business name (or a short description)', !logo && 'business logo'].filter(Boolean)
+    ? [!manualHasSubstance && 'photos (or a business name / short description)', !logo && 'business logo'].filter(Boolean)
     : [!input.trim() && 'website URL', !logo && 'business logo'].filter(Boolean)
 
   // Reconstructs a readable vibe summary — only ever populated by loading a
@@ -1571,61 +1573,38 @@ function extractLogoColors(dataUrl) {
           </div>
         ) : (
           <div style={card}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={stepBadge(manualHasSubstance)}>{manualHasSubstance ? '✓' : '1'}</span>
-              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Tell me about the business</span>
+              <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem' }}>Photos of the business</span>
             </div>
-            <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-              Every field is optional — skip anything you don't know. The more you add, the more complete the site.
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-              {[
-                ['bizName', 'Business name'],
-                ['services', 'Services / offerings (comma-separated is fine)'],
-                ['address', 'Address / area served'],
-                ['phone', 'Phone'],
-                ['hours', 'Hours'],
-                ['offers', 'Offers / promotions'],
-              ].map(([k, ph]) => (
-                <input
-                  key={k}
-                  value={manualIntake[k]}
-                  onChange={e => setIntakeField(k, e.target.value)}
-                  disabled={generating}
-                  placeholder={ph}
-                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
-                />
-              ))}
-            </div>
-            <textarea
-              value={manualIntake.freeform}
-              onChange={e => setIntakeField('freeform', e.target.value)}
-              disabled={generating}
-              placeholder="Anything else — what makes this business special, its story, who it serves, the vibe you want…"
-              rows={4}
-              style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8, resize: 'vertical' }}
-            />
+            {/* Primary action: a large, obvious drop zone. Photos alone are
+                enough to generate — the text accordion below never has to open. */}
             <div
+              onClick={() => !generating && intakePhotoInputRef.current?.click()}
               {...dropZoneProps('intake', onIntakePhotos, generating)}
-              style={{ marginTop: 10, padding: 8, borderRadius: 10, border: `1.5px dashed ${dragZone === 'intake' ? BLUE : 'transparent'}`, background: dragZone === 'intake' ? 'rgba(41,144,250,0.1)' : 'transparent', transition: 'background 0.15s ease, border-color 0.15s ease' }}
+              style={{
+                cursor: generating ? 'default' : 'pointer', textAlign: 'center',
+                padding: intakePhotos.length ? '18px 16px' : '34px 16px', borderRadius: 12,
+                border: `2px dashed ${dragZone === 'intake' ? BLUE : intakePhotos.length ? 'rgba(57,217,138,0.5)' : 'rgba(41,144,250,0.45)'}`,
+                background: dragZone === 'intake' ? 'rgba(41,144,250,0.12)' : BG,
+                transition: 'background 0.15s ease, border-color 0.15s ease',
+              }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => !generating && intakePhotoInputRef.current?.click()}
-                  style={{ background: 'transparent', border: `1px dashed ${BORDER}`, color: 'rgba(255,255,255,0.7)', borderRadius: 10, padding: '9px 14px', fontFamily: 'var(--font-inter)', fontSize: '0.8rem', cursor: 'pointer' }}
-                >📷 Add photos of the business{intakePhotos.length ? ` (${intakePhotos.length})` : ''}</button>
-                <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.68rem', color: dragZone === 'intake' ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)' }}>
-                  {dragZone === 'intake' ? 'Drop the photos here — several at once is fine.' : "As many as you like — they become the site's real imagery. Drag & drop works too."}
-                </span>
-                <input ref={intakePhotoInputRef} type="file" accept="image/*" multiple onChange={e => { onIntakePhotos(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+              <div style={{ fontSize: '1.6rem', lineHeight: 1, marginBottom: 8 }}>📷</div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 600, fontSize: '0.95rem', color: '#fff' }}>
+                {dragZone === 'intake' ? 'Drop the photos here' : intakePhotos.length ? `${intakePhotos.length} photo${intakePhotos.length === 1 ? '' : 's'} added — drop or click to add more` : 'Drag & drop photos of the business'}
               </div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                {dragZone === 'intake' ? 'Several at once is fine.' : "or click to browse — as many as you like, they become the site's real imagery"}
+              </div>
+              <input ref={intakePhotoInputRef} type="file" accept="image/*" multiple onChange={e => { onIntakePhotos(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
               {intakePhotos.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12, justifyContent: 'center' }}>
                   {intakePhotos.map((p, i) => (
                     <div key={i} style={{ position: 'relative', width: 62, height: 62, borderRadius: 8, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
                       <img src={p.preview} alt={p.name || `photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       <button
-                        onClick={() => setIntakePhotos(prev => prev.filter((_, j) => j !== i))}
+                        onClick={e => { e.stopPropagation(); setIntakePhotos(prev => prev.filter((_, j) => j !== i)) }}
                         style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.6rem', lineHeight: 1, cursor: 'pointer' }}
                       >✕</button>
                     </div>
@@ -1633,6 +1612,52 @@ function extractLogoColors(dataUrl) {
                 </div>
               )}
             </div>
+            {/* Optional details — collapsed accordion; every field stays
+                individually optional, exactly as before. */}
+            <button
+              onClick={() => setMoreInfoOpen(o => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', marginTop: 12, background: 'transparent', border: 'none', padding: '4px 2px', cursor: 'pointer', color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-inter)', fontSize: '0.84rem', fontWeight: 600, textAlign: 'left' }}
+            >
+              <span style={{ display: 'inline-block', transform: moreInfoOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease', fontSize: '0.7rem' }}>▶</span>
+              Tell me more about the business (optional)
+              {!moreInfoOpen && (manualIntake.bizName.trim() || manualIntake.freeform.trim()) && (
+                <span style={{ fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.6rem', color: GREEN }}>✓ has details</span>
+              )}
+            </button>
+            {moreInfoOpen && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+                  Every field is optional — skip anything you don't know. The more you add, the more complete the site.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+                  {[
+                    ['bizName', 'Business name'],
+                    ['services', 'Services / offerings (comma-separated is fine)'],
+                    ['address', 'Address / area served'],
+                    ['phone', 'Phone'],
+                    ['hours', 'Hours'],
+                    ['offers', 'Offers / promotions'],
+                  ].map(([k, ph]) => (
+                    <input
+                      key={k}
+                      value={manualIntake[k]}
+                      onChange={e => setIntakeField(k, e.target.value)}
+                      disabled={generating}
+                      placeholder={ph}
+                      style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box' }}
+                    />
+                  ))}
+                </div>
+                <textarea
+                  value={manualIntake.freeform}
+                  onChange={e => setIntakeField('freeform', e.target.value)}
+                  disabled={generating}
+                  placeholder="Anything else — what makes this business special, its story, who it serves, the vibe you want…"
+                  rows={4}
+                  style={{ width: '100%', background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, color: '#fff', padding: '12px 13px', fontSize: '0.88rem', fontFamily: 'var(--font-inter)', boxSizing: 'border-box', marginTop: 8, resize: 'vertical' }}
+                />
+              </div>
+            )}
           </div>
         )}
 
