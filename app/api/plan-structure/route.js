@@ -13,7 +13,7 @@ import { listStyles } from '../../../lib/supabase'
 
 export async function POST(request) {
   try {
-    const { analysis, vibe, lock, manualStyleId } = await request.json()
+    const { analysis, vibe, lock, manualStyleId, guidedDecisions } = await request.json()
     if (!analysis) {
       return Response.json({ error: 'Missing analysis to plan structure from.' }, { status: 400 })
     }
@@ -29,7 +29,8 @@ export async function POST(request) {
       allStyles,
       vibe: typeof vibe === 'string' ? vibe : '',
       lock: lock || null,
-      manualStyleId: manualStyleId || null,
+      manualStyleId: manualStyleId || guidedDecisions?.styleId || null,
+      guidedDecisions: guidedDecisions || null,
     })
     return Response.json({
       sectionOrder: plan.sectionOrder,
@@ -37,6 +38,10 @@ export async function POST(request) {
       motion: plan.motion,
       sectionRefs: plan.sectionRefs,
       sectionMap: plan.sectionMap,
+      // family/borrowed are attestation: which single design language the page
+      // committed to, and any category it had to source from outside it.
+      family: plan.family,
+      borrowed: plan.borrowed,
       lock: plan.lock,
     })
   } catch (err) {

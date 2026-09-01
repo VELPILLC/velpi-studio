@@ -3,6 +3,39 @@ export const maxDuration = 300
 
 import { callClaude, parseJson, stripFences } from '../../../lib/claude'
 import { findAssetCandidates } from '../../../lib/assetLibrary'
+import { reconcilePalette } from '../../../lib/brandPalette.mjs'
+
+// Claude vision accepts these only — a scraped SVG logo (very common) simply
+// isn't sent, and the analysis proceeds exactly as it did before.
+const VISION_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }
+const MAX_LOGO_BYTES = 3.5 * 1024 * 1024
+
+// The logo is the single most reliable statement of what a brand looks like,
+// and until now it only ever reached the model as a URL string. Load the
+// actual bytes so the analysis can SEE the mark. Best-effort by design:
+// any failure returns null and the caller falls back to the old text-only path.
+async function loadLogoImage(src) {
+  if (!src || typeof src !== 'string') return null
+  const trimmed = src.trim()
+
+  const dataMatch = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(trimmed)
+  if (dataMatch) {
+    const mt = dataMatch[1].toLowerCase()
+    if (!Object.values(VISION_TYPES).includes(mt)) return null
+    return { media_type: mt, data: dataMatch[2] }
+  }
+
+  if (!/^https?:\/\//i.test(trimmed)) return null
+  const ext = (trimmed.split('?')[0].split('.').pop() || '').toLowerCase()
+  const res = await fetch(trimmed)
+  if (!res.ok) return null
+  const headerType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+  const media_type = Object.values(VISION_TYPES).includes(headerType) ? headerType : VISION_TYPES[ext]
+  if (!media_type) return null // SVG, ICO, or anything vision can't read
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (!buf.length || buf.length > MAX_LOGO_BYTES) return null
+  return { media_type, data: buf.toString('base64') }
+}
 
 const REPAIR_SYSTEM = `You are given text that was supposed to be a single valid JSON object but failed to parse. The single most common cause: a stray, UNESCAPED double-quote mark inside a string value — usually a reviewer's own quoted word or aside (e.g. their annual "checkup" or a "nickname") that got left as a literal " instead of \\" (or a single quote). Scan every string value for this first and fix any you find. The next most common cause is truncation (cut off mid-response) — if that's what happened instead, complete it sensibly using the surrounding context (never invent new facts — only close out the structure). Return ONLY the corrected, complete, valid JSON object with the exact same content and meaning. No markdown, no commentary, no explanation — JSON only.`
 
@@ -22,6 +55,12 @@ const SYSTEM = `You are a senior brand and web strategist analyzing a business w
 
 STEP — RECON: extract EVERY piece of real information, exhaustively — business name, every phone number, every email address, every physical address/location, hours, social media links, nav structure, every service/menu item with prices when shown, every review/quote with attribution, taglines, delivery platforms, credentials, years in business. Miss nothing — the user reads this extraction directly.
 STEP — DIRECTION: commit to ONE highest-end creative direction appropriate to THIS industry (never a generic template) and name the single feeling a visitor should have within 3 seconds. Also decide the page's MODE by judgment: "funnel" (one linear persuasion path, minimal nav, one repeated action — fits urgent/single-service/offer-driven businesses), "website" (fuller informational structure — fits browse-heavy, menu/portfolio, multi-service businesses), or "hybrid". Choose what converts best for THIS business, not a house default.
+STEP — READ THE LOGO (when a logo image is attached): the FIRST attached image is this business's actual logo. It is the most reliable statement of who this brand is — read it before you decide anything visual, and fill in brand_read from what you actually SEE in it:
+  * COLORS: the real hexes in the mark, most dominant first, each with the role it plays (primary / secondary / accent / neutral). Report what is THERE, not what you think would look premium.
+  * TYPOGRAPHY: classify the lettering — geometric sans, humanist sans, transitional serif, didone, slab, script, hand-drawn, display — plus weight and case. The new site's type should feel related to this, not arbitrary.
+  * VISUAL LANGUAGE: era, ornamentation level, geometry (rounded/sharp/organic), and any recurring motif.
+  * THE PALETTE RULE — THIS IS WHERE SITES GO WRONG: color_palette must be built from the colors that are actually in this logo. A category prior ("premium restaurants use navy and gold") NEVER outranks the mark in front of you — a red-and-gold logo gets a red-and-gold site. You may add tints, shades, and one neutral, but do not introduce a hue the brand does not own.
+  * If NO logo image is attached, leave brand_read null and say so via confidence 0 — never guess a mark you cannot see.
 STEP — INFER THE VIBE YOURSELF: the creator does not configure feel/look/CTA — YOU determine all three (inferred_vibe) from what you can see: the crawled copy's tone and vocabulary → feel; their existing imagery, palette, and niche norms → look; the business type's natural money action → primary_cta. If the creator DID provide manual vibe selections (in the user message), align inferred_vibe with them instead of contradicting them.
 STEP — CONVERSION STRATEGY: think like a direct-response strategist about THIS business before any design happens:
   1. The ONE primary action that makes this business money (call, book, quote, order, visit) and the strongest secondary action.
@@ -50,7 +89,15 @@ Return ONLY valid JSON (no markdown, no prose) in exactly this shape:
     "look": "the visual treatment inferred from their existing imagery + industry (e.g. 'Dramatic full-screen imagery', 'Airy whitespace', 'Dark & moody', 'Clean structured grid', 'Rich & layered', 'Bold color-blocked sections')",
     "primary_cta": "the single action this business type most needs visitors to take (a gym: 'Join now'; a law firm: 'Book a consultation'; a boutique: 'Browse the collection')"
   },
-  "color_palette": ["#hex", "#hex"],
+  "brand_read": {
+    "colors": [{ "hex": "#hex", "role": "primary | secondary | accent | neutral", "prominence": "0-1, how much of the mark it occupies" }],
+    "typography": { "classification": "geometric sans | humanist sans | transitional serif | didone | slab | script | hand-drawn | display", "weight": "string", "case": "uppercase | title | lowercase | mixed" },
+    "visual_language": { "era": "string", "ornamentation": "none | minimal | moderate | rich", "geometry": "rounded | sharp | organic | mixed" },
+    "personality": ["2-4 adjectives the MARK itself communicates"],
+    "motifs": ["any repeated shape/symbol in the mark, or empty"],
+    "confidence": "0-1 — 0 when no logo image was attached"
+  },
+  "color_palette": ["#hex", "#hex — built from brand_read.colors; see THE PALETTE RULE"],
   "sections": ["ordered section keys, e.g. hero, services, about, reviews, hours, contact"],
   "layout": {
     "section_order": ["same ordered section keys, arrest -> build desire -> convert"],
@@ -121,9 +168,21 @@ Rules:
 
 export async function POST(request) {
   try {
-    const { scrapedData, vibe } = await request.json()
+    // logoImage: the uploaded logo's own bytes when the client has them (a
+    // data URI) — preferred over scrapedData.logo, which is often an SVG or a
+    // hotlink. logoPalette: canvas-sampled brand colors, kept SEPARATE from
+    // scrapedData.palette (which is regex-scraped site hexes, framework CSS
+    // noise included, and must never be mistaken for brand truth).
+    const { scrapedData, vibe, logoImage, logoPalette } = await request.json()
     if (!scrapedData) {
       return Response.json({ error: 'Missing scraped data to analyze.' }, { status: 400 })
+    }
+
+    let logoVision = null
+    try {
+      logoVision = await loadLogoImage(logoImage || scrapedData.logo)
+    } catch (e) {
+      console.error('logo vision load failed (non-fatal):', e.message)
     }
 
     // Cross-project asset library: surface previously generated images whose
@@ -142,6 +201,7 @@ export async function POST(request) {
     } catch (_) { /* library is optional */ }
 
     const user = `Analyze this crawled website (${scrapedData.pagesCrawled || 1} page(s)) and return the JSON analysis.
+${logoVision ? '\nTHE FIRST ATTACHED IMAGE IS THIS BUSINESS\'S ACTUAL LOGO — read it per the READ THE LOGO step and build color_palette from the colors that are really in it.\n' : '\n(No logo image could be attached — set brand_read.confidence to 0 and infer the palette from the crawled content instead.)\n'}${Array.isArray(logoPalette) && logoPalette.length ? `MEASURED LOGO COLORS (sampled from the mark's own pixels, most dominant first — these are brand truth, unlike the scraped site palette below): ${logoPalette.join(', ')}\n` : ''}
 ${vibe ? `\nCREATOR'S VIBE SELECTIONS (multiple-choice answers from the person commissioning this site — fold these directly into design_direction, target_feeling, and tone; they outrank your own instincts): ${vibe}\n` : ''}
 TITLE: ${scrapedData.title || '(none)'}
 DESCRIPTION: ${scrapedData.description || '(none)'}
@@ -156,7 +216,7 @@ ${libraryBlock}
 FULL CRAWLED CONTENT:
 ${(scrapedData.content || '').slice(0, 36000)}`
 
-    const raw = await callClaude({ system: SYSTEM, user, maxTokens: 16000 })
+    const raw = await callClaude({ system: SYSTEM, user, images: logoVision ? [logoVision] : [], maxTokens: 16000 })
     let analysis = parseJson(raw)
 
     // Self-repair: this JSON is the densest in the pipeline (facts + full
@@ -209,9 +269,40 @@ ${(scrapedData.content || '').slice(0, 36000)}`
     if (!analysis.color_palette || !analysis.color_palette.length) {
       analysis.color_palette = scrapedData.palette || ['#2990fa', '#0a1628']
     }
+
+    // BRAND ANCHOR — deterministic, and deliberately NOT another instruction.
+    // The prompt above already asks for a logo-derived palette, but that
+    // competes with "commit to ONE highest-end direction", and when the
+    // category prior wins, the invented hue gets THEME LOCKed downstream and
+    // even the generated photography is graded to it. So the palette is
+    // checked in code against the mark's real colors — vision-reported hexes
+    // first (it actually looked at the logo), canvas samples as backup —
+    // and only the LEAD color is corrected, minimally, with a record of why.
+    let paletteChanges = []
+    try {
+      const brandColors = [
+        ...(analysis.brand_read?.colors || [])
+          .filter(c => c && c.hex)
+          .map(c => ({ hex: c.hex, prominence: Number(c.prominence) || null })),
+        ...(Array.isArray(logoPalette) ? logoPalette : []).map(hex => ({ hex, prominence: null })),
+      ]
+      if (brandColors.length) {
+        const rec = reconcilePalette(analysis.color_palette, brandColors)
+        analysis.color_palette = rec.palette
+        paletteChanges = rec.changes
+        if (rec.changes.some(c => !c.flagged)) {
+          console.log('analyze: palette re-anchored to the logo —', JSON.stringify(rec.changes))
+        }
+      }
+    } catch (e) {
+      console.error('palette reconciliation failed (non-fatal):', e.message)
+    }
+
     analysis._source = { url: scrapedData.url, domain: scrapedData.domain, logo: scrapedData.logo }
 
-    return Response.json({ analysis })
+    // paletteChanges/logoSeen are attestation, same spirit as contrastFixes:
+    // prove what the pipeline did to the brand instead of hiding it.
+    return Response.json({ analysis, paletteChanges, logoSeen: !!logoVision })
   } catch (err) {
     console.error('analyze error:', err)
     return Response.json({ error: `Analysis failed: ${err.message}` }, { status: 500 })
