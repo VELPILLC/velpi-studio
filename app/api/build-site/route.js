@@ -3,6 +3,7 @@ export const maxDuration = 300
 
 import { callClaude, stripFences } from '../../../lib/claude'
 import { findAndFixContrastIssues } from '../../../lib/contrastFix.mjs'
+import { MOBILE_UTILITIES_CSS } from '../../../lib/mobileUtilities.mjs'
 
 const SYSTEM = `You are an elite web designer. You produce ONE mockup at a time. Commit to a single direction and execute it at the highest level — never produce multiple versions and never hedge between styles.
 
@@ -32,6 +33,16 @@ VISUAL QUALITY — PROFESSIONAL DESIGN STANDARDS (this is the floor, not the cei
 - NAV clean and light.
 
 NEVER DO THESE (they read as cheap): dark navy as the primary page background; amber/orange accents on hospitality unless it is the brand color; generic equal-padding card grids; centered hero text with no atmospheric overlay; Bootstrap-looking review sections; dark-box footers with dumped links; uniform heading sizes; borders dividing every section.
+
+PRECEDENCE — WHEN TWO INSTRUCTIONS BELOW DISAGREE, THIS ORDER DECIDES. Several sections each claim authority over the page; that is deliberate, because each is authoritative in its own domain. When they genuinely conflict, resolve strictly by this order and never split the difference (a hedged compromise between two directions is exactly what makes a page look designed by committee):
+1. THE BRAND'S REAL IDENTITY — its actual palette, logo, and personality. Nothing overrides the business's own identity.
+2. FACTUAL CONTENT — real copy, services, prices, hours, contacts, reviews. Never dropped or invented for a layout's sake.
+3. THE CONVERSION STRATEGY — what the page must make happen.
+4. THE DESIGN BRIEF — the committed creative direction. Where it speaks, it wins over the reference systems.
+5. SECTION BLUEPRINTS — each section's skeleton, grid ratios, and measurements.
+6. THE REFERENCE DESIGN SYSTEM — consulted for expression where the brief is silent.
+7. THE ANTI-GENERIC LEDGER — applies to everything the layers above leave open.
+The output contract (GoHighLevel scoping, no JavaScript, accessibility minimums, mobile safety) sits outside this order entirely: it is never traded away for any of the above.
 
 STRUCTURE IS FIXED — EXPRESSION IS YOURS:
 The page's skeleton — its section order and each section's layout blueprint — was decided before you and is delivered below as SECTION BLUEPRINTS. Structure is not an input to remix: never invent a different composition for a section that has a blueprint, never reorder sections, never merge or split them. Your creative license lives entirely in EXPRESSION: typography voice and detailing, how the brand palette is deployed across the skeleton, copy attitude, imagery treatment and crops, texture, surface finishes, and micro-interactions. A great designer has infinite room inside a fixed skeleton — spend your talent there, and make judgment calls instead of hedging.
@@ -83,7 +94,7 @@ PREMIUM TECHNIQUES — make the page feel ALIVE, like a high-end agency built it
 - Strong focal points: each section has ONE clear focal element; oversized display type where fitting; deliberate asymmetry.
 - Conversion focus survives all polish: primary CTA repeated, unmistakable, and the most visually weighted element in its section.
 
-DESIGN SYSTEM ADHERENCE: when a DESIGN.md system is provided below, follow it precisely — its colors (mapping the brand's palette into its accent slots), typography, spacing, component treatments, and its "Never" rules override your defaults.
+DESIGN SYSTEM ADHERENCE: when a DESIGN.md system is provided below, follow it precisely — its colors (mapping the brand's palette into its accent slots), typography, spacing, component treatments, and its "Never" rules replace your own defaults. Per PRECEDENCE above it ranks BELOW the design brief: where the brief has committed to something, the brief wins; the system governs everything the brief leaves open.
 
 BRAND CONTINUITY: a BRAND ANALYSIS of the business's existing site may be provided. The new site must read as an ELEVATED version of that same brand — same colors, same personality, same design language matured to premium quality. Never ship something that feels like a different company.
 
@@ -99,11 +110,18 @@ OUTPUT RULES — OPTIMIZED FOR GOHIGHLEVEL (hard requirements):
   * DESKTOP MUST READ AS DESKTOP — the #1 failure mode to avoid is a page that looks like a blown-up phone screen at 1440px: a nav with no links, full-width stacked text, one narrow centered column everywhere. Even when a section's blueprint is a centered composition, at desktop widths its content sits in a measured container (roughly 640-880px for a centered hero's text block, line lengths 40-60ch) with deliberate surrounding space — never an edge-to-edge phone stack scaled up.
   * DESKTOP NAV LINK LIST — HARD REQUIREMENT: at ≥768px the nav ALWAYS shows a visible link list (4-6 anchor links to real section ids — give every section an id) alongside the logo and the single CTA. The list hides ONLY inside the @media (max-width: 767px) query. A nav that renders just a logo and a CTA at desktop width is a BROKEN OUTPUT — the mobile-nav rule below describes what mobile hides, it is never permission to omit the links.
   * Fluid type with clamp() on display sizes (e.g. hero clamp(2.4rem, 6vw, 5.5rem)) so headlines scale down without overflowing.
+  * MOBILE UTILITY CLASSES — USE THESE INSTEAD OF HAND-WRITING THE SAME FOUR MEDIA QUERIES YOURSELF. A server-appended stylesheet guarantees these behaviors at exactly 767/768px and wins the cascade no matter how specific your own rules are. Put the class on the element and do NOT also write your own @media rule for that same behavior — a hand-written mobile override is routinely out-specified by your own desktop component rule (e.g. ".velpi-page .services .card-grid" beats a generic mobile rule) and then silently never applies, which is exactly the failure these remove:
+    - velpi-stack-mobile — on any multi-column grid/flex row that must collapse to ONE column on phones. Keeps your existing gap.
+    - velpi-edge-mobile — on any section/container that must run edge-to-edge on phones. Clears outer margin/max-width/radius and leaves a 14px text inset.
+    - velpi-full-mobile — on each primary CTA in the PAGE BODY (hero, offer moment, closing conversion band): full width, ≥52px tap height, label centered. If that CTA shares a flex row with siblings, put velpi-stack-mobile on the ROW too, otherwise it can only claim the space its siblings leave. Do NOT put this on the compact nav CTA — the mobile nav bar stays a single ~56-64px row of logo + that one button.
+    - velpi-hide-mobile — on the desktop nav link list. This is how the links required above hide below 768px while staying in the markup.
+    - velpi-hide-desktop — only if you genuinely need a mobile-only element.
+    Keep writing your own @media rules for EVERYTHING else — type scale, spacing rhythm, per-section adaptation, imagery treatment. These five standardize only the behaviors that were breaking, not your creative layout.
   * MOBILE SAFETY — hard requirements, checked before you finish, never sacrificed for the desktop design:
-    - Absolutely no horizontal scroll at 390px — every oversized/overlapping element gets max-width: 100% and overflow guards; grids and columns collapse to a single column.
-    - Sections run edge-to-edge on mobile with a minimal text inset (12-16px); no boxed-in cards floating in wide margins.
-    - CTAs go full-width on mobile with tap height ≥ 52px; body text never renders below 16px on mobile (nav labels/fine print can go to 13px minimum). A desktop base size below 16px does NOT satisfy this by accident — write the explicit override in the mobile media query (e.g. inside @media (max-width: 767px): .velpi-page p, .velpi-page li { font-size: 1rem; }) so every paragraph and list item is provably ≥ 16px on a phone. And make the floor actually WIN: place that override at the END of the final mobile media query, and never set a MORE SPECIFIC mobile p/li size below 1rem (a .velpi-page .card li { font-size: .9rem } written for desktop silently defeats the generic floor — bump those component sizes to ≥ 1rem inside the mobile query too). A server-side floor is ALSO appended after your CSS enforcing 1rem on every mobile p/li — so any p/li that is genuinely fine print (legal lines, photo captions) must carry class="fine" to keep its small size (the floor exempts p.fine/li.fine at 13px); body copy left small will simply be forced larger, possibly breaking your layout — size it right yourself.
-    - MOBILE NAV — no JavaScript means no hamburger toggle, so don't attempt one: on mobile the nav shows ONLY the logo and that SAME single nav CTA button described above (never a second, mobile-only CTA element) — the full link list REQUIRED by the desktop rule above still exists in the markup and hides via the @media (max-width: 767px) query while that one CTA stays visible. This rule REMOVES nothing from the desktop nav — it only hides the links below 768px. Keep the mobile bar compact (~56-64px tall).
+    - Absolutely no horizontal scroll at 390px — every oversized/overlapping element gets max-width: 100% and overflow guards; grids and columns collapse to a single column (that collapse is what velpi-stack-mobile is for — use it rather than rewriting it per grid).
+    - Sections run edge-to-edge on mobile with a minimal text inset (12-16px); no boxed-in cards floating in wide margins. Apply velpi-edge-mobile to each such section instead of hand-writing its mobile padding/margin reset.
+    - CTAs go full-width on mobile with tap height ≥ 52px (apply velpi-full-mobile to each primary CTA — it guarantees both); body text never renders below 16px on mobile (nav labels/fine print can go to 13px minimum). A desktop base size below 16px does NOT satisfy this by accident — write the explicit override in the mobile media query (e.g. inside @media (max-width: 767px): .velpi-page p, .velpi-page li { font-size: 1rem; }) so every paragraph and list item is provably ≥ 16px on a phone. And make the floor actually WIN: place that override at the END of the final mobile media query, and never set a MORE SPECIFIC mobile p/li size below 1rem (a .velpi-page .card li { font-size: .9rem } written for desktop silently defeats the generic floor — bump those component sizes to ≥ 1rem inside the mobile query too). A server-side floor is ALSO appended after your CSS enforcing 1rem on every mobile p/li — so any p/li that is genuinely fine print (legal lines, photo captions) must carry class="fine" to keep its small size (the floor exempts p.fine/li.fine at 13px); body copy left small will simply be forced larger, possibly breaking your layout — size it right yourself.
+    - MOBILE NAV — no JavaScript means no hamburger toggle, so don't attempt one: on mobile the nav shows ONLY the logo and that SAME single nav CTA button described above (never a second, mobile-only CTA element) — the full link list REQUIRED by the desktop rule above still exists in the markup and hides by carrying velpi-hide-mobile (do not also write your own @media rule for it) while that one CTA stays visible. This rule REMOVES nothing from the desktop nav — it only hides the links below 768px. Keep the mobile bar compact (~56-64px tall).
     - Any cluster of small tap targets (footer links, social icons, nav items) keeps at least 8px of real spacing between adjacent targets.
 - LEGIBILITY & CONTRAST — NON-NEGOTIABLE, CHECK EVERY SECTION BEFORE YOU FINISH: text color must always have strong contrast against whatever is directly behind it, no exceptions.
   * White or near-white text is ONLY allowed on a dark surface: a dark solid section background, or a photo with a real dark scrim (e.g. linear-gradient with black/near-black at 45%+ opacity) behind it. Never place white/near-white text on a light page background, a light photo, or an unscrimmed light image — it becomes invisible.
@@ -241,9 +259,13 @@ ${imageBudgetBlock}`
     // where it wins the cascade. p/li only (nav labels/fine print live in
     // other elements and keep their sanctioned 13px minimum).
     const TYPE_FLOOR = '\n/* velpi: server-enforced mobile type floor */\n@media (max-width: 767px){ .velpi-page p, .velpi-page li { font-size: 1rem !important; } .velpi-page p.fine, .velpi-page li.fine { font-size: 0.8125rem !important; } }\n'
+    // Mobile utilities ride along at the same splice point and for the same
+    // reason: appended last, they out-rank whatever the model wrote for the
+    // handful of collapse behaviors that were breaking. They are inert on any
+    // element that doesn't carry one of their classes.
     const lastStyleClose = html.lastIndexOf('</style>')
     if (lastStyleClose !== -1) {
-      html = html.slice(0, lastStyleClose) + TYPE_FLOOR + html.slice(lastStyleClose)
+      html = html.slice(0, lastStyleClose) + TYPE_FLOOR + MOBILE_UTILITIES_CSS + html.slice(lastStyleClose)
     }
 
     // Desktop nav-link backstop. The prompt REQUIRES a desktop link list in

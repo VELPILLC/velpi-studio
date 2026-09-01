@@ -25,7 +25,7 @@ CONCEPT: a name + two sentences capturing the big idea (e.g. "Golden Hour Author
 PALETTE MAP: every color with its exact hex and role — page background, section alternates, headline ink, body text, primary CTA, accents. Only the brand's real palette plus tints/shades, white, and one near-black.
 TYPE SYSTEM: the exact Google Fonts pairing (display + body), weights, and the scale (hero/h2/h3/body sizes with clamp() values for fluid mobile-first sizing).
 HERO CONCEPT: precisely what the hero is — image treatment, composition, headline attitude, CTA placement.
-SECTION TREATMENTS: for each section in the persuasion flow, one line — its background treatment and focal element. NOTE: each section's layout STRUCTURE is already fixed by an assigned blueprint (listed in the input when available) — specify surface, mood, and emphasis WITHIN that structure, never a different composition. Alternate rhythm deliberately.
+SECTION TREATMENTS: for each section in the persuasion flow, one line — its background treatment and focal element. Each section's layout SKELETON is fixed by an assigned blueprint (listed in the input when available): keep its composition, grid ratios and container logic. Everything that makes the page feel like ONE designed object is yours to unify and you are expected to use it — a single material language (one shadow scale, one corner radius, one border treatment), one spacing rhythm, one image-crop language, consistent focal weight from section to section. State these once as page-wide rules, then note only where a section deliberately departs. Alternate background rhythm deliberately.
 SIGNATURE DETAILS: 3-5 specific touches that make this site unmistakable (oversized numerals, pull-quotes, border treatments, image crops, hover behaviors).
 SIGNATURE MOTION: exactly ONE motion/background treatment for the whole site — you are given a pre-selected preset matched to the niche's intensity; state where it lives (hero backdrop, section interlude, headline) and how it supports the vibe. You may overrule the preset with "none — stillness serves this brand" if motion would cheapen it. Never specify more than one motion treatment.
 MOBILE BEHAVIOR: how the design lands on a 390px phone — edge-to-edge moments, full-width CTAs, type scale floor.
@@ -34,12 +34,23 @@ Steal the STRONGEST ideas from the reference systems and fuse them so the result
 
 export async function POST(request) {
   try {
-    const { analysis, vibe, styleMds, motion, blueprintAssignments } = await request.json()
+    const { analysis, vibe, styleMds, motion, blueprintAssignments, guided } = await request.json()
     if (!analysis) {
       return Response.json({ error: 'Missing analysis for the design brief.' }, { status: 400 })
     }
 
-    const user = `BUSINESS: ${analysis.business_name || ''} — ${analysis.industry || ''}${analysis.niche ? ` (${analysis.niche})` : ''}
+    // Guided directives are DECISIONS THE CLIENT ALREADY MADE, so they sit
+    // above the autonomy rules — the brief's job here is to build the best
+    // possible design around them, not to reconsider them.
+    const guidedBlock = guided && Object.keys(guided).length
+      ? `THE CLIENT HAS ALREADY DECIDED THESE — THEY ARE NOT YOURS TO REVISIT. Every part of the brief must be built around them, and any section that would contradict one is wrong:
+${Object.entries(guided).map(([k, v]) => `- ${k.toUpperCase()}: ${v}`).join('\n')}
+Use the exact fonts and hex values given. Do not substitute a "better" pairing or palette.
+
+`
+      : ''
+
+    const user = `${guidedBlock}BUSINESS: ${analysis.business_name || ''} — ${analysis.industry || ''}${analysis.niche ? ` (${analysis.niche})` : ''}
 ${Array.isArray(blueprintAssignments) && blueprintAssignments.length ? `FIXED SECTION BLUEPRINTS (structure already decided — brief the treatment WITHIN each): ${blueprintAssignments.join(' | ')}` : ''}
 TONE: ${analysis.tone || ''}
 BRAND PALETTE (locked): ${(analysis.color_palette || []).join(', ')}
@@ -52,13 +63,32 @@ ${motion ? `PRE-SELECTED SIGNATURE MOTION (matched to niche intensity — place 
 REFERENCE DESIGN SYSTEMS TO FUSE (${(styleMds || []).length}):
 ${(styleMds || []).map((s, i) => `--- SYSTEM ${i + 1} ---\n${String(s).slice(0, 4000)}`).join('\n\n') || '(none — derive the direction from brand + vibe alone)'}`
 
-    const brief = stripFences(await callClaude({ system: SYSTEM, user, maxTokens: 2500 }))
-    if (!brief || brief.length < 200) {
-      return Response.json({ brief: '' }) // non-fatal — build falls back to raw systems
+    // A missing brief is NOT a soft failure: build-site's prompt switches to
+    // an explicit "mix & match the raw systems" collage path when no brief is
+    // present, which is the exact incoherence the brief exists to prevent. So
+    // retry once, and report honestly when it still can't be written instead
+    // of silently returning '' and letting the page degrade unnoticed.
+    let brief = ''
+    let attempts = 0
+    let lastErr = null
+    for (attempts = 1; attempts <= 2; attempts++) {
+      try {
+        brief = stripFences(await callClaude({ system: SYSTEM, user, maxTokens: 2500 }))
+        if (brief && brief.length >= 200) return Response.json({ brief, attempts })
+      } catch (e) {
+        lastErr = e
+        console.error(`design-brief attempt ${attempts} failed:`, e.message)
+      }
     }
-    return Response.json({ brief })
+    console.error('design-brief: no usable brief after 2 attempts — the build will fall back to raw systems')
+    return Response.json({
+      brief: '',
+      attempts: attempts - 1,
+      degraded: true,
+      reason: lastErr ? `brief call failed: ${lastErr.message}` : 'the model returned an unusably short brief twice',
+    })
   } catch (err) {
     console.error('design-brief error:', err)
-    return Response.json({ brief: '' }) // never block the pipeline on the brief
+    return Response.json({ brief: '', degraded: true, reason: err.message }) // never block the pipeline
   }
 }

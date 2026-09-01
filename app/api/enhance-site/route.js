@@ -26,7 +26,8 @@ HARD CONSTRAINTS (violating any of these fails the review):
 - Preserve EVERY image placeholder token %%IMG:...%% exactly as written — same tokens, you may reposition/resize/crop their containers but never rename, add, or remove tokens.
 - Keep the brand color palette exactly — no new hues, only tints/shades of the existing palette plus white and one near-black.
 - Keep the GoHighLevel constraints: ALL body content inside <div class="velpi-page">, every CSS selector prefixed .velpi-page, all CSS in ONE <style> tag, Google Fonts via @import at the top of that style tag, NO JavaScript, no position:fixed (sticky is fine).
-- Keep the MOBILE-FIRST contract: base CSS targets ~390px with EDGE-TO-EDGE sections (no page gutters on mobile, 12-16px text insets max, minimal padding, full-width CTAs, clamp() fluid type, zero horizontal scroll), enhanced upward via min-width media queries.
+- Keep the DESKTOP-FIRST, MOBILE-SAFE contract the page was BUILT to (do not invert it): base CSS is authored for a ~1440px canvas and adapts DOWNWARD via @media (max-width: 1024px) and (max-width: 767px). On phones: edge-to-edge sections (12-16px text insets, no page gutters), full-width CTAs at ≥52px tap height, clamp() fluid type, zero horizontal scroll at 390px.
+- The page carries server-guaranteed mobile utility classes — velpi-stack-mobile (collapse a grid/flex row to one column), velpi-edge-mobile (edge-to-edge band), velpi-full-mobile (full-width CTA), velpi-hide-mobile / velpi-hide-desktop. Preserve them where they already are, and prefer adding one over hand-writing an equivalent @media rule that your own component selectors would out-specify.
 - Return ONLY the complete rebuilt HTML document starting with <!DOCTYPE html>. No markdown, no commentary.`
 
 // Surgical mode — used by the refinement loop: fix EXACTLY the critic's issues.
@@ -37,7 +38,8 @@ RULES:
 - Change NOTHING that is not required by an issue — untouched sections stay byte-for-byte identical.
 - Preserve every %%IMG:...%% token exactly (same tokens, none added, renamed, or removed).
 - Preserve all real content (copy, services, prices, hours, contacts, reviews) unless an issue explicitly says otherwise.
-- Keep all constraints: .velpi-page scoping on every selector, ONE <style> tag with @import fonts at top, no JavaScript, no position:fixed, mobile-first edge-to-edge base styles, brand palette only.
+- Keep all constraints: .velpi-page scoping on every selector, ONE <style> tag with @import fonts at top, no JavaScript, no position:fixed, the desktop-first/mobile-safe contract the page was built to (base CSS for ~1440px adapting downward via max-width queries — never invert it to mobile-first), brand palette only.
+- Preserve every velpi-stack-mobile / velpi-edge-mobile / velpi-full-mobile / velpi-hide-mobile / velpi-hide-desktop class already on an element — they are the page's guaranteed responsive behavior, and stripping one silently breaks that element on phones.
 - Return ONLY the complete corrected HTML document starting with <!DOCTYPE html>. No markdown, no commentary.`
 
 export async function POST(request) {

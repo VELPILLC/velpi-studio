@@ -3,6 +3,11 @@ import { useState, useEffect, useRef } from 'react'
 import LightningBackground from './LightningBackground'
 import ReviewExportBar from './dev/ReviewExportBar'
 import { isDevReviewClient } from '../lib/creative/flags.mjs'
+import GuidedPanel from './GuidedPanel'
+import { decisionsFromAnswers } from '../lib/guidedSpine.mjs'
+import { injectElementIds, stripElementIds } from '../lib/elementIds.mjs'
+import { detectOverlaps, buildOverlapFixes, renderCssOverrideBlock } from '../lib/geometryFix.mjs'
+import { probeGeometry } from '../lib/geometryProbe.js'
 
 // Accurate device preview viewports — real widths, not scaled approximations.
 // Picked once and recorded here so every build's decisions.md is consistent.
@@ -59,6 +64,7 @@ const STEP_DEFS = [
   { id: 'crawl', label: 'Crawling website' },
   { id: 'logo', label: 'Fetching & refining logo' },
   { id: 'analyze', label: 'Analyzing brand' },
+  { id: 'guided', label: 'Your design choices' },
   { id: 'brief', label: 'Writing design brief' },
   { id: 'copy', label: 'Writing copy' },
   { id: 'build', label: 'Building website' },
@@ -298,6 +304,19 @@ function substituteImageTokens(html, { assetsById = {}, ghlUrls = {}, logoSrc = 
   })
 }
 
+// { vid -> image slot id } for the Inspect & Fix preview, so a clicked
+// element can be recognized as an image and routed to the existing image
+// pipeline instead of the LLM. Derived from the RAW template (tokens still
+// present); the preview tab derives the same vids from its substituted copy,
+// which lands identically because vid numbering never depends on attribute
+// values. Matches exactly what injectElementIds emits: vid then vslot.
+function vslotMapFor(template) {
+  const { html } = injectElementIds(template || '')
+  const map = {}
+  for (const m of html.matchAll(/data-vid="(v\d+)" data-vslot="([a-z0-9_]+)"/g)) map[m[1]] = m[2]
+  return map
+}
+
 // Plain-text report of everything the generator extracted, decided, and used —
 // made to be copy-pasted into a chat so the "thinking" can be critiqued.
 function composeReport(analysis, vibeText, chosenStyles, photoSlots, designBrief) {
@@ -423,6 +442,15 @@ export default function Studio() {
   const [altLayouts, setAltLayouts] = useState([])
   const [rebuilding, setRebuilding] = useState(null) // alternate name while rebuilding
   const lastRunRef = useRef(null) // { analysis, copy, brief, motion, sectionRefs, slots }
+  const previewWinRef = useRef(null) // the open /device-preview tab — fixes are pushed back into it
+  // Guided mode: runGeneration pauses on this deferred until the panel
+  // resolves it with the user's answers (or null to hand everything back to
+  // the agent). Held in a ref so the resolver survives re-renders.
+  const guidedResolveRef = useRef(null)
+  const [guidedMode, setGuidedMode] = useState(false)
+  const [guidedData, setGuidedData] = useState(null) // { questions, sets, family, source }
+  const reevalHandlerRef = useRef(null) // always the CURRENT handler, so the mount-time listener never goes stale
+  const [reevaluating, setReevaluating] = useState(false)
 
   // ── Project library ──
   const [projects, setProjects] = useState([])
@@ -597,7 +625,11 @@ export default function Studio() {
   // previews are gone — a page renders the exact HTML a client would see,
   // with no height clamping). The HTML travels via a postMessage handshake:
   // the new tab announces readiness, this tab answers with the payload.
-  function openDevicePreview(html, label, mode) {
+  // inspectTemplate: the RAW (token-bearing, id-free) template this preview
+  // was rendered from. Passing it opts the tab into Inspect & Fix — only the
+  // ACTIVE session does, because a fix has to write back into live state;
+  // quick-previewing a saved project stays read-only by design.
+  function openDevicePreview(html, label, mode, { inspectTemplate = null } = {}) {
     if (!html) return
     setPreviewMode(mode)
     try { localStorage.setItem('velpi_preview_mode', mode) } catch (_) {}
@@ -607,9 +639,12 @@ export default function Studio() {
       label: label || bizName || 'Preview',
       buildId: reviewBuildId || null,
       projectId: reviewProjectId || null,
+      canInspect: !!inspectTemplate,
+      vslotByVid: inspectTemplate ? vslotMapFor(inspectTemplate) : null,
     }
     const win = window.open(`/device-preview?mode=${mode}`, '_blank')
     if (!win) { setError('The preview tab was blocked — allow popups for this site.'); return }
+    previewWinRef.current = win
     const onReady = e => {
       if (e.origin !== window.location.origin || e.data?.type !== 'velpi-preview-ready') return
       try { win.postMessage(payload, window.location.origin) } catch (_) {}
@@ -737,14 +772,25 @@ export default function Studio() {
     })
   }
 
-  // Dominant brand colors from an uploaded logo (canvas sampling, grays skipped) —
-// feeds theming so an uploaded logo drives the palette like a crawled one does.
+  // Dominant BRAND colors sampled from the logo's own pixels — the backup
+// source of brand truth when the analyzer's vision read is unavailable or
+// low-confidence (a scraped SVG can't be sent to vision at all).
+//
+// Sampling notes, all of which were getting this wrong before:
+//  - 96px, not 48: a wordmark's accent color often occupies very few pixels.
+//  - 4-bit buckets (16 levels/channel), not 5-bit (8): at 8 levels a red and
+//    an orange can share a bucket and average into something that is neither,
+//    which is exactly how a red+yellow mark reads as muddy orange.
+//  - Neutrals are dropped by SATURATION rather than by a near-white/near-black
+//    test, so a mid-gray field can't outvote the actual brand hue.
+//  - Ranked by pixel count weighted toward saturation: a logo on a large white
+//    plate should still report its mark color first, not the plate.
 function extractLogoColors(dataUrl) {
   return new Promise(resolve => {
     const img = new Image()
     img.onload = () => {
       try {
-        const s = 48
+        const s = 96
         const c = document.createElement('canvas')
         c.width = s; c.height = s
         const ctx = c.getContext('2d')
@@ -755,13 +801,18 @@ function extractLogoColors(dataUrl) {
           if (d[i + 3] < 128) continue
           const r = d[i], g = d[i + 1], b = d[i + 2]
           const max = Math.max(r, g, b), min = Math.min(r, g, b)
-          if (max - min < 18 && (max > 235 || max < 25)) continue // near-white/black
-          const key = `${r >> 5},${g >> 5},${b >> 5}`
-          const bk = (buckets[key] = buckets[key] || { n: 0, r: 0, g: 0, b: 0 })
-          bk.n++; bk.r += r; bk.g += g; bk.b += b
+          const l = (max + min) / 2 / 255
+          const sat = max === min ? 0 : (max - min) / (255 - Math.abs(max + min - 255))
+          if (sat < 0.15 || l < 0.06 || l > 0.95) continue // carries no brand hue
+          const key = `${r >> 4},${g >> 4},${b >> 4}`
+          const bk = (buckets[key] = buckets[key] || { n: 0, r: 0, g: 0, b: 0, sat: 0 })
+          bk.n++; bk.r += r; bk.g += g; bk.b += b; bk.sat += sat
         }
         const hex = v => Math.round(v).toString(16).padStart(2, '0')
-        resolve(Object.values(buckets).sort((a, b) => b.n - a.n).slice(0, 3)
+        resolve(Object.values(buckets)
+          .map(bk => ({ ...bk, weight: bk.n * (0.5 + bk.sat / bk.n) }))
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, 3)
           .map(bk => `#${hex(bk.r / bk.n)}${hex(bk.g / bk.n)}${hex(bk.b / bk.n)}`))
       } catch (_) { resolve([]) }
     }
@@ -826,6 +877,47 @@ function extractLogoColors(dataUrl) {
       return canvas
     } finally {
       try { document.body.removeChild(frame) } catch (_) {}
+    }
+  }
+
+  // Deterministic layout-overlap check + surgical fix — the geometry sibling
+  // of the server-side contrast pass in build-site/route.js, but this one
+  // needs REAL browser layout (not text/CSS parsing) to know where things
+  // actually render, so it runs here against a real hidden-iframe render —
+  // the exact iframe technique captureFullPageCanvas already uses. `html` is
+  // the canonical (id-free, token-bearing) template; `subst` is the same
+  // {assetsById, ghlUrls, slots, logoSrc} shape previewHtml() uses, so the
+  // probe sees real image URLs instead of broken %%IMG:%% placeholders.
+  // Returns a PATCHED COPY of `html` — ids are injected only into a
+  // throwaway probing copy and never survive into the returned html, which
+  // stays exactly what htmlTemplate/export/the public /preview/{id} route
+  // expect: id-free, %%IMG:%%-token-bearing markup, now with (if needed) one
+  // targeted CSS override block appended, same shape as contrastFix's fix.
+  async function runAutomaticGeometryCheck(html, subst) {
+    try {
+      const { html: idedHtml } = injectElementIds(html)
+      const renderable = substituteImageTokens(idedHtml, subst)
+      const [desktopNodes, mobileNodes] = await Promise.all([
+        probeGeometry(renderable, PREVIEW_VIEWPORTS.desktop),
+        probeGeometry(renderable, PREVIEW_VIEWPORTS.mobile),
+      ])
+      const allNodes = [...desktopNodes, ...mobileNodes]
+      if (!allNodes.length) return { html, fixes: [], escalated: [] }
+      const nodesById = Object.fromEntries(allNodes.map(n => [n.vid, n]))
+      const { fixes: fixesDesktop, escalate: escDesktop } = buildOverlapFixes(detectOverlaps(desktopNodes), nodesById)
+      const { fixes: fixesMobile, escalate: escMobile } = buildOverlapFixes(detectOverlaps(mobileNodes), nodesById)
+      const bySelector = new Map()
+      for (const f of [...fixesDesktop, ...fixesMobile]) bySelector.set(f.selector, f)
+      const fixes = [...bySelector.values()]
+      const escalated = [...escDesktop, ...escMobile]
+      if (!fixes.length) return { html, fixes: [], escalated }
+      const overrideBlock = renderCssOverrideBlock(fixes)
+      const lastStyleClose = html.lastIndexOf('</style>')
+      const patched = lastStyleClose !== -1 ? html.slice(0, lastStyleClose) + overrideBlock + html.slice(lastStyleClose) : html
+      return { html: patched, fixes, escalated }
+    } catch (e) {
+      console.error('geometry check failed (non-fatal):', e.message)
+      return { html, fixes: [], escalated: [] }
     }
   }
 
@@ -1024,7 +1116,21 @@ function extractLogoColors(dataUrl) {
 
       mark('analyze', 'active')
       const manualVibe = vibeSummary()
-      const { analysis } = await callRoute('/api/analyze', { scrapedData, vibe: manualVibe })
+      // The logo's own bytes go to the analyzer so it can SEE the mark
+      // (colors, lettering, visual language) instead of being handed a URL
+      // string. logoPalette is sent separately from scrapedData.palette:
+      // sampled logo pixels are brand truth, scraped site hexes are not.
+      const { analysis, paletteChanges, logoSeen } = await callRoute('/api/analyze', {
+        scrapedData,
+        vibe: manualVibe,
+        logoImage: logo?.preview || logoUrl || null,
+        logoPalette,
+      })
+      if (Array.isArray(paletteChanges) && paletteChanges.some(c => !c.flagged)) {
+        const fix = paletteChanges.find(c => !c.flagged)
+        setSavedMsg(`Palette re-anchored to your logo (${fix.from} → ${fix.to})`)
+        setTimeout(() => setSavedMsg(null), 6000)
+      }
 
       // Manual intake: swap the uploaded://N pseudo-urls the analyzer planned
       // with for the real photo data URIs, so the image step can enhance the
@@ -1043,7 +1149,7 @@ function extractLogoColors(dataUrl) {
       // Customize, the agent's own read of the business (copy tone → feel,
       // imagery → look, business type → CTA) drives everything downstream.
       const inf = analysis.inferred_vibe || {}
-      const vibeText = manualVibe || [
+      let vibeText = manualVibe || [
         inf.feel ? `How should it feel? ${inf.feel}` : null,
         inf.look ? `How should it look? ${inf.look}` : null,
         inf.primary_cta ? `What should visitors do? ${inf.primary_cta}` : null,
@@ -1051,6 +1157,50 @@ function extractLogoColors(dataUrl) {
       setBizName(analysis.business_name || '')
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
+
+      // ── GUIDED MODE ──
+      // The one point where the brand is fully known but nothing is committed
+      // yet. The questions here decide exactly what a domain hash used to
+      // decide: the design system, the section blueprints, the palette, the
+      // motion. Answers become hard inputs below; anything skipped stays the
+      // agent's call, identical to the one-shot path.
+      let guidedDecisions = null
+      if (guidedMode) {
+        mark('guided', 'active')
+        try {
+          const brandColors = [
+            ...(analysis.brand_read?.colors || []).map(c => c?.hex).filter(Boolean),
+            ...logoPalette,
+          ]
+          const qres = await callRoute('/api/guided-step', { analysis, brandColors })
+          if (qres?.questions?.length) {
+            setGuidedData({ questions: qres.questions, sets: qres.sets, family: qres.family, source: qres.source })
+            const answers = await new Promise(resolve => { guidedResolveRef.current = resolve })
+            setGuidedData(null)
+            guidedResolveRef.current = null
+            if (answers && Object.keys(answers).length) {
+              guidedDecisions = decisionsFromAnswers(answers, { sets: qres.sets, family: qres.family })
+              // A chosen palette is brand truth from here on — the same
+              // status the logo-derived palette has.
+              if (guidedDecisions.palette?.length) analysis.color_palette = guidedDecisions.palette
+              // Style scoring downstream reads vibeText, so the choices have
+              // to be visible there too — not just in the structured payload.
+              if (guidedDecisions.vibeSuffix) vibeText = `${vibeText} | ${guidedDecisions.vibeSuffix}`.trim()
+              mark('guided', 'complete')
+            } else {
+              mark('guided', 'complete') // handed back to the agent on purpose
+            }
+          } else {
+            mark('guided', 'error')
+            setError('The guided questions could not be prepared — continuing with the agent designing on its own.')
+          }
+        } catch (e) {
+          mark('guided', 'error')
+          setError(`Guided mode failed (${e.message}) — continuing with the agent designing on its own.`)
+          setGuidedData(null)
+          guidedResolveRef.current = null
+        }
+      }
 
       // ── CIL Stages 1→2→3→4→5 (Understanding → Strategy → Creative Director → Blueprint → Validator) — SHADOW ONLY ──
       // Fire-and-forget: never awaited, never sets state, never touches the
@@ -1133,6 +1283,7 @@ function extractLogoColors(dataUrl) {
         vibe: vibeText,
         lock: priorLock,
         manualStyleId: manual ? manual.id : null,
+        guidedDecisions,
       })
       const chosenStyles = structPlan.styles || []
       const motionPreset = structPlan.motion || null
@@ -1163,11 +1314,21 @@ function extractLogoColors(dataUrl) {
             const ref = sectionRefs.find(r => r.id === refId)
             return `${sec}: ${ref?.name || refId}`
           }),
+          guided: guidedDecisions?.directives || null,
         })
         designBrief = res.brief || ''
-        mark('brief', 'complete')
-      } catch (_) {
-        mark('brief', 'error') // non-fatal — build falls back to raw systems
+        // A missing brief isn't cosmetic: without it the build prompt drops
+        // into its raw-systems path, which is measurably less cohesive. Show
+        // it rather than letting the page quietly come out worse.
+        if (!designBrief || res.degraded) {
+          mark('brief', 'error')
+          setError(`The design brief could not be written${res.reason ? ` (${res.reason})` : ''} — this build will be less cohesive than usual. Regenerating usually fixes it.`)
+        } else {
+          mark('brief', 'complete')
+        }
+      } catch (e) {
+        mark('brief', 'error')
+        setError(`The design brief step failed (${e.message}) — this build will be less cohesive than usual.`)
       }
 
       mark('images', 'active')
@@ -1218,9 +1379,14 @@ function extractLogoColors(dataUrl) {
         sectionRefs,
         structure, // the deterministic skeleton — same on every regeneration
         logoMeta: logoMetaLocal, // measured shape/ratio — wide wordmarks size by ratio
+        // A chosen story order rides the existing forcedLayout path, which
+        // already overrides the analyzer's section order in the build prompt.
+        ...(guidedDecisions?.sectionOrder
+          ? { forcedLayout: { name: 'Your chosen order', hook: '', section_order: guidedDecisions.sectionOrder, structure_notes: guidedDecisions.directives?.density || '' } }
+          : {}),
       }
       lastRunRef.current = buildPayload // kept for alternate-layout rebuilds
-      const { html, trace } = await callRoute('/api/build-site', buildPayload)
+      let { html, trace, contrastFixes } = await callRoute('/api/build-site', buildPayload)
       if (trace) setPromptTrace(trace)
       setHtmlTemplate(html)
       setBuilt(true)
@@ -1240,6 +1406,10 @@ function extractLogoColors(dataUrl) {
         + (!manualVibe && (inf.feel || inf.look || inf.primary_cta) ? `\n--- AUTO-INFERRED VIBE (no manual selections — agent's own read) ---\nFeel: ${inf.feel || '—'}\nLook: ${inf.look || '—'}\nPrimary CTA: ${inf.primary_cta || '—'}\n` : '')
         + (motionPreset ? `\n--- SIGNATURE MOTION ---\n${motionPreset.name} (${motionPreset.intensity} ${motionPreset.effect}, ${motionPreset.dependency}) — ${motionPreset.summary || ''}\n` : '')
         + (sectionRefs.length ? `\n--- STRUCTURAL REFERENCES STUDIED ---\n${sectionRefs.map(r => `${r.name} (${r.category}) — ${r.source}`).join('\n')}\n` : '')
+        // Which single design language the page committed to, and anything it
+        // had to source from outside that family — disclosed, never hidden,
+        // because an unreported borrow is how incoherence creeps back in.
+        + (structPlan.family ? `\n--- DESIGN LANGUAGE ---\nAll sections drawn from the "${structPlan.family}" blueprint family.\n${structPlan.borrowed?.length ? structPlan.borrowed.map(b => `Borrowed ${b.category} from ${b.fromFamily} (${b.blueprintId}) — ${b.reason}`).join('\n') : 'No outside borrows.'}\n` : '')
       setBuildReport(report)
 
       await Promise.all([imagesPromise, refineP])
@@ -1276,6 +1446,23 @@ function extractLogoColors(dataUrl) {
         mark('images', 'complete')
       }
 
+      // Deterministic layout-overlap check — runs after images settle so the
+      // probed layout matches what actually ships. Silent and automatic, same
+      // spirit as the server-side contrast pass: only touches html if a real
+      // collision was found, via a targeted CSS override, never a rebuild.
+      let geometryFixes = []
+      let geometryEscalated = []
+      {
+        const geo = await runAutomaticGeometryCheck(html, {
+          assetsById: { ...localAssets, ...(logoAssetLocal ? { logo: logoAssetLocal } : {}) },
+          ghlUrls: {}, slots: photoSlots, logoSrc: refinedLogo || logo?.preview || logoUrl,
+        })
+        html = geo.html
+        geometryFixes = geo.fixes
+        geometryEscalated = geo.escalated
+        if (geometryFixes.length) setHtmlTemplate(html)
+      }
+
       // (The old anti-repetition memory is gone on purpose: same-input
       // regenerations must KEEP their structure, not be forced to vary —
       // cross-business variety now comes from per-domain seeding instead.)
@@ -1308,6 +1495,10 @@ function extractLogoColors(dataUrl) {
           buildReport: report,
           promptTrace: trace || null, // the exact payload sent to the build model
           imagesMeta: imagesMetaLocal || null, // proof the image API ran (call counts)
+          guidedDecisions, // the client's own design choices — reused on rebuilds
+          contrastFixes: contrastFixes || [], // server-side text-contrast attestation
+          geometryFixes, // client-side layout-overlap attestation — what was auto-patched
+          geometryEscalated, // overlaps found but not auto-fixable — surfaced in Inspect & Fix later
           vibe,
           refinedLogo: uploaded.refinedLogo,
           logoUrl: scrapedData.logo || null,
@@ -1395,6 +1586,165 @@ function extractLogoColors(dataUrl) {
     }
   }
 
+  // ── Inspect & Fix (the /device-preview selection tool) ──
+  //
+  // One batched sibling of regenerateSlot: N selected images become ONE
+  // /api/generate-images call (the route already parallelizes internally)
+  // instead of N sequential round trips. Returns the new asset map so the
+  // caller can substitute immediately, without waiting for a state flush.
+  async function regenerateSlots(items) {
+    if (!analysisData || !items.length) return {}
+    const inventory = items.map(({ slot, note }) => ({
+      slot: Number(String(slot.id).replace('img_', '')) || 0,
+      what: slot.name,
+      section: slot.section,
+      source: 'none',
+      action: 'generate',
+      url: null,
+      // The reviewer's note is direction for the NEW image, appended so the
+      // slot's original subject still anchors it ("patio at dusk" + "warmer").
+      prompt: note ? `${slot.prompt || slot.name}. ${note}` : (slot.prompt || ''),
+    }))
+    const { images } = await callRoute('/api/generate-images', { analysis: { ...analysisData, image_inventory: inventory } })
+    if (images?.warning) setError(images.warning)
+    const fresh = {}
+    for (const a of images?.assets || []) if (a.src) fresh[a.id] = a.src
+    if (Object.keys(fresh).length) setAssetsById(prev => ({ ...prev, ...fresh }))
+    return fresh
+  }
+
+  // Triage what the reviewer selected, cheapest path first:
+  //   image slot  -> the existing image pipeline (no LLM touches the HTML)
+  //   everything else -> ONE batched, gated LLM punch-list call
+  // Deliberately not "regenerate the page": a fix must leave everything the
+  // reviewer didn't point at byte-for-byte alone.
+  async function handleReevaluateRequest({ selections, skippedScreenshots }) {
+    const reply = (ok, message, extra = {}) => {
+      const win = previewWinRef.current
+      if (!win || win.closed) return
+      try { win.postMessage({ type: 'velpi-reevaluate-result', ok, message, ...extra }, window.location.origin) } catch (_) {}
+    }
+    if (reevaluating) return reply(false, 'A previous Reevaluate is still running.')
+    if (!htmlTemplate) return reply(false, 'No site is loaded in Studio.')
+    if (!Array.isArray(selections) || !selections.length) return reply(false, 'Nothing was selected.')
+
+    setReevaluating(true)
+    setError(null)
+    try {
+      // The preview tab derived its vids from ITS copy of the page. If the
+      // template has changed since (a rebuild, a layout switch), those ids no
+      // longer address anything and a "fix" would edit the wrong elements —
+      // so verify before spending anything.
+      const idedTemplate = injectElementIds(htmlTemplate).html
+      const unknown = selections.filter(s => !idedTemplate.includes(`data-vid="${s.vid}"`))
+      if (unknown.length) {
+        return reply(false, 'This preview is out of date with Studio — close it and open Preview again, then reselect.')
+      }
+
+      const done = []
+      let nextTemplate = htmlTemplate
+      let nextAssets = assetsById
+
+      // 1 — images through the existing pipeline.
+      const imageSels = selections.filter(s => s.imageSlotId)
+      if (imageSels.length) {
+        const items = imageSels
+          .map(s => ({ slot: slots.find(sl => sl.id === s.imageSlotId), note: s.note }))
+          .filter(x => x.slot)
+        if (items.length) {
+          const fresh = await regenerateSlots(items)
+          const got = items.filter(x => fresh[x.slot.id]).length
+          nextAssets = { ...nextAssets, ...fresh }
+          done.push(`${got}/${items.length} image${items.length > 1 ? 's' : ''} regenerated`)
+          if (got < items.length) done.push(`${items.length - got} image regeneration${items.length - got > 1 ? 's' : ''} failed`)
+        }
+      }
+
+      // 2 — everything else as one batched punch list.
+      const rest = selections.filter(s => !s.imageSlotId)
+      if (rest.length) {
+        const images = []
+        const issues = rest.map(s => {
+          const entry = { target: s.vid, tag: s.tag, textSnippet: s.textSnippet, note: s.note || '' }
+          if (!s.note?.trim() && s.screenshot) {
+            entry.imageIndex = images.length
+            images.push({ media_type: 'image/jpeg', data: s.screenshot })
+          }
+          return entry
+        })
+
+        const res = await callRoute('/api/reevaluate-fix', {
+          html: idedTemplate, issues, images, analysis: analysisData,
+        })
+
+        if (!res.applied) {
+          const why = res.failures?.length ? ` (${res.failures.join('; ')})` : ''
+          done.push(`the layout/copy fix was rejected as unsafe and nothing was changed${why}`)
+        } else {
+          const candidate = stripElementIds(res.html)
+          const substArgs = { assetsById: nextAssets, ghlUrls, slots, logoSrc: refinedLogo || logo?.preview || logoUrl }
+          // The structural gates ran server-side; this is the gate they
+          // can't run — no headless browser exists on the server, so
+          // "did the fix break the layout?" is answered here, against a
+          // real render, before anything is committed.
+          const before = await runAutomaticGeometryCheck(nextTemplate, substArgs)
+          const after = await runAutomaticGeometryCheck(candidate, substArgs)
+          if (after.escalated.length > before.escalated.length) {
+            done.push('the fix introduced new overlapping elements, so it was discarded and nothing was changed')
+          } else {
+            nextTemplate = after.html
+            done.push(`${rest.length} element${rest.length > 1 ? 's' : ''} reworked`)
+            if (after.fixes.length) done.push(`${after.fixes.length} overlap${after.fixes.length > 1 ? 's' : ''} auto-patched`)
+          }
+        }
+      }
+
+      if (nextTemplate !== htmlTemplate) setHtmlTemplate(nextTemplate)
+
+      if (skippedScreenshots > 0) {
+        done.push(`${skippedScreenshots} selection${skippedScreenshots > 1 ? 's' : ''} had no note and no screenshot (capture limit) — those were diagnosed from text alone`)
+      }
+
+      // Push the refreshed page back into the SAME preview tab, computed from
+      // local values rather than state (setState hasn't flushed yet here).
+      const win = previewWinRef.current
+      if (win && !win.closed) {
+        try {
+          win.postMessage({
+            type: 'velpi-preview-html',
+            html: substituteImageTokens(nextTemplate, { assetsById: nextAssets, ghlUrls, slots, logoSrc: refinedLogo || logo?.preview || logoUrl }),
+            label: bizName || 'Preview',
+            buildId: reviewBuildId || null,
+            projectId: reviewProjectId || null,
+            canInspect: true,
+            vslotByVid: vslotMapFor(nextTemplate),
+            reevaluateResult: { ok: true, message: done.join(' · ') || 'No changes were needed.' },
+          }, window.location.origin)
+        } catch (_) { reply(true, done.join(' · ')) }
+      }
+      setSavedMsg(`Inspect & Fix: ${done.join(' · ') || 'no changes needed'} — use Save to keep it`)
+      setTimeout(() => setSavedMsg(null), 6000)
+    } catch (e) {
+      reply(false, `Reevaluate failed: ${e.message}`)
+      setError(`Inspect & Fix failed: ${e.message}`)
+    } finally {
+      setReevaluating(false)
+    }
+  }
+
+  // The listener is mounted once; the handler it calls is read from a ref so
+  // it always sees current state instead of the closure from first render.
+  useEffect(() => { reevalHandlerRef.current = handleReevaluateRequest })
+  useEffect(() => {
+    const onMsg = e => {
+      if (e.origin !== window.location.origin) return
+      if (e.data?.type !== 'velpi-reevaluate-request') return
+      reevalHandlerRef.current?.(e.data)
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, [])
+
   function copyHtml() {
     const out = finalHtml()
     if (!out) return
@@ -1422,8 +1772,12 @@ function extractLogoColors(dataUrl) {
     setRebuilding(alt.name)
     setError(null)
     try {
-      const { html } = await callRoute('/api/build-site', { ...lastRunRef.current, forcedLayout: alt })
-      if (html) {
+      const { html: rawHtml } = await callRoute('/api/build-site', { ...lastRunRef.current, forcedLayout: alt })
+      if (rawHtml) {
+        const geo = await runAutomaticGeometryCheck(rawHtml, {
+          assetsById, ghlUrls, slots, logoSrc: refinedLogo || logo?.preview || logoUrl,
+        })
+        const html = geo.html
         setHtmlTemplate(html)
         // A deliberately chosen alternate structure UPDATES the lock — this is
         // the one sanctioned way structure changes; regenerations then keep it.
@@ -1707,6 +2061,30 @@ function extractLogoColors(dataUrl) {
         </div>
 
 
+        {/* ── Design together, or let the agent decide ── */}
+        <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          {[
+            { on: false, title: 'Design it for me', desc: 'One pass — the agent makes every call' },
+            { on: true, title: 'Design it with me', desc: 'It asks first, then builds around your answers' },
+          ].map(m => (
+            <button
+              key={String(m.on)}
+              onClick={() => setGuidedMode(m.on)}
+              disabled={generating}
+              style={{
+                flex: 1, textAlign: 'left', cursor: generating ? 'default' : 'pointer',
+                background: guidedMode === m.on ? 'rgba(41,144,250,0.14)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${guidedMode === m.on ? BLUE : BORDER}`,
+                borderRadius: 12, padding: '11px 13px', color: '#fff', font: 'inherit',
+                opacity: generating ? 0.5 : 1,
+              }}
+            >
+              <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '0.8rem' }}>{m.title}</div>
+              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.4 }}>{m.desc}</div>
+            </button>
+          ))}
+        </div>
+
         {/* ── GENERATE ── */}
         <button
           onClick={runGeneration}
@@ -1731,6 +2109,16 @@ function extractLogoColors(dataUrl) {
           <div style={{ width: '100%', background: '#2a0d12', border: '1px solid #ff4455', borderRadius: 12, padding: '12px 16px', color: '#ffb3bd', fontFamily: 'var(--font-inter)', fontSize: '0.84rem', lineHeight: 1.5 }}>
             {error}
           </div>
+        )}
+
+        {/* Generation is paused here waiting on these answers. */}
+        {guidedData && (
+          <GuidedPanel
+            questions={guidedData.questions}
+            source={guidedData.source}
+            onDone={answers => guidedResolveRef.current?.(answers)}
+            onSkip={() => guidedResolveRef.current?.(null)}
+          />
         )}
 
         {/* ── Progress — live checkmark list during/after a fresh run; folded
@@ -1800,12 +2188,17 @@ function extractLogoColors(dataUrl) {
               <span style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '1.02rem', color: '#fff' }}>
                 {bizName ? `${bizName} — website ready` : 'Website ready'}
               </span>
-              <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile')} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
+              <button onClick={() => openDevicePreview(previewHtml(), bizName, 'mobile', { inspectTemplate: htmlTemplate })} style={{ background: BLUE, border: 'none', color: '#fff', borderRadius: 10, padding: '13px 0', fontFamily: 'var(--font-ibm-plex-mono)', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', width: '100%' }}>
                 Preview Mobile
               </button>
-              <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop')} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
+              <button onClick={() => openDevicePreview(previewHtml(), bizName, 'desktop', { inspectTemplate: htmlTemplate })} style={{ ...monoBtn, width: '100%', padding: '12px 0' }}>
                 Preview Desktop
               </button>
+              <span style={{ fontFamily: 'var(--font-inter)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.45 }}>
+                {reevaluating
+                  ? 'Reevaluating your selections…'
+                  : 'In the preview, use 🔍 Inspect & Fix to click anything that needs reworking.'}
+              </span>
               <button onClick={downloadFullImage} disabled={snapping} style={{ ...monoBtn, width: '100%', padding: '12px 0', opacity: snapping ? 0.6 : 1 }}>
                 {snapping ? 'Capturing…' : 'Download as Image (full page)'}
               </button>
