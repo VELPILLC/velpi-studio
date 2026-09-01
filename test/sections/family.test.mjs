@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import {
   familyOf, groupFamilies, scoreFamily, chooseFamily, planBorrows, rankWithinFamily,
+  permutationFor, neededCategoriesFor, SECTION_TO_CATEGORY,
 } from '../../lib/sectionFamily.mjs'
 
 // Run against the REAL manifest — the whole point is that one family can
@@ -91,6 +92,76 @@ test('rankWithinFamily prefers a niche match, then a real desktop hero compositi
   const ranked = rankWithinFamily(pool, { industryText: 'restaurant mexican', category: 'hero' })
   assert.equal(ranked[0].id, 'c', 'a decisive niche match wins')
   assert.equal(ranked[1].id, 'b', 'then the multi-column hero over a centered stack')
+})
+
+// ── regression: the same blueprint was stamped across four sections ──
+//
+// A real generated page for a landscaping business had portfolio, services,
+// trust, and service_areas ALL resolve to velpi--features--bento-mixed-tiles
+// (a SaaS feature-tile grid) — because none of the first three were in
+// SECTION_TO_CATEGORY, so all four defaulted to 'features', and the old
+// per-key hash rotation had no actual guarantee against different keys
+// landing on the same index. The trust bar ended up with a stray photo tile
+// wedged beside three text blurbs, immediately followed by three more
+// sections built from the identical composition.
+
+test('portfolio, trust, and service_areas are categorized away from the generic features bucket', () => {
+  assert.equal(SECTION_TO_CATEGORY.portfolio, 'card')
+  assert.equal(SECTION_TO_CATEGORY.trust, 'stats')
+  assert.equal(SECTION_TO_CATEGORY.service_areas, 'card')
+  assert.notEqual(SECTION_TO_CATEGORY.portfolio, SECTION_TO_CATEGORY.services)
+  assert.notEqual(SECTION_TO_CATEGORY.trust, SECTION_TO_CATEGORY.services)
+})
+
+test('permutationFor gives every index exactly once before any repeat', () => {
+  for (const seed of ['a:features', 'kasaamigos.com:card', 'x']) {
+    for (const len of [1, 2, 4, 7]) {
+      const perm = permutationFor(seed, len)
+      assert.equal(perm.length, len)
+      assert.deepEqual([...perm].sort((a, b) => a - b), Array.from({ length: len }, (_, i) => i))
+    }
+  }
+})
+
+test('permutationFor is deterministic per seed and diverges across seeds', () => {
+  assert.deepEqual(permutationFor('donbeto.com:features', 4), permutationFor('donbeto.com:features', 4))
+  const seeds = ['a:features', 'b:features', 'c:features', 'd:features', 'e:features']
+  const distinct = new Set(seeds.map(s => permutationFor(s, 4).join(',')))
+  assert.ok(distinct.size > 1, 'different seeds should not all collapse to the same permutation')
+})
+
+test('four different section keys sharing one category never collapse onto a single blueprint', () => {
+  // The exact shape of the reported bug: 4 needed slots, drawing from a
+  // 4-entry pool, via 4 DIFFERENT section keys (not the same key redrawn).
+  const family = groupFamilies(entries).get('velpi')
+  const flow = ['about', 'portfolio', 'services', 'trust', 'process', 'service_areas']
+  const domain = 'donbetopatiosandlandscaping.com'
+  const assigned = {}
+  const used = {}
+  for (const key of flow) {
+    const cat = SECTION_TO_CATEGORY[key] || 'features'
+    const pool = rankWithinFamily(family.byCat[cat] || [], { industryText: 'landscaping', category: cat })
+    if (!pool.length) continue
+    const perm = permutationFor(`${domain}:${cat}`, pool.length)
+    const nth = used[cat] || 0
+    used[cat] = nth + 1
+    assigned[key] = pool[perm[nth % pool.length]].id
+  }
+  // portfolio/trust/service_areas must not land in the same category as
+  // services/about/process at all now...
+  assert.notEqual(SECTION_TO_CATEGORY.portfolio, SECTION_TO_CATEGORY.services)
+  // ...and none of the six sections should end up sharing an id, since every
+  // category's pool (2-4 entries) covers its actual demand (1-3 sections).
+  const ids = Object.values(assigned)
+  assert.equal(new Set(ids).size, ids.length, `expected all distinct, got ${JSON.stringify(assigned)}`)
+})
+
+test('the family/needed-categories the guided flow sees match what the builder actually uses', () => {
+  // neededCategoriesFor is shared specifically so these two can't drift apart.
+  const flow = ['hero', 'about', 'portfolio', 'services', 'trust', 'process', 'service_areas', 'contact']
+  const cats = neededCategoriesFor(flow)
+  assert.ok(cats.includes('card'), 'portfolio/service_areas must route to card')
+  assert.ok(cats.includes('stats'), 'trust must route to stats')
 })
 
 test('groupFamilies buckets by category and resolves a framework per family', () => {
