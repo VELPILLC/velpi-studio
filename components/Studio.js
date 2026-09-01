@@ -2,6 +2,12 @@
 import { useState, useEffect, useRef } from 'react'
 import LightningBackground from './LightningBackground'
 import ReviewExportBar from './dev/ReviewExportBar'
+import dynamic from 'next/dynamic'
+
+// three.js (~150kB) has no reason to load for every visit to the builder —
+// only once someone actually opens the 3D mockup. ssr:false because it
+// touches window/WebGL directly.
+const Device3DMockup = dynamic(() => import('./Device3DMockup'), { ssr: false })
 import { isDevReviewClient } from '../lib/creative/flags.mjs'
 import GuidedPanel from './GuidedPanel'
 import { decisionsFromAnswers } from '../lib/guidedSpine.mjs'
@@ -426,6 +432,8 @@ export default function Studio() {
   const [copiedReport, setCopiedReport] = useState(false)
   const [snapping, setSnapping] = useState(false)
   const [makingPdf, setMakingPdf] = useState(false)
+  const [building3d, setBuilding3d] = useState(false)
+  const [mockupCanvas, setMockupCanvas] = useState(null) // set -> the 3D mockup modal is open
 
   // ── Device previews open the dedicated /device-preview page (new tab) —
   // works for the active build AND for any saved Library project via a
@@ -877,6 +885,48 @@ function extractLogoColors(dataUrl) {
       return canvas
     } finally {
       try { document.body.removeChild(frame) } catch (_) {}
+    }
+  }
+
+  // Same offscreen-iframe technique as captureFullPageCanvas, but WITHOUT the
+  // full-scroll-height measurement — a fixed 1440x900 (exactly
+  // PREVIEW_VIEWPORTS.desktop, exactly 16:10) capture of just what's visible
+  // above the fold. The 3D mockup shows a laptop screen, not an infinitely
+  // tall scrolling page stretched onto one flat plane.
+  async function captureViewportCanvas() {
+    const out = previewHtml()
+    if (!out) return null
+    const frame = document.createElement('iframe')
+    try {
+      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:900px;border:none;'
+      frame.setAttribute('sandbox', 'allow-same-origin')
+      document.body.appendChild(frame)
+      frame.srcdoc = out
+      await new Promise(res => { frame.onload = res })
+      await new Promise(res => setTimeout(res, 1200))
+      const html2canvas = (await import('html2canvas-pro')).default
+      return await html2canvas(frame.contentDocument.documentElement, {
+        useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
+        windowWidth: 1440, windowHeight: 900, width: 1440, height: 900,
+        scale: 1, logging: false,
+      })
+    } finally {
+      try { document.body.removeChild(frame) } catch (_) {}
+    }
+  }
+
+  async function open3dMockup() {
+    if (!htmlTemplate || building3d) return
+    setBuilding3d(true)
+    setError(null)
+    try {
+      const canvas = await captureViewportCanvas()
+      if (!canvas) { setError('Could not capture the site for the 3D mockup.'); return }
+      setMockupCanvas(canvas)
+    } catch (e) {
+      setError(`Could not build the 3D mockup: ${e.message}`)
+    } finally {
+      setBuilding3d(false)
     }
   }
 
@@ -2356,6 +2406,9 @@ function extractLogoColors(dataUrl) {
                 <button onClick={downloadPdf} disabled={makingPdf} style={{ ...monoBtn, background: BLUE, borderColor: BLUE, color: '#fff', opacity: makingPdf ? 0.6 : 1 }}>
                   {makingPdf ? 'Rendering PDF…' : '⬇ Download PDF'}
                 </button>
+                <button onClick={open3dMockup} disabled={building3d} style={{ ...monoBtn, opacity: building3d ? 0.6 : 1 }}>
+                  {building3d ? 'Building 3D mockup…' : '🖥 3D Mockup'}
+                </button>
                 <button onClick={copyHtml} style={{ ...monoBtn, ...(allLinked ? { background: GREEN, borderColor: GREEN, color: '#04240f' } : {}) }}>{copiedHtml ? 'Copied ✓' : (allLinked ? '⧉ Copy Final HTML' : '⧉ Copy HTML (draft)')}</button>
                 <button onClick={downloadHtml} style={monoBtn}>⬇ HTML file</button>
                 {promptTrace && <button onClick={downloadPromptTrace} style={monoBtn}>⬇ prompt-trace</button>}
@@ -2520,6 +2573,13 @@ function extractLogoColors(dataUrl) {
           tab — the popup/modal is gone (its height-clamped frame was the
           popup-vs-page divergence). */}
       </div>
+      {mockupCanvas && (
+        <Device3DMockup
+          screenCanvas={mockupCanvas}
+          label={bizName}
+          onClose={() => setMockupCanvas(null)}
+        />
+      )}
     </div>
   )
 }
