@@ -19,3 +19,6 @@ only: never modify template files, never ship their demo images in client work.
 - **colors/palettes.md** — 28 palettes by niche/mood with 60/30/10 + dark variants
 - **animations/animations.md** — GHL-safe animation catalog (transform/opacity only,
   vanilla JS/CSS, working code)
+- **3d-effects/threejs-inspired.md** — Three.js-style ambient effects (gradient mesh,
+  particle fields, liquid blobs, orbiting elements, holographic sheen) rebuilt as
+  pure-CSS recipes — no WebGL, no external library, no JS at all
