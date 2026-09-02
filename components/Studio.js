@@ -453,7 +453,6 @@ export default function Studio() {
   // resolves it with the user's answers (or null to hand everything back to
   // the agent). Held in a ref so the resolver survives re-renders.
   const guidedResolveRef = useRef(null)
-  const [guidedMode, setGuidedMode] = useState(false)
   const [guidedData, setGuidedData] = useState(null) // { questions, sets, family, source }
   const reevalHandlerRef = useRef(null) // always the CURRENT handler, so the mount-time listener never goes stale
   const [reevaluating, setReevaluating] = useState(false)
@@ -1206,48 +1205,48 @@ function extractLogoColors(dataUrl) {
       setAnalysisData(analysis)
       setLogoUrl(analysis._source?.logo || scrapedData.logo || null)
 
-      // ── GUIDED MODE ──
+      // ── GUIDED DESIGN QUESTIONS ──
       // The one point where the brand is fully known but nothing is committed
-      // yet. The questions here decide exactly what a domain hash used to
-      // decide: the design system, the section blueprints, the palette, the
-      // motion. Answers become hard inputs below; anything skipped stays the
-      // agent's call, identical to the one-shot path.
+      // yet. Always runs — this IS the generation process now, not a side
+      // mode: the decisions here (design system, section blueprints, palette,
+      // motion) used to be made by a domain hash, and now they're made by a
+      // person. Answering fewer questions is always allowed (GuidedPanel's
+      // "Build with what I've chosen" / "Let the agent decide everything");
+      // anything left unanswered simply stays the agent's own call.
       let guidedDecisions = null
-      if (guidedMode) {
-        mark('guided', 'active')
-        try {
-          const brandColors = [
-            ...(analysis.brand_read?.colors || []).map(c => c?.hex).filter(Boolean),
-            ...logoPalette,
-          ]
-          const qres = await callRoute('/api/guided-step', { analysis, brandColors })
-          if (qres?.questions?.length) {
-            setGuidedData({ questions: qres.questions, sets: qres.sets, family: qres.family, source: qres.source })
-            const answers = await new Promise(resolve => { guidedResolveRef.current = resolve })
-            setGuidedData(null)
-            guidedResolveRef.current = null
-            if (answers && Object.keys(answers).length) {
-              guidedDecisions = decisionsFromAnswers(answers, { sets: qres.sets, family: qres.family })
-              // A chosen palette is brand truth from here on — the same
-              // status the logo-derived palette has.
-              if (guidedDecisions.palette?.length) analysis.color_palette = guidedDecisions.palette
-              // Style scoring downstream reads vibeText, so the choices have
-              // to be visible there too — not just in the structured payload.
-              if (guidedDecisions.vibeSuffix) vibeText = `${vibeText} | ${guidedDecisions.vibeSuffix}`.trim()
-              mark('guided', 'complete')
-            } else {
-              mark('guided', 'complete') // handed back to the agent on purpose
-            }
-          } else {
-            mark('guided', 'error')
-            setError('The guided questions could not be prepared — continuing with the agent designing on its own.')
-          }
-        } catch (e) {
-          mark('guided', 'error')
-          setError(`Guided mode failed (${e.message}) — continuing with the agent designing on its own.`)
+      mark('guided', 'active')
+      try {
+        const brandColors = [
+          ...(analysis.brand_read?.colors || []).map(c => c?.hex).filter(Boolean),
+          ...logoPalette,
+        ]
+        const qres = await callRoute('/api/guided-step', { analysis, brandColors })
+        if (qres?.questions?.length) {
+          setGuidedData({ questions: qres.questions, sets: qres.sets, family: qres.family, source: qres.source })
+          const answers = await new Promise(resolve => { guidedResolveRef.current = resolve })
           setGuidedData(null)
           guidedResolveRef.current = null
+          if (answers && Object.keys(answers).length) {
+            guidedDecisions = decisionsFromAnswers(answers, { sets: qres.sets, family: qres.family })
+            // A chosen palette is brand truth from here on — the same
+            // status the logo-derived palette has.
+            if (guidedDecisions.palette?.length) analysis.color_palette = guidedDecisions.palette
+            // Style scoring downstream reads vibeText, so the choices have
+            // to be visible there too — not just in the structured payload.
+            if (guidedDecisions.vibeSuffix) vibeText = `${vibeText} | ${guidedDecisions.vibeSuffix}`.trim()
+            mark('guided', 'complete')
+          } else {
+            mark('guided', 'complete') // handed back to the agent on purpose
+          }
+        } else {
+          mark('guided', 'error')
+          setError('The guided questions could not be prepared — continuing with the agent designing on its own.')
         }
+      } catch (e) {
+        mark('guided', 'error')
+        setError(`Guided design questions failed (${e.message}) — continuing with the agent designing on its own.`)
+        setGuidedData(null)
+        guidedResolveRef.current = null
       }
 
       const inv = analysis.image_inventory || []
@@ -2047,30 +2046,6 @@ function extractLogoColors(dataUrl) {
           )}
         </div>
 
-
-        {/* ── Design together, or let the agent decide ── */}
-        <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-          {[
-            { on: false, title: 'Design it for me', desc: 'One pass — the agent makes every call' },
-            { on: true, title: 'Design it with me', desc: 'It asks first, then builds around your answers' },
-          ].map(m => (
-            <button
-              key={String(m.on)}
-              onClick={() => setGuidedMode(m.on)}
-              disabled={generating}
-              style={{
-                flex: 1, textAlign: 'left', cursor: generating ? 'default' : 'pointer',
-                background: guidedMode === m.on ? 'rgba(41,144,250,0.14)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${guidedMode === m.on ? BLUE : BORDER}`,
-                borderRadius: 12, padding: '11px 13px', color: '#fff', font: 'inherit',
-                opacity: generating ? 0.5 : 1,
-              }}
-            >
-              <div style={{ fontFamily: 'var(--font-inter)', fontWeight: 700, fontSize: '0.8rem' }}>{m.title}</div>
-              <div style={{ fontFamily: 'var(--font-inter)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.4 }}>{m.desc}</div>
-            </button>
-          ))}
-        </div>
 
         {/* ── GENERATE ── */}
         <button
