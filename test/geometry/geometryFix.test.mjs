@@ -103,3 +103,32 @@ test('buildOverlapFixes escalates when no durable selector can be built', () => 
 test('renderCssOverrideBlock returns empty string for no fixes', () => {
   assert.equal(renderCssOverrideBlock([]), '')
 })
+
+// ── pages that carry JavaScript ──
+
+test('a scroll-reveal element parked at opacity:0 is not a collision', () => {
+  // Generated pages now open with reveal targets at opacity:0 until they
+  // enter the viewport. They are invisible, cannot collide with anything a
+  // visitor sees, and "fixing" them would bake a permanent override.
+  const hidden = node('v1', { classes: ['reveal'], rect: rect(0, 0, 400, 200), opacity: 0, tag: 'h2' })
+  const real = node('v2', { classes: ['hero-copy'], rect: rect(20, 20, 360, 160), tag: 'p' })
+  assert.equal(detectOverlaps([hidden, real]).length, 0)
+})
+
+test('the same pair IS flagged once the reveal has played', () => {
+  // Same geometry, now visible — proves the opacity rule is what suppressed
+  // it, not the shapes.
+  const shown = node('v1', { classes: ['reveal'], rect: rect(0, 0, 400, 200), opacity: 1, tag: 'h2' })
+  const real = node('v2', { classes: ['hero-copy'], rect: rect(20, 20, 360, 160), tag: 'p' })
+  assert.equal(detectOverlaps([shown, real]).length, 1)
+})
+
+test('a WebGL canvas measured at real size behaves like any content element', () => {
+  // The old probe never ran scripts, so a canvas reported its default
+  // 300x150 and overlap maths were computed against a phantom box.
+  const canvas = node('v1', { tag: 'canvas', classes: ['hero-gl'], rect: rect(0, 0, 1440, 800), hasText: false })
+  const numeral = node('v2', { classes: ['section-numeral'], rect: rect(40, 40, 300, 300), opacity: 0.9, position: 'absolute' })
+  // canvas isn't text/img/svg, so it is not content-bearing on its own —
+  // the decorative numeral over it is not a text-legibility problem.
+  assert.equal(detectOverlaps([canvas, numeral]).length, 0)
+})
