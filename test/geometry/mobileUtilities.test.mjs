@@ -81,19 +81,19 @@ test('build-site injects the utilities and teaches every class by name', () => {
   }
 })
 
-test('the fix routes are told to preserve the classes rather than strip them', () => {
-  for (const route of ['reevaluate-fix', 'enhance-site']) {
-    const src = readRoute(route)
-    for (const cls of MOBILE_UTILITY_CLASSES) {
-      assert.ok(src.includes(cls), `${route} must know about ${cls} so a "surgical" fix cannot drop it`)
-    }
+test('the fix route is told to preserve the classes rather than strip them', () => {
+  const src = readRoute('reevaluate-fix')
+  for (const cls of MOBILE_UTILITY_CLASSES) {
+    assert.ok(src.includes(cls), `reevaluate-fix must know about ${cls} so a "surgical" fix cannot drop it`)
   }
 })
 
 test('no route still claims the page is mobile-first', () => {
-  // build-site authors desktop-first; enhance-site used to say the opposite,
-  // which would have had a revived pass invert the whole responsive strategy.
-  for (const route of ['build-site', 'enhance-site', 'reevaluate-fix']) {
+  // build-site authors desktop-first; a since-removed dormant route (enhance-
+  // site) used to say the opposite, which would have inverted the whole
+  // responsive strategy if it were ever revived. Guarded here so a future
+  // route can't reintroduce the same contradiction.
+  for (const route of ['build-site', 'reevaluate-fix']) {
     const src = readRoute(route)
     assert.ok(!/MOBILE-FIRST contract/i.test(src), `${route} contradicts the desktop-first build`)
   }

@@ -1,7 +1,7 @@
 // Transport-resilience helper tests — pure, deterministic, no deps.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isTransientError, backoffDelay, describeError, MAX_CLAUDE_RETRIES } from '../../lib/claudeRetry.mjs'
+import { isTransientError, backoffDelay, describeError, MAX_CLAUDE_RETRIES } from '../lib/claudeRetry.mjs'
 
 test('isTransientError: retries the allowed HTTP statuses', () => {
   for (const status of [429, 500, 503, 529]) {
