@@ -1376,6 +1376,9 @@ function extractLogoColors(dataUrl) {
         sectionRefs,
         structure, // the deterministic skeleton — same on every regeneration
         logoMeta: logoMetaLocal, // measured shape/ratio — wide wordmarks size by ratio
+        // The 3D/advanced hero treatment the creator picked in plain language.
+        // Only the id travels; the build resolves it to the full recipe.
+        forcedHeroEffect: guidedDecisions?.heroEffectId || null,
         // A chosen story order rides the existing forcedLayout path, which
         // already overrides the analyzer's section order in the build prompt.
         ...(guidedDecisions?.sectionOrder

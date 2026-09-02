@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import {
   buildCandidateSets, validateGuided, autoLabel, fallbackQuestions, decisionsFromAnswers, QUESTION_IDS,
 } from '../../lib/guidedSpine.mjs'
+import { HERO_EFFECT_IDS } from '../../lib/effectsLibrary.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const load = p => JSON.parse(readFileSync(join(repo, ...p), 'utf8'))
@@ -207,6 +208,10 @@ test('candidate sets never reference generated project data', () => {
     ...motionPresets.map(m => m.id),
     ...palettes.map(p => p.id),
     ...pairings.map(p => p.id),
+    // The hero-effect catalogue is a curated library in code, exactly like the
+    // imagery/density vocabularies below — not anything derived from the
+    // owner's own generated sites, which is what this test guards against.
+    ...HERO_EFFECT_IDS,
     'pal-brand', 'motion-none',
     'img-full-bleed', 'img-editorial-crop', 'img-warm-graded', 'img-documentary',
     'den-airy', 'den-standard', 'den-rich',

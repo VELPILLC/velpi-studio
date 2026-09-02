@@ -20,6 +20,41 @@ test('the catalogue is well-formed', () => {
   assert.ok(HERO_EFFECT_IDS.includes('none'), 'an explicit opt-out must exist')
 })
 
+// The two registers must not bleed into each other: plain words for the person
+// choosing, technical vocabulary for the model building. Both directions are
+// failures — jargon in a label makes the choice harder, and a vague recipe
+// produces exactly the generic output this library exists to prevent.
+const JARGON = [
+  'shader', 'webgl', 'three.js', 'buffergeometry', 'geometry', 'mesh',
+  'attenuation', 'octave', 'uniform', 'fragment', 'vertex', 'fog',
+  'pixel ratio', 'intersectionobserver', 'canvas', 'roughness', 'metalness',
+  'parallax', 'render loop', 'viewport', 'opacity', 'z-index',
+]
+
+test('what a person reads is plain — no jargon in labels, summaries or bestFor', () => {
+  for (const e of HERO_EFFECTS) {
+    const facing = `${e.label} ${e.summary} ${e.bestFor || ''}`.toLowerCase()
+    for (const word of JARGON) {
+      assert.ok(!facing.includes(word), `"${word}" leaked into the user-facing copy for ${e.id}: "${e.label} — ${e.summary}"`)
+    }
+    assert.ok(e.label.length <= 32, `${e.id} label too long to read as a choice: "${e.label}"`)
+    assert.ok(e.bestFor && e.bestFor.length > 10, `${e.id} needs a plain "best for" to help someone choose`)
+  }
+})
+
+test('what the model reads is technical — the depth vocabulary is on every 3D recipe', () => {
+  const colors = { primary: '#ff0000', secondary: '#00ff00', surface: '#0000ff', all: [] }
+  for (const e of HERO_EFFECTS) {
+    if (e.id === 'none') continue
+    const recipe = e.recipe({ colors }).toLowerCase()
+    // These are the words that actually produce depth instead of a spinning
+    // object on a black square.
+    for (const term of ['parallax', 'time of day', 'contact shadow', 'texture']) {
+      assert.ok(recipe.includes(term), `${e.id} recipe is missing "${term}" — it will produce generic 3D`)
+    }
+  }
+})
+
 test('every recipe is concrete, not prose — it names real Three.js constructs', () => {
   const colors = { primary: '#ff0000', secondary: '#00ff00', surface: '#0000ff', all: [] }
   for (const e of HERO_EFFECTS) {
