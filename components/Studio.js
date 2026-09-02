@@ -113,7 +113,7 @@ function safeName(s) {
 // image (recoverable via Regenerate) and the failure is reported to the
 // caller via `failed` so the UI can say so.
 async function uploadBase64Assets(assetsById, refinedLogoValue, keyPrefix) {
-  const failed = []
+  const failed = [] // [{ id, reason }] — the actual PUT failure was being computed and thrown away
   const uploadOne = async (id, src) => {
     const match = typeof src === 'string' ? /^data:([^;,]+);base64,/.exec(src) : null
     if (!match) return [id, src]
@@ -122,10 +122,19 @@ async function uploadBase64Assets(assetsById, refinedLogoValue, keyPrefix) {
       const { signedUrl, publicUrl } = await callRoute('/api/upload-image', { path: `${keyPrefix}-${id}`, contentType })
       const blob = await (await fetch(src)).blob()
       const put = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob })
-      if (!put.ok) throw new Error(`storage PUT failed (${put.status})`)
+      if (!put.ok) {
+        // Supabase's error body (bucket/policy/size-limit detail) is exactly
+        // what's needed to diagnose this from outside a browser devtools
+        // session — it used to be read into the Error message and then
+        // discarded the moment the catch block below swallowed it.
+        const body = await put.text().catch(() => '')
+        throw new Error(`storage PUT failed (${put.status})${body ? `: ${body.slice(0, 200)}` : ''}`)
+      }
       return [id, publicUrl]
-    } catch (_) {
-      failed.push(id)
+    } catch (e) {
+      const reason = e?.message || String(e)
+      console.error(`asset upload failed for "${id}":`, reason)
+      failed.push({ id, reason })
       return [id, null] // drop — never let base64 back into the save payload
     }
   }
@@ -562,7 +571,9 @@ export default function Studio() {
       setSavedMsg(`Saved "${project.name}" to the library`)
       setTimeout(() => setSavedMsg(null), 3000)
       if (uploaded.failed.length) {
-        setError(`Saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${uploaded.failed.join(', ')}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then save again.`)
+        const ids = uploaded.failed.map(f => f.id).join(', ')
+        const reasons = [...new Set(uploaded.failed.map(f => f.reason))].join(' | ')
+        setError(`Saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${ids}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Reason: ${reasons}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then save again.`)
       }
     } catch (e) {
       setError(e.message)
@@ -1520,7 +1531,9 @@ function extractLogoColors(dataUrl) {
           if (records.length) callRoute('/api/asset-library', { records }).catch(() => {})
         } catch (_) {}
         if (uploaded.failed.length) {
-          setError(`Auto-saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${uploaded.failed.join(', ')}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then use Save to retry.`)
+          const ids = uploaded.failed.map(f => f.id).join(', ')
+          const reasons = [...new Set(uploaded.failed.map(f => f.reason))].join(' | ')
+          setError(`Auto-saved, but ${uploaded.failed.length} image${uploaded.failed.length > 1 ? 's' : ''} (${ids}) could not be uploaded to storage and ${uploaded.failed.length > 1 ? 'were' : 'was'} left out of the saved copy — the live session still has ${uploaded.failed.length > 1 ? 'them' : 'it'}. Reason: ${reasons}. Check SUPABASE_SERVICE_ROLE_KEY / the project-images bucket, then use Save to retry.`)
         }
       } catch (e) {
         // Silent failure hid a missing DB table for weeks — never again.
