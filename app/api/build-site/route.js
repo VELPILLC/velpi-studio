@@ -4,6 +4,9 @@ export const maxDuration = 300
 import { callClaude, stripFences } from '../../../lib/claude'
 import { findAndFixContrastIssues } from '../../../lib/contrastFix.mjs'
 import { MOBILE_UTILITIES_CSS } from '../../../lib/mobileUtilities.mjs'
+import { chooseHeroEffect, heroEffectPromptBlock } from '../../../lib/effectsLibrary.mjs'
+import { selectSavedSkills, savedSkillsPromptBlock } from '../../../lib/savedSkills.mjs'
+import { listSavedSkills } from '../../../lib/supabase'
 
 const SYSTEM = `You are an elite web designer. You produce ONE mockup at a time. Commit to a single direction and execute it at the highest level — never produce multiple versions and never hedge between styles.
 
@@ -173,6 +176,23 @@ export async function POST(request) {
     }
     const slotList = Array.isArray(slots) ? slots : []
     const palette = analysis.color_palette || ['#2990fa', '#0a1628', '#ffffff']
+
+    // Same domain key structurePlan uses, so every deterministic engine agrees
+    // on what "this business" means — otherwise the hero treatment could
+    // reroll while the blueprints stayed put.
+    const domain = analysis?._source?.domain || analysis?.business_name || 'velpi-site'
+
+    // WHICH advanced treatment this page commits to. Decided here rather than
+    // left to the model: a freely improvised 3D hero makes the same business
+    // land somewhere different on every regeneration, and makes different
+    // businesses converge on the same spinning object.
+    const heroChoice = chooseHeroEffect({
+      analysis,
+      domain,
+      palette,
+      forcedId: body.forcedHeroEffect || null,
+    })
+
     // forcedLayout: an alternate structure the user chose post-generation —
     // overrides the analysis's section order and carries its structural intent.
     const sectionOrder = forcedLayout?.section_order?.length
@@ -182,6 +202,18 @@ export async function POST(request) {
         : analysis.layout?.section_order?.length
           ? analysis.layout.section_order
           : (analysis.sections || Object.keys(copy.sections || {}))
+
+    // Treatments the operator explicitly approved from earlier builds. Selected
+    // AFTER sectionOrder so a saved section treatment can only apply to a
+    // section this page actually has. Failing to reach the library must never
+    // fail a build: listSavedSkills returns [] on error and selection tolerates
+    // an empty pool.
+    const savedSelection = selectSavedSkills(await listSavedSkills(), {
+      analysis,
+      domain,
+      sectionOrder,
+      forcedIds: Array.isArray(body.forcedSkillIds) ? body.forcedSkillIds : [],
+    })
 
     const slotBlock = slotList.length
       ? slotList.map(s => `- token %%IMG:${s.id}%% — ${s.name}${s.section ? ` (place in section: ${s.section})` : ''}`).join('\n')
@@ -228,9 +260,13 @@ ${factsBlock}
 
 ${motion?.snippet ? `SIGNATURE MOTION TREATMENT — exactly ONE per site, never stacked with others:
 "${motion.name}" (${motion.intensity} ${motion.effect}) — ${motion.summary || ''}
-Base implementation (zero-JS CSS/HTML — adapt it, don't just paste):
+Base implementation (CSS/HTML — adapt it, don't just paste):
 ${motion.snippet}
 Rules: place it where the brief says (default: hero backdrop). Map var(--vm-c1)/var(--vm-c2) to the brand's SECONDARY or NEUTRAL palette color — never the accent/CTA color, which must stay reserved for buttons and small emphasis so it never gets diluted into a big decorative texture. CONTAINMENT (hard requirement): the .vm-...-wrap element wraps ONLY the one section it lives in — never the page shell, never <div class="velpi-page"> itself, never more than one section. WEIGHT (hard requirement): it must read as a faint atmospheric texture glimpsed behind content, not a foreground graphic — cap any pattern/grid/line opacity so it stays subtle (roughly 6-15% visual weight against its section's background) and never approaches the contrast of real text or CTAs. VISIBILITY (hard requirement): it still has to be visible — if its section's background is a saturated brand color, tint the motion toward a lighter or near-white variant of that same hue (or add a soft glow) so the movement actually reads against it; a motion effect rendered in a color close to its own background is functionally invisible and does not count as the signature moment. Merge its <style> rules into your single style tag, keeping the .vm- class prefixes and the prefers-reduced-motion rule. Keep content above it (position:relative; z-index). Do NOT add any other ambient/background animation anywhere else on the page — this is the site's one signature motion. If the design brief overruled motion with "none", omit this entirely.` : ''}
+
+${heroEffectPromptBlock(heroChoice)}
+
+${savedSkillsPromptBlock(savedSelection)}
 
 CONVERSION STRATEGY (the page's brain — execute exactly):
 ${JSON.stringify(analysis.conversion_strategy || {}, null, 2)}
@@ -350,7 +386,16 @@ ${imageBudgetBlock}`
     // trace: the EXACT payload sent to the model — persisted with the project
     // and downloadable, so "what was actually in the prompt" is answerable
     // with an artifact instead of code archaeology.
-    return Response.json({ html, trace: { system: SYSTEM, user }, contrastFixes, navLinksInjected })
+    // Report which treatment was chosen and which saved skills applied. A
+    // silent choice is how incoherence creeps back in unnoticed — the same
+    // reason blueprint borrows are disclosed rather than hidden.
+    const treatment = {
+      heroEffect: heroChoice.effect.id,
+      heroEffectLabel: heroChoice.effect.label,
+      heroEffectForced: heroChoice.forced,
+      savedSkills: savedSelection.applied.map(s => ({ id: s.id, name: s.name, kind: s.kind, category: s.category })),
+    }
+    return Response.json({ html, trace: { system: SYSTEM, user }, contrastFixes, navLinksInjected, treatment })
   } catch (err) {
     console.error('build-site error:', err)
     return Response.json({ error: `Mockup build failed: ${err.message}` }, { status: 500 })
