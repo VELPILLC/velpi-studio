@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkFixedHtml, imgTokensOf, vidsOf } from '../../lib/reevaluateGates.mjs'
+import { checkFixedHtml, imgTokensOf, vidsOf, scriptCountOf } from '../../lib/reevaluateGates.mjs'
 
 // A stand-in for a real generated page: the structural things the gates care
 // about (doctype, .velpi-page scoping, image tokens, element ids) plus enough
@@ -70,4 +70,43 @@ test('gates report every independent failure at once, not just the first', () =>
 test('token/vid extractors are order-insensitive', () => {
   assert.equal(imgTokensOf('%%IMG:b%% %%IMG:a%%'), imgTokensOf('%%IMG:a%% %%IMG:b%%'))
   assert.equal(vidsOf('data-vid="v2" data-vid="v1"'), vidsOf('data-vid="v1" data-vid="v2"'))
+})
+
+// ── scripts are now part of the page and must survive a "surgical" fix ──
+
+const withScripts = before.replace(
+  '</div></body>',
+  `</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>var s = 1;</script>
+</body>`
+)
+
+test('stripping the scripts is rejected even when everything else is intact', () => {
+  // This is the exact failure the gate exists for: remove the WebGL treatment
+  // and the result still has valid HTML, identical tokens, identical vids and
+  // the wrapper — it passed every other check while deleting the feature.
+  const after = withScripts.replace(/<script[\s\S]*?<\/script>\s*/gi, '')
+  const res = checkFixedHtml(withScripts, after)
+  assert.equal(res.ok, false)
+  assert.ok(res.failures.some(f => /script tags/.test(f)))
+})
+
+test('an unprompted extra script is rejected too', () => {
+  const after = withScripts.replace('</body>', '<script>var injected = 2;</script></body>')
+  const res = checkFixedHtml(withScripts, after)
+  assert.equal(res.ok, false)
+  assert.ok(res.failures.some(f => /script tags/.test(f)))
+})
+
+test('editing copy while leaving the scripts alone still passes', () => {
+  const after = withScripts.replace('<li data-vid="v6">Monday</li>', '<li data-vid="v6">Monday — Taco Night</li>')
+  const res = checkFixedHtml(withScripts, after)
+  assert.equal(res.ok, true, res.failures.join('; '))
+})
+
+test('scriptCountOf counts opening tags regardless of form', () => {
+  assert.equal(scriptCountOf('<script src="a.js"></script><script>x</script>'), 2)
+  assert.equal(scriptCountOf('<SCRIPT SRC="a.js"></SCRIPT>'), 1)
+  assert.equal(scriptCountOf('<p>no scripts</p>'), 0)
 })

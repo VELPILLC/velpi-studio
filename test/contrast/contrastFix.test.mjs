@@ -234,3 +234,67 @@ test('contrastRatio matches known WCAG anchors', () => {
   assert.ok(Math.abs(contrastRatio([0, 0, 0], [255, 255, 255]) - 21) < 0.01)
   assert.ok(Math.abs(contrastRatio([119, 119, 119], [255, 255, 255]) - 4.48) < 0.05)
 })
+
+// ── real JavaScript in the page (the GoHighLevel script-sibling shape) ──
+//
+// GHL requires <script> tags to be siblings of the wrapper div, not children,
+// so a generated page now ends: </div> <script>...</script> </body>. That is
+// exactly the position the body match used to refuse.
+
+const pageWithScripts = (css, body, js) => `<!DOCTYPE html>
+<html><head><title>t</title><style>${css}</style></head>
+<body><div class="velpi-page">${body}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>${js}</script>
+</body></html>`
+
+test('a script between the wrapper and </body> does not break contrast detection', () => {
+  const html = pageWithScripts(
+    `.velpi-page .p { background: #ffffff; }
+     .velpi-page .p a { color: #dddddd; }`,
+    `<div class="p"><a class="lnk" href="mailto:hi@x.com">Email us now</a></div>`,
+    `var x = 1;`
+  )
+  const res = findAndFixContrastIssues(html)
+  assert.ok(res.fixes.length >= 1, 'the failing link must still be found with scripts present')
+})
+
+test('markup inside a script string is never treated as page content', () => {
+  // A script that builds markup contains tags that are not on the page. If the
+  // walker sees them, it invents elements and patches selectors that match
+  // nothing real.
+  const html = pageWithScripts(
+    `.velpi-page .p { background: #ffffff; color: #111111; }`,
+    `<div class="p">Readable copy here</div>`,
+    `var tpl = '<a class="ghost" style="color:#eee">invisible</a>';`
+  )
+  const res = findAndFixContrastIssues(html)
+  assert.ok(!res.fixes.some(f => (f.selector || '').includes('ghost')), 'no fix may target markup that only exists inside JS')
+})
+
+test('every style tag is analyzed, not just the first', () => {
+  // An effect or library shipping its own <style> used to hide the real page
+  // CSS from analysis, because only the first block was read.
+  const html = `<!DOCTYPE html>
+<html><head><title>t</title>
+<style>.velpi-page .decor { opacity: .5 }</style>
+<style>.velpi-page .p { background: #ffffff; } .velpi-page .p a { color: #dddddd; }</style>
+</head>
+<body><div class="velpi-page"><div class="p"><a href="tel:+15551234567">Call us today</a></div></div></body></html>`
+  const res = findAndFixContrastIssues(html)
+  assert.ok(res.fixes.length >= 1, 'CSS in a second style tag must still be analyzed')
+})
+
+test('the fix is spliced into real CSS, never into a script string', () => {
+  const html = pageWithScripts(
+    `.velpi-page .p { background: #ffffff; }
+     .velpi-page .p a { color: #dddddd; }`,
+    `<div class="p"><a href="mailto:hi@x.com">Email us now</a></div>`,
+    `var closing = '</style>';`
+  )
+  const res = findAndFixContrastIssues(html)
+  assert.ok(res.fixes.length >= 1)
+  const marker = res.html.indexOf('/* velpi: server-enforced text contrast fix */')
+  const scriptStart = res.html.indexOf('<script>')
+  assert.ok(marker > 0 && marker < scriptStart, 'the override must land in the head CSS, not inside the JS')
+})
