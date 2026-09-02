@@ -3,13 +3,21 @@
 // Inspect & Fix — click anything in the rendered preview and send it back to
 // the Studio tab to be reworked.
 //
-// How it reaches into the preview: the preview iframe is srcDoc +
-// sandbox="allow-same-origin" (deliberately WITHOUT allow-scripts, because
-// generated sites are contractually JS-free). Same-origin means this parent
-// page can read frame.contentDocument directly and attach its own listeners
-// — the same access captureFullPage/html2canvas already relies on. Nothing is
-// injected into the generated HTML itself; the highlight boxes are plain
-// divs in THIS document, positioned over the iframe.
+// How it reaches into the preview: it doesn't, deliberately. Generated sites
+// now ship real JavaScript (WebGL heroes, scroll behavior, CDN libraries), so
+// the preview frame needs allow-scripts for the page to be honest — and
+// allow-scripts alongside allow-same-origin would give that page, which is
+// LLM-authored and partly derived from scraped third-party sites, full
+// same-origin access to this Studio tab.
+//
+// So the frame is opaque-origin (allow-scripts, NO allow-same-origin) and
+// this panel talks to it purely over postMessage via lib/previewBridge.mjs:
+// hover/select/reflow come in as messages, crops are rendered inside the
+// frame and returned as base64. The highlight boxes are still plain divs in
+// THIS document, positioned over the iframe from the reported rects.
+//
+// (The previous design read frame.contentDocument directly. That only worked
+// while generated pages were contractually JS-free.)
 //
 // Every element in the iframe carries data-vid="vNN" (lib/elementIds.mjs),
 // assigned in document order. Because that numbering depends only on tag
@@ -18,158 +26,139 @@
 // lets a click here address the right element in the HTML sent to the model.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { onBridgeMessage, sendToBridge } from '../lib/previewBridge.mjs'
 
 const MAX_SCREENSHOTS = 4 // vision crops are the expensive part of a fix; cap and disclose
+const CROP_TIMEOUT_MS = 8000 // a frame that never answers must not hang the submit
 
 const box = (r) => ({ left: r.left, top: r.top, width: r.width, height: r.height })
 
-export default function InspectFixPanel({ frameRef, vslotByVid = {}, onSubmit, busy, result, onClose }) {
+export default function InspectFixPanel({ frameRef, token, vslotByVid = {}, onSubmit, busy, result, onClose }) {
   const [hover, setHover] = useState(null)      // { vid, rect }
   const [selected, setSelected] = useState([])  // [{ vid, tag, label, note }]
   const [rects, setRects] = useState({})        // vid -> viewport-space box
   const selectedRef = useRef(selected)
   selectedRef.current = selected
 
-  const doc = () => frameRef.current?.contentDocument || null
-
-  // Element rects are relative to the IFRAME's viewport; the overlay divs are
-  // position:fixed in the parent. Adding the iframe's own viewport offset
-  // converts between the two, and because getBoundingClientRect already
-  // accounts for the iframe's internal scroll, this stays correct as the
-  // preview scrolls — we just have to recompute on scroll.
-  const rectFor = useCallback((vid) => {
-    const d = doc(), frame = frameRef.current
-    if (!d || !frame) return null
-    const el = d.querySelector(`[data-vid="${vid}"]`)
-    if (!el) return null
-    const r = el.getBoundingClientRect()
+  // Rects arrive from inside the frame relative to ITS viewport; the overlay
+  // divs are position:fixed in this document. Adding the iframe's own offset
+  // converts between the two, and because the reported rect already accounts
+  // for the frame's internal scroll, this stays correct as the preview
+  // scrolls — the bridge just has to re-report on scroll.
+  const toParentSpace = useCallback((rect) => {
+    const frame = frameRef.current
+    if (!frame || !rect || rect.width < 1 || rect.height < 1) return null
     const f = frame.getBoundingClientRect()
-    if (r.width < 1 || r.height < 1) return null
-    return { left: f.left + r.left, top: f.top + r.top, width: r.width, height: r.height }
+    return { left: f.left + rect.left, top: f.top + rect.top, width: rect.width, height: rect.height }
   }, [frameRef])
 
-  const recompute = useCallback(() => {
-    const next = {}
-    for (const s of selectedRef.current) {
-      const r = rectFor(s.vid)
-      if (r) next[s.vid] = r
-    }
-    setRects(next)
-    setHover(h => (h ? { ...h, rect: rectFor(h.vid) || h.rect } : h))
-  }, [rectFor])
-
-  const describe = useCallback((el) => {
-    const tag = el.tagName.toLowerCase()
-    const text = (el.textContent || '').replace(/\s+/g, ' ').trim()
-    if (tag === 'img') return el.getAttribute('alt')?.trim() || 'image'
-    if (text) return text.slice(0, 60)
-    return el.getAttribute('class')?.split(/\s+/)[0] || tag
+  const describe = useCallback((node) => {
+    if (!node) return ''
+    if (node.tag === 'img') return node.alt?.trim() || 'image'
+    if (node.text) return node.text.slice(0, 60)
+    return (node.classes && node.classes[0]) || node.tag
   }, [])
 
-  // Wire hover/click into the preview document.
+  // Everything now arrives as messages from the isolated frame. The parent
+  // can no longer read its DOM at all (that is the point — see the header),
+  // so hover, selection, reflow and crops are all message-driven.
   useEffect(() => {
-    const d = doc()
-    if (!d) return
+    const frame = frameRef.current
+    if (!frame || !token) return
 
-    const onMove = e => {
-      const el = e.target?.closest?.('[data-vid]')
-      if (!el) { setHover(null); return }
-      const vid = el.getAttribute('data-vid')
-      const r = rectFor(vid)
-      if (r) setHover({ vid, rect: r })
-    }
-    const onLeave = () => setHover(null)
-    // Capture phase + preventDefault: generated pages are full of real <a>
-    // tags, and without this a click to select would navigate the preview.
-    const onClick = e => {
-      const el = e.target?.closest?.('[data-vid]')
-      e.preventDefault()
-      e.stopPropagation()
-      if (!el) return
-      const vid = el.getAttribute('data-vid')
-      setSelected(prev => prev.some(s => s.vid === vid)
-        ? prev.filter(s => s.vid !== vid)
-        : [...prev, { vid, tag: el.tagName.toLowerCase(), label: describe(el), note: '' }])
-    }
-    const onScroll = () => recompute()
+    const stop = onBridgeMessage(frame, token, msg => {
+      if (msg.event === 'hover') {
+        if (!msg.node) return setHover(null)
+        const rect = toParentSpace(msg.node.rect)
+        if (rect) setHover({ vid: msg.node.vid, rect })
+        return
+      }
+      if (msg.event === 'select') {
+        const node = msg.node
+        setSelected(prev => prev.some(s => s.vid === node.vid)
+          ? prev.filter(s => s.vid !== node.vid)
+          : [...prev, { vid: node.vid, tag: node.tag, label: describe(node), note: '' }])
+        return
+      }
+      if (msg.event === 'moved' || msg.event === 'ready') {
+        // A late-decoding photo reflows everything below it and would strand
+        // the highlights over the wrong content, so the frame re-reports on
+        // scroll, resize and image load.
+        const byVid = Object.fromEntries((msg.nodes || []).map(n => [n.vid, n]))
+        setSelected(prevSel => {
+          const next = {}
+          for (const s of prevSel) {
+            const r = byVid[s.vid] ? toParentSpace(byVid[s.vid].rect) : null
+            if (r) next[s.vid] = r
+          }
+          setRects(next)
+          return prevSel
+        })
+        return
+      }
+      if (msg.event === 'parentOf' && msg.node) {
+        const p = msg.node
+        setSelected(prev => {
+          if (prev.some(s => s.vid === p.vid)) return prev.filter(s => s.vid !== msg.of)
+          return prev.map(s => (s.vid === msg.of
+            ? { vid: p.vid, tag: p.tag, label: describe(p), note: s.note }
+            : s))
+        })
+      }
+    })
 
-    d.addEventListener('mousemove', onMove, true)
-    d.addEventListener('mouseleave', onLeave, true)
-    d.addEventListener('click', onClick, true)
-    d.defaultView?.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onScroll)
-    window.addEventListener('scroll', onScroll, true)
-
-    // Scroll and resize aren't the only things that move an element: a photo
-    // served from a remote URL can finish decoding after a selection is made
-    // and push everything below it down, stranding the highlight over the
-    // wrong content. Watch the document itself for reflow, and catch late
-    // image loads directly.
-    let ro = null
-    try {
-      ro = new ResizeObserver(onScroll)
-      if (d.documentElement) ro.observe(d.documentElement)
-      if (d.body) ro.observe(d.body)
-    } catch (_) { /* older browser — scroll/resize coverage still applies */ }
-    d.addEventListener('load', onScroll, true) // bubbles:false on <img>, so capture phase
+    // The frame reports its own scroll; this covers the parent window moving
+    // the iframe itself underneath the overlays.
+    const onParentMove = () => sendToBridge(frame, token, { request: 'nodes' })
+    window.addEventListener('resize', onParentMove)
+    window.addEventListener('scroll', onParentMove, true)
 
     return () => {
-      d.removeEventListener('mousemove', onMove, true)
-      d.removeEventListener('mouseleave', onLeave, true)
-      d.removeEventListener('click', onClick, true)
-      d.removeEventListener('load', onScroll, true)
-      d.defaultView?.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onScroll)
-      window.removeEventListener('scroll', onScroll, true)
-      try { ro?.disconnect() } catch (_) {}
+      stop()
+      window.removeEventListener('resize', onParentMove)
+      window.removeEventListener('scroll', onParentMove, true)
     }
-  }, [frameRef, rectFor, recompute, describe])
+  }, [frameRef, token, toParentSpace, describe])
 
-  useEffect(() => { recompute() }, [selected, recompute])
+  useEffect(() => {
+    const frame = frameRef.current
+    if (frame && token) sendToBridge(frame, token, { request: 'nodes' })
+  }, [selected, frameRef, token])
 
   // Replace a selection with its nearest addressable ancestor — the way to
-  // grab "this whole section" after clicking a headline inside it.
+  // grab "this whole section" after clicking a headline inside it. The frame
+  // answers with the parent node; the swap happens in the handler above.
   const widen = (vid) => {
-    const d = doc()
-    if (!d) return
-    const el = d.querySelector(`[data-vid="${vid}"]`)
-    const parent = el?.parentElement?.closest('[data-vid]')
-    if (!parent) return
-    const pvid = parent.getAttribute('data-vid')
-    setSelected(prev => {
-      if (prev.some(s => s.vid === pvid)) return prev.filter(s => s.vid !== vid)
-      return prev.map(s => s.vid === vid
-        ? { vid: pvid, tag: parent.tagName.toLowerCase(), label: describe(parent), note: s.note }
-        : s)
-    })
+    const frame = frameRef.current
+    if (frame && token) sendToBridge(frame, token, { request: 'parentOf', vid })
   }
 
   const setNote = (vid, note) => setSelected(prev => prev.map(s => (s.vid === vid ? { ...s, note } : s)))
 
   async function submit() {
-    const d = doc()
-    if (!d || !selected.length) return
+    const frame = frameRef.current
+    if (!frame || !token || !selected.length) return
 
     // Screenshot only what actually needs a visual diagnosis: a selection
     // with a note already says what's wrong, so a crop would add cost and
     // latency for nothing.
     const needShot = selected.filter(s => !s.note.trim() && !vslotByVid[s.vid])
     const shotFor = new Map()
-    if (needShot.length) {
-      try {
-        const html2canvas = (await import('html2canvas-pro')).default
-        for (const s of needShot.slice(0, MAX_SCREENSHOTS)) {
-          const el = d.querySelector(`[data-vid="${s.vid}"]`)
-          if (!el) continue
-          try {
-            const canvas = await html2canvas(el, {
-              useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
-              scale: Math.min(1, 900 / Math.max(el.offsetWidth || 900, 1)), logging: false,
-            })
-            shotFor.set(s.vid, canvas.toDataURL('image/jpeg', 0.7).split(',')[1])
-          } catch (_) { /* one failed crop just falls back to text-only diagnosis */ }
-        }
-      } catch (_) { /* html2canvas unavailable — every issue goes text-only */ }
+
+    // The crop has to happen INSIDE the frame now — this document can't reach
+    // those elements. Each request is answered with a base64 JPEG, or null if
+    // the frame couldn't produce one, in which case that issue simply goes to
+    // the model as text.
+    for (const s of needShot.slice(0, MAX_SCREENSHOTS)) {
+      const data = await new Promise(resolve => {
+        const done = d => { stop(); resolve(d) }
+        const stop = onBridgeMessage(frame, token, msg => {
+          if (msg.event === 'crop' && msg.vid === s.vid) done(msg.data || null)
+        })
+        setTimeout(() => done(null), CROP_TIMEOUT_MS)
+        sendToBridge(frame, token, { request: 'crop', vid: s.vid })
+      })
+      if (data) shotFor.set(s.vid, data)
     }
 
     onSubmit({

@@ -22,6 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import InspectFixPanel from '../../components/InspectFixPanel'
 import { injectElementIds } from '../../lib/elementIds.mjs'
+import { injectBridge, newBridgeToken } from '../../lib/previewBridge.mjs'
 
 const CACHE_KEY = 'velpi_device_preview_payload'
 
@@ -81,13 +82,22 @@ export default function DevicePreviewPage() {
     return () => { window.removeEventListener('message', onMessage); clearTimeout(t) }
   }, [])
 
+  // One token per inspect session, used to verify bridge messages really came
+  // from this frame (an opaque-origin frame reports origin "null", so an
+  // origin check would prove nothing).
+  const [bridgeToken] = useState(() => newBridgeToken())
+
   // Ids are injected into the ALREADY-SUBSTITUTED html on purpose: vid
   // numbering depends only on tag structure, never on attribute values, so
   // this yields exactly the same vNN the Studio tab derives from the raw
   // token-bearing template — no need to ship a second copy of the document.
+  // The bridge rides along in the same transient copy; neither the ids nor
+  // the bridge ever reach the exported site.
   const idedHtml = useMemo(
-    () => (payload?.html && inspect ? injectElementIds(payload.html).html : null),
-    [payload?.html, inspect],
+    () => (payload?.html && inspect
+      ? injectBridge(injectElementIds(payload.html).html, { token: bridgeToken, mode: 'interactive' })
+      : null),
+    [payload?.html, inspect, bridgeToken],
   )
 
   const canInspect = !!(payload?.canInspect && typeof window !== 'undefined' && window.opener && !window.opener.closed)
@@ -152,11 +162,16 @@ export default function DevicePreviewPage() {
             borderRadius: isMobile ? 12 : 0,
             overflow: 'hidden', background: '#fff',
           }}>
+            {/* allow-scripts so the page's own JavaScript (WebGL hero, scroll
+                behavior) actually runs, and deliberately NOT allow-same-origin:
+                together they would give the generated page — LLM-authored, partly
+                derived from scraped sites — full access to this Studio tab.
+                Inspect & Fix reaches it over postMessage instead. */}
             <iframe
               ref={frameRef}
               title={`${mode} preview`}
               srcDoc={inspect && idedHtml ? idedHtml : payload.html}
-              sandbox="allow-same-origin"
+              sandbox="allow-scripts"
               onLoad={() => setFrameLoads(n => n + 1)}
               style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#fff', cursor: inspect ? 'crosshair' : 'auto' }}
             />
@@ -175,6 +190,7 @@ export default function DevicePreviewPage() {
         <InspectFixPanel
           key={frameLoads}
           frameRef={frameRef}
+          token={bridgeToken}
           vslotByVid={payload.vslotByVid || {}}
           onSubmit={submitReevaluate}
           busy={busy}
