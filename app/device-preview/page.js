@@ -20,9 +20,7 @@
 // publicly.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import ReviewPanel from '../../components/dev/ReviewPanel'
 import InspectFixPanel from '../../components/InspectFixPanel'
-import { isDevReviewClient } from '../../lib/creative/flags.mjs'
 import { injectElementIds } from '../../lib/elementIds.mjs'
 
 const CACHE_KEY = 'velpi_device_preview_payload'
@@ -162,9 +160,6 @@ export default function DevicePreviewPage() {
               onLoad={() => setFrameLoads(n => n + 1)}
               style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#fff', cursor: inspect ? 'crosshair' : 'auto' }}
             />
-            {isDevReviewClient() && !inspect && (
-              <ReviewPanel buildId={payload.buildId} projectId={payload.projectId} viewport={mode} />
-            )}
           </div>
         </div>
       ) : (
