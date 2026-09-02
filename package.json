@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "npm run test:claude && npm run test:contrast && npm run test:geometry && npm run test:brand && npm run test:sections && npm run test:designintel && npm run test:guided && npm run test:effects",
-    "test:effects": "node --test test/effects/heroEffects.test.mjs",
+    "test:effects": "node --test test/effects/heroEffects.test.mjs test/effects/savedSkills.test.mjs",
     "test:claude": "node --test test/claudeRetry.test.mjs",
     "test:contrast": "node --test test/contrast/contrastFix.test.mjs",
     "test:brand": "node --test test/brand/palette.test.mjs",
