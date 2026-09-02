@@ -41,8 +41,8 @@ PRECEDENCE — WHEN TWO INSTRUCTIONS BELOW DISAGREE, THIS ORDER DECIDES. Several
 1. THE BRAND'S REAL IDENTITY — its actual palette, logo, and personality. Nothing overrides the business's own identity.
 2. FACTUAL CONTENT — real copy, services, prices, hours, contacts, reviews. Never dropped or invented for a layout's sake.
 3. THE CONVERSION STRATEGY — what the page must make happen.
-4. THE DESIGN BRIEF — the committed creative direction. Where it speaks, it wins over the reference systems.
-5. SECTION BLUEPRINTS — each section's skeleton, grid ratios, and measurements.
+4. THE DESIGN BRIEF and any SAVED TREATMENTS — the committed creative direction. Where they speak, they win over the reference systems.
+5. SECTION BLUEPRINTS and THE HERO TREATMENT — each section's skeleton, grid ratios and measurements, plus the advanced/3D treatment assigned to the hero. THE HERO BACKDROP BELONGS TO THE HERO TREATMENT: when one is assigned (anything other than "Still and serious"), it owns that space outright, and the SIGNATURE MOTION TREATMENT below must go somewhere else on the page rather than competing for it. Two ambient effects layered in one hero is the single fastest way to make a page look cheap.
 6. THE REFERENCE DESIGN SYSTEM — consulted for expression where the brief is silent.
 7. THE ANTI-GENERIC LEDGER — applies to everything the layers above leave open.
 The output contract (GoHighLevel scoping, script placement, accessibility minimums, mobile safety, graceful fallback) sits outside this order entirely: it is never traded away for any of the above.
@@ -263,7 +263,7 @@ ${motion?.snippet ? `SIGNATURE MOTION TREATMENT — exactly ONE per site, never 
 "${motion.name}" (${motion.intensity} ${motion.effect}) — ${motion.summary || ''}
 Base implementation (CSS/HTML — adapt it, don't just paste):
 ${motion.snippet}
-Rules: place it where the brief says (default: hero backdrop). Map var(--vm-c1)/var(--vm-c2) to the brand's SECONDARY or NEUTRAL palette color — never the accent/CTA color, which must stay reserved for buttons and small emphasis so it never gets diluted into a big decorative texture. CONTAINMENT (hard requirement): the .vm-...-wrap element wraps ONLY the one section it lives in — never the page shell, never <div class="velpi-page"> itself, never more than one section. WEIGHT (hard requirement): it must read as a faint atmospheric texture glimpsed behind content, not a foreground graphic — cap any pattern/grid/line opacity so it stays subtle (roughly 6-15% visual weight against its section's background) and never approaches the contrast of real text or CTAs. VISIBILITY (hard requirement): it still has to be visible — if its section's background is a saturated brand color, tint the motion toward a lighter or near-white variant of that same hue (or add a soft glow) so the movement actually reads against it; a motion effect rendered in a color close to its own background is functionally invisible and does not count as the signature moment. Merge its <style> rules into your single style tag, keeping the .vm- class prefixes and the prefers-reduced-motion rule. Keep content above it (position:relative; z-index). Do NOT add any other ambient/background animation anywhere else on the page — this is the site's one signature motion. If the design brief overruled motion with "none", omit this entirely.` : ''}
+Rules: place it ${heroChoice.effect.id === 'none' ? 'where the brief says (default: hero backdrop)' : `in a section OTHER THAN THE HERO — the hero backdrop is already taken by the HERO TREATMENT above, and layering two ambient effects there is exactly what makes a page look cheap. Put this behind a mid-page band instead (the offer moment, a stats/trust band, or the closing conversion section), and if no section genuinely suits it, OMIT IT ENTIRELY rather than forcing it in`}. Map var(--vm-c1)/var(--vm-c2) to the brand's SECONDARY or NEUTRAL palette color — never the accent/CTA color, which must stay reserved for buttons and small emphasis so it never gets diluted into a big decorative texture. CONTAINMENT (hard requirement): the .vm-...-wrap element wraps ONLY the one section it lives in — never the page shell, never <div class="velpi-page"> itself, never more than one section. WEIGHT (hard requirement): it must read as a faint atmospheric texture glimpsed behind content, not a foreground graphic — cap any pattern/grid/line opacity so it stays subtle (roughly 6-15% visual weight against its section's background) and never approaches the contrast of real text or CTAs. VISIBILITY (hard requirement): it still has to be visible — if its section's background is a saturated brand color, tint the motion toward a lighter or near-white variant of that same hue (or add a soft glow) so the movement actually reads against it; a motion effect rendered in a color close to its own background is functionally invisible and does not count as the signature moment. Merge its <style> rules into your single style tag, keeping the .vm- class prefixes and the prefers-reduced-motion rule. Keep content above it (position:relative; z-index). Do NOT add any other ambient/background animation anywhere else on the page — this and the assigned HERO TREATMENT are the page's only two ambient moments, and they live in different sections. If the design brief overruled motion with "none", omit this entirely.` : ''}
 
 ${heroEffectPromptBlock(heroChoice)}
 
@@ -395,6 +395,14 @@ ${imageBudgetBlock}`
       heroEffectLabel: heroChoice.effect.label,
       heroEffectForced: heroChoice.forced,
       savedSkills: savedSelection.applied.map(s => ({ id: s.id, name: s.name, kind: s.kind, category: s.category })),
+      // Report where the signature motion was actually sent, not just that one
+      // was picked. These two engines both used to claim the hero backdrop, and
+      // the motion silently lost every time a 3D treatment was active — so the
+      // build reported a decision that never reached the page.
+      motion: motion?.name || null,
+      motionScope: !motion?.snippet
+        ? 'none'
+        : heroChoice.effect.id === 'none' ? 'hero' : 'mid-page (hero belongs to the hero treatment)',
     }
     return Response.json({ html, trace: { system: SYSTEM, user }, contrastFixes, navLinksInjected, treatment })
   } catch (err) {
