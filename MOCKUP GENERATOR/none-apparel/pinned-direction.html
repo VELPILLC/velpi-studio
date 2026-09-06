@@ -18,11 +18,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
-/* The whole page is the sheet. With the paper underneath everything, a garment
-   multiplied onto it prints straight into the page — there is no framed square
-   left for the eye to catch. */
-body{background:var(--paper) url('assets/paper.png') center center / cover no-repeat fixed;
-  color:var(--ink);font-family:var(--sans);font-weight:300;
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:300;
   -webkit-font-smoothing:antialiased;touch-action:none}
 h1,h2{font-family:var(--serif);font-weight:300;margin:0;line-height:1.05}
 p{margin:0;line-height:1.9;color:var(--soft);font-size:1rem}
@@ -65,10 +61,13 @@ a{color:inherit;text-decoration:none}
 .piece .card.flipped{transform:rotateY(180deg)}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 
-/* No sheet any more — the page background carries the paper, so the garment
-   multiplies directly into it and the frame disappears entirely. */
-.sheet{display:none}
-.frames{position:absolute;inset:0}
+/* The sheet. Multiplying the garment onto it turns the clip's studio white into
+   ink on paper — which is what stops the video reading as a pasted rectangle. */
+.sheet{position:absolute;inset:0;background:url('assets/paper.png') center/cover no-repeat;
+  box-shadow:0 20px 56px rgba(74,58,38,.17), 0 2px 8px rgba(74,58,38,.10);
+  transform:rotate(-.5deg)}
+.piece.at-left .sheet{transform:rotate(.6deg)}
+.frames{position:absolute;inset:4%}
 .frames img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   opacity:0;transition:opacity .55s ease;mix-blend-mode:multiply}
 .frames img.on{opacity:1}
@@ -77,16 +76,14 @@ a{color:inherit;text-decoration:none}
 .frames video.live{opacity:1}
 .frames.has-video img{opacity:0!important}
 
-/* The page is paper now, so the flip side needs its own surface or it would
-   dissolve into the background and the turn would read as nothing happening. */
+/* The flip side is the same sheet turned over. */
 .face.back{transform:rotateY(180deg);display:flex;flex-direction:column;gap:30px;
-  align-items:center;justify-content:center;text-align:center;padding:16%;
-  background:linear-gradient(160deg,rgba(46,40,35,.94),rgba(46,40,35,.88));
-  box-shadow:0 24px 60px rgba(46,35,20,.28)}
-.face.back .k{font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;
-  color:#9DAB8E}
+  align-items:center;justify-content:center;text-align:center;padding:15%;
+  background:url('assets/paper.png') center/cover no-repeat;
+  box-shadow:0 20px 56px rgba(74,58,38,.17)}
+.face.back .k{font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;color:var(--sage)}
 .face.back .v{font-family:var(--serif);font-size:clamp(1.2rem,1.8vw,1.6rem);
-  color:#EDE7DC;margin-top:7px}
+  color:var(--ink);margin-top:7px}
 
 /* ---------- scenes ---------- */
 .scene{position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;
@@ -153,6 +150,7 @@ a{color:inherit;text-decoration:none}
     <!-- 01 shirt — sheet right, carries the rotation clip -->
     <div class="piece at-right" data-i="0"><div class="card">
       <div class="face front">
+        <div class="sheet"></div>
         <div class="frames" data-video="assets/shirt-turn.mp4">
           <img class="on" src="assets/shirt-cut.png"  alt="Oversized boxy cotton t-shirt in oat, front">
           <img src="assets/shirt-3q-cut.png"   alt="The same t-shirt at three-quarter angle">
@@ -170,6 +168,7 @@ a{color:inherit;text-decoration:none}
     <!-- 02 pants — sheet left -->
     <div class="piece at-left" data-i="1"><div class="card">
       <div class="face front">
+        <div class="sheet"></div>
         <div class="frames">
           <img class="on" src="assets/pants-cut.png" alt="Wide-leg cotton canvas trousers in clay, front">
           <img src="assets/pants-3q-cut.png"   alt="The same trousers at three-quarter angle">
@@ -187,6 +186,7 @@ a{color:inherit;text-decoration:none}
     <!-- 03 cap — sheet right -->
     <div class="piece at-right" data-i="2"><div class="card">
       <div class="face front">
+        <div class="sheet"></div>
         <div class="frames">
           <img class="on" src="assets/cap-cut.png"  alt="Unstructured six-panel cap in sage twill">
           <img src="assets/cap-3q-cut.png"   alt="The same cap at three-quarter angle">
