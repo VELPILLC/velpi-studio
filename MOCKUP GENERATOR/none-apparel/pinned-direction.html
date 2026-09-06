@@ -289,27 +289,61 @@ a{color:inherit;text-decoration:none}
     if(set.seeking){ set.want=t; return; }
     if(Math.abs(set.vid.currentTime-time)<.012) return;
     set.seeking=true;
+    // If a 'seeked' never arrives the flag would latch and every later seek
+    // would be swallowed, freezing the turn. Release it on a timer as well.
+    clearTimeout(set.guard);
+    set.guard=setTimeout(function(){ set.seeking=false; },260);
     try{ set.vid.currentTime=time; }catch(e){ set.seeking=false; }
   }
 
   var frameSets=pieces.map(function(p){
     var host=p.querySelector('.frames');
     var set={ imgs:[].slice.call(host.querySelectorAll('img')), idx:0,
-              host:host, vid:null, ready:false, seeking:false, want:-1 };
+              host:host, vid:null, ready:false, looping:false,
+              seeking:false, want:-1, guard:null };
     var src=host.getAttribute('data-video');
     if(src && !reduced){
       var v=document.createElement('video');
       v.muted=true; v.playsInline=true; v.setAttribute('playsinline','');
       v.preload='auto'; v.src=src;
-      v.addEventListener('loadedmetadata',function(){
+      // Three tiers, because a clip can be fully downloaded and still refuse to
+      // seek: served without HTTP range support the browser reports seekable as
+      // [0,0] and silently drops every currentTime assignment, freezing the
+      // garment on frame one. Duration is not proof it can be scrubbed.
+      //   1. seekable      -> scroll drives the turn (what we want)
+      //   2. plays but not -> loop it, so it still MOVES even if the motion is
+      //      seekable          no longer tied to the scroll position
+      //   3. neither       -> the four stills
+      function arm(){
+        if(set.ready||set.looping) return;
         if(!isFinite(v.duration)||v.duration<=0) return;
-        set.ready=true; set.vid=v;
-        v.classList.add('live'); host.classList.add('has-video');
-      });
+        var canSeek=v.seekable.length && v.seekable.end(v.seekable.length-1)>0;
+        if(canSeek){
+          set.ready=true; set.vid=v;
+          v.classList.add('live'); host.classList.add('has-video');
+          return;
+        }
+        // Not seekable. Falling back to four stills would just be the slideshow
+        // again, so loop the clip instead — continuous motion either way.
+        if(v.readyState>=3){
+          set.looping=true; set.vid=v;
+          v.loop=true;
+          v.play().then(function(){
+            v.classList.add('live'); host.classList.add('has-video');
+          }).catch(function(){
+            set.looping=false;   // autoplay refused — stills carry on
+          });
+        }
+      }
+      v.addEventListener('loadedmetadata',arm);
+      v.addEventListener('canplay',arm);
+      v.addEventListener('canplaythrough',arm);
+      v.addEventListener('progress',arm);
       v.addEventListener('error',function(){
         set.ready=false; v.classList.remove('live'); host.classList.remove('has-video');
       });
       v.addEventListener('seeked',function(){
+        clearTimeout(set.guard);
         set.seeking=false;
         if(set.want>=0){ var w=set.want; set.want=-1; seekTo(set,w); }
       });
@@ -384,6 +418,8 @@ a{color:inherit;text-decoration:none}
       var t=clamp((local+.62)/1.24,0,1);
       if(set.ready){
         seekTo(set,t);
+      }else if(set.looping){
+        /* the clip is playing itself — nothing to drive */
       }else{
         var n=set.imgs.length;
         var fi=Math.min(n-1,Math.floor(t*n));

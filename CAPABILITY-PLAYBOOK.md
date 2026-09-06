@@ -20,6 +20,8 @@ from actually running the tools here. Detailed technique notes live in
 | **Bash heredocs with HTML/JS** | They break on backticks, `content:''` and `$`. Use the Write tool for any file with code in it. |
 | **Interactive CLI prompts** | Non-interactive flags only (`-y`, `--yes`). Never `git rebase -i`, never a command that opens an editor. |
 | **`npx next build` while a dev server runs** | It overwrites `.next` and desyncs webpack chunks — the running server then throws `Cannot find module './948.js'`. Stop the server first, or use `node --check` on the file. |
+| **Scroll-scrubbing a video that will not seek** | A clip can be fully downloaded, `readyState 4`, duration known — and still refuse to seek. Check `video.seekable`: if it reports `[0,0]`, every `currentTime` assignment is silently dropped and the clip freezes on frame one. Cause is almost always a server with no HTTP **range** support (must answer `206 Partial Content` with `Accept-Ranges`). `file://` is unreliable for this too — serve over HTTP. Never treat a known duration as proof a clip is scrubbable. |
+| **`requestAnimationFrame` in the preview pane** | `document.hidden` is true there, so rAF never fires and any scroll/animation loop is frozen. Anything measured from it (a `currentTime` stuck at 0, a blank screenshot) proves nothing. Verify loop-driven behaviour by re-running the maths directly, and ask for a screenshot from a real window. |
 
 ## 2. Higgsfield — what it costs and when to reach for it
 
