@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<!-- STRUCTURE: nav=minimal-rail | stage=sticky-robot-scroll(hero+4 steps) | proof=stat-band | pricing=value-anchor | cta=closing-band | footer=column -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VELPI — Growth Infrastructure</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap');
+
+:root{
+  --ink:#05070b; --panel:#0b1017; --steel:#141b24; --edge:#212c39;
+  --text:#e9eef6; --muted:#8593a6; --chrome:#b9c6d6;
+  --blue:#4da3ff; --blue-deep:#1d5fa8; --glow:rgba(77,163,255,.35);
+  --display:'Space Grotesk',system-ui,sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--body);font-weight:300;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,.d{font-family:var(--display);font-weight:600;letter-spacing:-.02em;margin:0}
+p{margin:0;line-height:1.65;color:var(--muted)}
+a{color:inherit;text-decoration:none}
+.wrap{width:min(1240px,92vw);margin:0 auto}
+.eyebrow{font-family:var(--display);font-size:.7rem;font-weight:500;letter-spacing:.22em;text-transform:uppercase;color:var(--blue)}
+
+/* ---------- nav ---------- */
+.nav{position:fixed;inset:0 0 auto 0;z-index:50;backdrop-filter:blur(14px);
+  background:linear-gradient(180deg,rgba(5,7,11,.92),rgba(5,7,11,.55));border-bottom:1px solid rgba(255,255,255,.06)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:70px}
+.logo{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:.18em}
+.logo span{color:var(--blue)}
+.nav-links{display:flex;gap:34px;font-size:.83rem;color:var(--muted)}
+.nav-links a:hover{color:var(--text)}
+.btn{display:inline-block;font-family:var(--display);font-size:.8rem;font-weight:500;letter-spacing:.04em;
+  padding:11px 22px;border:1px solid var(--edge);border-radius:2px;color:var(--text);
+  background:linear-gradient(180deg,rgba(77,163,255,.14),rgba(77,163,255,.03));
+  transition:border-color .3s,box-shadow .3s,transform .3s}
+.btn:hover{border-color:var(--blue);box-shadow:0 0 28px var(--glow);transform:translateY(-1px)}
+.btn-lg{padding:16px 34px;font-size:.9rem}
+
+/* ---------- sticky robot stage ---------- */
+.stage{position:relative}
+.stage-canvas{position:sticky;top:0;height:100vh;width:100%;z-index:0;
+  background:radial-gradient(ellipse 70% 60% at 62% 45%,#16222f 0%,#0a0f16 45%,var(--ink) 100%)}
+#scene{display:block;width:100%;height:100%}
+.stage-content{position:relative;z-index:2;margin-top:-100vh;pointer-events:none}
+.panel{min-height:100vh;display:flex;align-items:center}
+.panel .inner{width:min(560px,46vw);pointer-events:auto}
+h1{font-size:clamp(2.6rem,5.6vw,4.6rem);line-height:1.02;font-weight:700}
+h1 em{font-style:normal;color:var(--blue)}
+.lede{font-size:1.06rem;max-width:44ch;margin-top:26px}
+.hero-cta{display:flex;gap:14px;margin-top:40px;flex-wrap:wrap}
+.rule{width:64px;height:1px;background:linear-gradient(90deg,var(--blue),transparent);margin:26px 0}
+
+/* step panels */
+.step .inner{background:linear-gradient(135deg,rgba(11,16,23,.93),rgba(11,16,23,.72));
+  border:1px solid var(--edge);border-left:2px solid var(--blue);padding:38px 40px;backdrop-filter:blur(8px)}
+.step-no{font-family:var(--display);font-size:3.6rem;font-weight:700;line-height:1;
+  background:linear-gradient(180deg,var(--chrome),#42525f);-webkit-background-clip:text;background-clip:text;color:transparent}
+.step h2{font-size:1.85rem;margin:10px 0 14px}
+.step ul{margin:22px 0 0;padding:0;list-style:none}
+.step li{font-size:.9rem;color:var(--muted);padding:8px 0 8px 20px;position:relative;border-top:1px solid rgba(255,255,255,.05)}
+.step li::before{content:"";position:absolute;left:0;top:15px;width:6px;height:6px;background:var(--blue);
+  box-shadow:0 0 10px var(--glow)}
+
+/* ---------- proof ---------- */
+.proof{border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);background:var(--panel);position:relative;z-index:3}
+.proof-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.stat{padding:52px 30px;border-right:1px solid var(--edge)}
+.stat:last-child{border-right:none}
+.stat .n{font-family:var(--display);font-size:2.7rem;font-weight:700;
+  background:linear-gradient(180deg,#fff,#7d8ea1);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat .l{font-size:.78rem;color:var(--muted);margin-top:8px;letter-spacing:.05em}
+
+/* ---------- pricing / anchor ---------- */
+.pricing{padding:130px 0;position:relative;z-index:3;background:
+  radial-gradient(ellipse 60% 50% at 50% 0%,rgba(29,95,168,.14),transparent 70%),var(--ink)}
+.p-head{text-align:center;max-width:640px;margin:0 auto 70px}
+.p-head h2{font-size:clamp(2rem,3.8vw,3rem);margin-bottom:18px}
+.anchor{display:grid;grid-template-columns:1.15fr .85fr;gap:0;border:1px solid var(--edge);background:var(--panel)}
+.col-a{padding:46px 48px;border-right:1px solid var(--edge)}
+.col-a h3{font-size:1.05rem;color:var(--muted);font-weight:500;letter-spacing:.04em;margin-bottom:28px}
+.line{display:flex;justify-content:space-between;align-items:baseline;padding:15px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.92rem}
+.line .who{color:var(--chrome)}
+.line .amt{font-family:var(--display);color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(255,90,90,.5)}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding-top:24px;margin-top:8px}
+.total .who{font-family:var(--display);font-size:1rem;color:var(--text)}
+.total .amt{font-family:var(--display);font-size:2rem;font-weight:700;color:#ff7b7b}
+.col-b{padding:46px 44px;display:flex;flex-direction:column;justify-content:center;
+  background:linear-gradient(160deg,rgba(77,163,255,.09),transparent 60%)}
+.col-b .tag{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--blue);margin-bottom:18px;font-family:var(--display)}
+.price{font-family:var(--display);font-size:3.6rem;font-weight:700;line-height:1;letter-spacing:-.03em}
+.price small{font-size:1rem;font-weight:400;color:var(--muted);letter-spacing:0}
+.col-b p{margin:20px 0 30px;font-size:.92rem}
+
+/* ---------- cta + footer ---------- */
+.cta{padding:120px 0;text-align:center;border-top:1px solid var(--edge);position:relative;z-index:3;background:var(--panel)}
+.cta h2{font-size:clamp(2rem,4.4vw,3.4rem);max-width:16ch;margin:0 auto 22px;line-height:1.1}
+footer{padding:52px 0;border-top:1px solid var(--edge);position:relative;z-index:3;background:var(--ink)}
+.f-in{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;color:var(--muted);gap:20px;flex-wrap:wrap}
+
+/* ---------- responsive ---------- */
+@media(max-width:900px){
+  .nav-links{display:none}
+  .panel{align-items:flex-end;padding-bottom:9vh}
+  .panel .inner{width:100%}
+  .panel.hero{align-items:center}
+  .step .inner{padding:28px 24px}
+  .proof-grid{grid-template-columns:repeat(2,1fr)}
+  .stat{border-bottom:1px solid var(--edge)}
+  .stat:nth-child(2n){border-right:none}
+  .anchor{grid-template-columns:1fr}
+  .col-a{border-right:none;border-bottom:1px solid var(--edge);padding:34px 26px}
+  .col-b{padding:34px 26px}
+  .stage-canvas{background:radial-gradient(ellipse 90% 50% at 50% 32%,#16222f 0%,#0a0f16 50%,var(--ink) 100%)}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="velpi-page">
+
+  <nav class="nav"><div class="wrap nav-in">
+    <div class="logo">VEL<span>PI</span></div>
+    <div class="nav-links">
+      <a href="#stage">Capabilities</a><a href="#proof">Standard</a>
+      <a href="#pricing">Investment</a><a href="#contact">Contact</a>
+    </div>
+    <a href="#contact" class="btn">Request access</a>
+  </div></nav>
+
+  <section class="stage" id="stage">
+    <div class="stage-canvas"><canvas id="scene"></canvas></div>
+    <div class="stage-content">
+
+      <div class="panel hero"><div class="wrap"><div class="inner">
+        <div class="eyebrow">Growth infrastructure</div>
+        <div class="rule"></div>
+        <h1>Built for companies that intend to <em>win</em>.</h1>
+        <p class="lede">Websites, automation, AI reception and custom software — engineered as one system by one team. Not four vendors pointing at each other.</p>
+        <div class="hero-cta">
+          <a href="#pricing" class="btn btn-lg">See the standard</a>
+          <a href="#stage" class="btn btn-lg" style="background:none">Watch the build →</a>
+        </div>
+      </div></div></div>
+
+      <div class="panel step" data-step="0"><div class="wrap"><div class="inner">
+        <div class="step-no">01</div>
+        <h2>Websites</h2>
+        <p>Engineered to convert, not to win awards. Every section earns its place or it does not ship.</p>
+        <ul><li>Sub-second load on real devices</li><li>Built around one decisive action</li><li>Owned outright — no platform lock</li></ul>
+      </div></div></div>
+
+      <div class="panel step" data-step="1"><div class="wrap"><div class="inner">
+        <div class="step-no">02</div>
+        <h2>Automations</h2>
+        <p>The follow-up that never sleeps, never forgets and never leaves for a competitor.</p>
+        <ul><li>Lead routed and answered in seconds</li><li>Pipeline that updates itself</li><li>Reporting you do not assemble by hand</li></ul>
+      </div></div></div>
+
+      <div class="panel step" data-step="2"><div class="wrap"><div class="inner">
+        <div class="step-no">03</div>
+        <h2>AI Front Desk</h2>
+        <p>Answers on the first ring. Books while the office is dark. Never has an off day.</p>
+        <ul><li>Voice and chat, trained on your business</li><li>Books directly into your calendar</li><li>Escalates to a human when it should</li></ul>
+      </div></div></div>
+
+      <div class="panel step" data-step="3"><div class="wrap"><div class="inner">
+        <div class="step-no">04</div>
+        <h2>Custom Applications</h2>
+        <p>When off-the-shelf stops fitting the business, we build the shelf.</p>
+        <ul><li>Internal tools your team will actually open</li><li>Client portals that carry your name</li><li>Integrations into what you already run</li></ul>
+      </div></div></div>
+
+    </div>
+  </section>
+
+  <section class="proof" id="proof"><div class="wrap"><div class="proof-grid">
+    <div class="stat"><div class="n">4</div><div class="l">Systems, one team</div></div>
+    <div class="stat"><div class="n">24/7</div><div class="l">Reception that never closes</div></div>
+    <div class="stat"><div class="n">&lt;1s</div><div class="l">First response to a new lead</div></div>
+    <div class="stat"><div class="n">100%</div><div class="l">Yours — code and data</div></div>
+  </div></div></section>
+
+  <section class="pricing" id="pricing"><div class="wrap">
+    <div class="p-head">
+      <div class="eyebrow">Investment</div>
+      <h2 style="margin-top:16px">Compare it to what it replaces.</h2>
+      <p>Most companies assemble this from four payrolls and three vendors. Here is that bill.</p>
+    </div>
+    <div class="anchor">
+      <div class="col-a">
+        <h3>The conventional way</h3>
+        <div class="line"><span class="who">Marketing hire</span><span class="amt">$96,000 / yr</span></div>
+        <div class="line"><span class="who">Full-time receptionist</span><span class="amt">$42,000 / yr</span></div>
+        <div class="line"><span class="who">Agency retainer</span><span class="amt">$60,000 / yr</span></div>
+        <div class="line"><span class="who">Contract development</span><span class="amt">$80,000 / yr</span></div>
+        <div class="total"><span class="who">Annual, before overhead</span><span class="amt">$278,000</span></div>
+      </div>
+      <div class="col-b">
+        <div class="tag">VELPI — everything above</div>
+        <div class="price">$4,800<small> / month</small></div>
+        <p>One system. One team. One number to call. Deployed in weeks, not quarters — and you own every line of it.</p>
+        <a href="#contact" class="btn btn-lg" style="text-align:center">Request access</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="contact"><div class="wrap">
+    <div class="eyebrow">Limited engagements</div>
+    <h2 style="margin-top:18px">We take four new companies a quarter.</h2>
+    <p style="max-width:52ch;margin:0 auto 34px">If that sounds restrictive, it is. It is also why the work is what it is.</p>
+    <a href="#contact" class="btn btn-lg">Start the conversation</a>
+  </div></section>
+
+  <footer><div class="wrap f-in">
+    <div class="logo">VEL<span>PI</span></div>
+    <div>Growth infrastructure — websites, automation, AI reception, custom software.</div>
+    <div>&copy; 2026 VELPI</div>
+  </div></footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  var canvas = document.getElementById('scene');
+  if(!canvas) return;
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function isMobile(){ return window.innerWidth < 768; }
+  function supportsWebGL(){
+    try{ var c=document.createElement('canvas');
+      return !!(window.WebGLRenderingContext && (c.getContext('webgl')||c.getContext('experimental-webgl'))); }
+    catch(e){ return false; }
+  }
+
+  var scene, camera, renderer, robot, head, rings=[], ringGroup, particles, pmrem;
+  var raf=null, visible=false, ready=false;
+  var pointer={x:0,y:0}, target={x:0,y:0};
+  var activeStep=-1, stepTurn=0, stepTurnTarget=0;
+  var clock=null;
+  var M={};
+
+  // Fake studio environment so the metal actually has something to reflect.
+  function envMap(){
+    var c=document.createElement('canvas'); c.width=512; c.height=256;
+    var x=c.getContext('2d');
+    var g=x.createLinearGradient(0,0,0,256);
+    g.addColorStop(0,'#0b1622'); g.addColorStop(.46,'#22384f');
+    g.addColorStop(.5,'#7d9dc4'); g.addColorStop(.56,'#1b2836'); g.addColorStop(1,'#04060a');
+    x.fillStyle=g; x.fillRect(0,0,512,256);
+    x.fillStyle='rgba(200,228,255,.95)'; x.fillRect(54,36,168,30);
+    x.fillStyle='rgba(120,175,255,.75)'; x.fillRect(322,58,132,20);
+    x.fillStyle='rgba(255,255,255,.5)';  x.fillRect(232,150,60,10);
+    var t=new THREE.CanvasTexture(c);
+    t.mapping=THREE.EquirectangularReflectionMapping;
+    return t;
+  }
+
+  function materials(){
+    M.dark  = new THREE.MeshStandardMaterial({color:0x36404c, metalness:.94, roughness:.38});
+    M.light = new THREE.MeshStandardMaterial({color:0x93a2b4, metalness:1.0,  roughness:.20});
+    M.plate = new THREE.MeshStandardMaterial({color:0x5a6675, metalness:.92, roughness:.30});
+    M.glow  = new THREE.MeshStandardMaterial({color:0x0a1a2c, metalness:.30, roughness:.45,
+                emissive:0x4da3ff, emissiveIntensity:2.4});
+    M.dim   = new THREE.MeshStandardMaterial({color:0x0a1a2c, metalness:.30, roughness:.45,
+                emissive:0x4da3ff, emissiveIntensity:.55});
+  }
+
+  function cyl(rt,rb,h,seg,mat){ return new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg||16), mat); }
+  function box(w,h,d,mat){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); }
+  function ball(r,mat,seg){ return new THREE.Mesh(new THREE.SphereGeometry(r,seg||24,seg||18), mat); }
+
+  function buildRobot(){
+    var g=new THREE.Group();
+
+    // Broad at the shoulders, tapering to a narrow waist. The first pass was
+    // the reverse — widest at the base — which reads as a bell or a lampshade
+    // rather than something engineered.
+    var chest=cyl(.9,.6,1.0,8,M.dark);   chest.position.y=.72; g.add(chest);
+    var waist=cyl(.56,.5,.34,8,M.plate); waist.position.y=.06; g.add(waist);
+    var hips=cyl(.62,.76,.44,8,M.dark);  hips.position.y=-.32; g.add(hips);
+    var collar=cyl(.72,.88,.18,8,M.plate); collar.position.y=1.24; g.add(collar);
+
+    var ring=new THREE.Mesh(new THREE.TorusGeometry(.26,.05,14,36), M.plate);
+    ring.position.set(0,.78,.5); g.add(ring);
+    var core=ball(.15,M.glow,20); core.position.set(0,.78,.5); g.add(core);
+
+    // Smaller and sculpted rather than one big slab — a single flat box on a
+    // barrel torso reads as a mailbox, not a machine. Crown, jaw taper and a
+    // recessed visor give it enough planes to catch the rim lights.
+    head=new THREE.Group(); head.position.y=1.58;
+    head.add(box(.78,.56,.68,M.light));
+    var crown=box(.7,.1,.6,M.plate); crown.position.y=.32; head.add(crown);
+    var jaw=cyl(.3,.24,.16,8,M.plate); jaw.position.y=-.32; head.add(jaw);
+    var visor=box(.66,.17,.05,M.glow); visor.position.set(0,.03,.35); head.add(visor);
+    var visorFrame=box(.72,.25,.04,M.plate); visorFrame.position.set(0,.03,.325); head.add(visorFrame);
+    var brow=box(.82,.07,.72,M.plate); brow.position.y=.25; head.add(brow);
+    var earL=cyl(.11,.11,.1,14,M.plate); earL.rotation.z=Math.PI/2; earL.position.set(-.43,0,0); head.add(earL);
+    var earR=earL.clone(); earR.position.x=.43; head.add(earR);
+    var ant=cyl(.022,.022,.3,8,M.plate); ant.position.set(.22,.46,0); head.add(ant);
+    var tip=ball(.045,M.glow,14); tip.position.set(.22,.62,0); head.add(tip);
+    g.add(head);
+
+    var neck=cyl(.17,.17,.3,12,M.plate); neck.position.y=1.24; g.add(neck);
+
+    function arm(side){
+      var a=new THREE.Group();
+      var sh=ball(.27,M.plate,20); sh.position.set(side*.98,1.02,0); a.add(sh);
+      var up=cyl(.135,.115,.74,14,M.dark); up.position.set(side*.98,.62,0); a.add(up);
+      var el=ball(.155,M.light,16); el.position.set(side*.98,.24,0); a.add(el);
+      var fo=cyl(.115,.1,.66,14,M.dark); fo.position.set(side*.98,-.1,0); a.add(fo);
+      var hd=box(.2,.24,.14,M.light); hd.position.set(side*.98,-.5,0); a.add(hd);
+      var band=cyl(.122,.122,.05,14,M.glow); band.position.set(side*.98,.02,0); a.add(band);
+      return a;
+    }
+    var armL=arm(-1), armR=arm(1); g.add(armL); g.add(armR);
+    g.userData.armL=armL; g.userData.armR=armR;
+
+    var pad=new THREE.Mesh(new THREE.TorusGeometry(.86,.045,12,48), M.dim);
+    pad.rotation.x=Math.PI/2; pad.position.y=-.72; g.add(pad);
+    var pad2=new THREE.Mesh(new THREE.TorusGeometry(.58,.02,10,40), M.dim);
+    pad2.rotation.x=Math.PI/2; pad2.position.y=-.82; g.add(pad2);
+
+    return g;
+  }
+
+  // The rings live in their own group pinned to the robot's X. Left in the
+  // scene at origin they orbit the PAGE, not the robot, and slice straight
+  // through the headline — which put a strikethrough across the word "win".
+  // Radii stay tight enough that they never reach the text column.
+  function buildRings(){
+    ringGroup=new THREE.Group();
+    ringGroup.position.x=robot.position.x;
+    var defs=[
+      {r:1.28,t:.011,rx:1.35,ry:.2},
+      {r:1.54,t:.010,rx:-1.1,ry:.7},
+      {r:1.80,t:.009,rx:1.55,ry:-.5},
+      {r:2.06,t:.008,rx:-1.4,ry:1.2}
+    ];
+    for(var i=0;i<defs.length;i++){
+      var d=defs[i];
+      var mesh=new THREE.Mesh(new THREE.TorusGeometry(d.r,d.t,8,90), M.dim.clone());
+      mesh.rotation.x=d.rx; mesh.rotation.y=d.ry; mesh.position.y=.4;
+      mesh.userData.spin=(i%2?-1:1)*(.03+i*.012);
+      ringGroup.add(mesh); rings.push(mesh);
+    }
+    scene.add(ringGroup);
+  }
+
+  function buildParticles(){
+    var n=isMobile()?260:820, pos=new Float32Array(n*3);
+    for(var i=0;i<n;i++){
+      var r=3+Math.random()*9, a=Math.random()*Math.PI*2, y=(Math.random()-.5)*9;
+      pos[i*3]=Math.cos(a)*r; pos[i*3+1]=y; pos[i*3+2]=Math.sin(a)*r-2;
+    }
+    var geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    particles=new THREE.Points(geo,new THREE.PointsMaterial({
+      color:0x8ec5ff,size:.028,transparent:true,opacity:.55,sizeAttenuation:true}));
+    scene.add(particles);
+  }
+
+  function init(){
+    if(ready || !supportsWebGL()) return;
+    var w=canvas.clientWidth, h=canvas.clientHeight;
+    if(!w||!h) return;
+
+    renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:!isMobile(),alpha:true,preserveDrawingBuffer:true});
+    renderer.setSize(w,h,false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,isMobile()?1.5:2));
+    renderer.outputEncoding=THREE.sRGBEncoding;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure=1.05;
+
+    scene=new THREE.Scene();
+    scene.fog=new THREE.FogExp2(0x05070b,.052);
+
+    camera=new THREE.PerspectiveCamera(38,w/h,.1,100);
+    camera.position.set(0,.9,7.4);
+    camera.lookAt(0,.5,0);
+
+    try{
+      pmrem=new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      scene.environment=pmrem.fromEquirectangular(envMap()).texture;
+    }catch(e){ /* the lights alone still read as metal */ }
+
+    scene.add(new THREE.AmbientLight(0x35506e,.55));
+    var key=new THREE.DirectionalLight(0xdce9ff,2.1); key.position.set(4,6,5); scene.add(key);
+    var rim=new THREE.DirectionalLight(0x4da3ff,2.4); rim.position.set(-6,2,-4); scene.add(rim);
+    var rim2=new THREE.DirectionalLight(0x1d5fa8,1.5); rim2.position.set(5,-2,-5); scene.add(rim2);
+    var fill=new THREE.PointLight(0x8ec5ff,1.2,14); fill.position.set(0,1.2,3.4); scene.add(fill);
+
+    materials();
+    robot=buildRobot();
+    robot.position.x=isMobile()?0:1.35;
+    scene.add(robot);
+    buildRings();
+    buildParticles();
+
+    clock=new THREE.Clock();
+    ready=true;
+  }
+
+  function frame(){
+    raf=requestAnimationFrame(frame);
+    if(!ready) return;
+    var t=clock.getElapsedTime();
+
+    target.x += (pointer.x-target.x)*.05;
+    target.y += (pointer.y-target.y)*.05;
+    stepTurn += (stepTurnTarget-stepTurn)*.045;
+
+    if(robot){
+      robot.rotation.y = target.x*.42 + stepTurn;
+      robot.position.y = Math.sin(t*.75)*.07;
+      if(head){ head.rotation.y=target.x*.34; head.rotation.x=-target.y*.2; }
+      var aL=robot.userData.armL, aR=robot.userData.armR;
+      if(aL) aL.rotation.z =  Math.sin(t*.7)*.05 + .06;
+      if(aR) aR.rotation.z = -Math.sin(t*.7+1)*.05 - .06;
+    }
+    for(var i=0;i<rings.length;i++){
+      var m=rings[i].material;
+      rings[i].rotation.z += rings[i].userData.spin*.02;
+      m.emissiveIntensity += ((activeStep===i?2.6:.5)-m.emissiveIntensity)*.06;
+    }
+    if(particles) particles.rotation.y=t*.014;
+    renderer.render(scene,camera);
+  }
+
+  function start(){
+    if(!ready) init();
+    if(!ready) return;
+    if(reduced){ renderer.render(scene,camera); return; }
+    if(!raf) frame();
+  }
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
+
+  // Only run while the canvas is actually on screen.
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ visible=e.isIntersecting; visible?start():stop(); });
+  },{threshold:.02});
+  io.observe(canvas);
+
+  // Which capability is being read drives the robot's turn and the live ring.
+  var stepEls=document.querySelectorAll('.step');
+  var sio=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(!e.isIntersecting) return;
+      var i=parseInt(e.target.getAttribute('data-step'),10);
+      activeStep=i; stepTurnTarget=(i-1.5)*.3;
+    });
+  },{threshold:.55});
+  for(var s=0;s<stepEls.length;s++) sio.observe(stepEls[s]);
+
+  window.addEventListener('pointermove',function(e){
+    pointer.x=(e.clientX/window.innerWidth)*2-1;
+    pointer.y=(e.clientY/window.innerHeight)*2-1;
+  },{passive:true});
+
+  var rt=null;
+  window.addEventListener('resize',function(){
+    clearTimeout(rt);
+    rt=setTimeout(function(){
+      if(!ready){ if(visible) start(); return; }
+      var w=canvas.clientWidth,h=canvas.clientHeight;
+      if(!w||!h) return;
+      camera.aspect=w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w,h,false);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio,isMobile()?1.5:2));
+      var rx=isMobile()?0:1.35;
+      if(robot) robot.position.x=rx;
+      if(ringGroup) ringGroup.position.x=rx;
+    },160);
+  },{passive:true});
+
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden) stop(); else if(visible) start();
+  });
+})();
+</script>
+</body>
+</html>
