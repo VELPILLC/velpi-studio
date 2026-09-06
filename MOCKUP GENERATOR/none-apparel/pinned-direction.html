@@ -1,10 +1,7 @@
 <!DOCTYPE html>
 <!-- STRUCTURE: pinned-viewport (no native scroll) | scroll delta drives progress 0>4
-     scenes: mark > shirt(centre, clip-scrubbed) > pants(left) > cap(right) > close
-     wordmark letters scatter on first handover; copy always sits opposite the garment -->
-<!-- Photography and the rotation clip generated with Higgsfield. The clip is never played:
-     scroll drives its currentTime, so every frame of the turn is reachable. Pacing is
-     deliberately slow — the fabric is the product and it gets time to be looked at. -->
+     scenes: mark > shirt(sheet right, clip-scrubbed) > pants(sheet left) > cap(sheet right) > close
+     each garment is multiplied onto a vintage paper sheet; page carries a procedural grain -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -14,8 +11,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Inter:wght@300;400;500&display=swap');
 
 :root{
-  --paper:#EDE7DC; --bark:#2E2823; --ink:#3A332C; --soft:#7C7266;
-  --sage:#7E8B70; --line:#CFC4B2;
+  --paper:#E9E1D3; --paper-warm:#E2D8C6; --bark:#2E2823; --ink:#3A332C;
+  --soft:#796F62; --sage:#7B8A6E; --line:#C9BCA6;
   --serif:'Cormorant Garamond',Georgia,serif;
   --sans:'Inter',system-ui,sans-serif;
 }
@@ -24,18 +21,27 @@ html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:300;
   -webkit-font-smoothing:antialiased;touch-action:none}
 h1,h2{font-family:var(--serif);font-weight:300;margin:0;line-height:1.05}
-p{margin:0;line-height:1.85;color:var(--soft);font-size:.95rem}
+p{margin:0;line-height:1.9;color:var(--soft);font-size:1rem}
 a{color:inherit;text-decoration:none}
 .lbl{font-size:.64rem;letter-spacing:.34em;text-transform:uppercase;color:var(--soft)}
 
 #viewport{position:fixed;inset:0;overflow:hidden}
 
-.nav{position:fixed;top:0;left:0;right:0;height:74px;display:flex;align-items:center;
+/* Procedural grain over the whole page. Seamless and weightless, where a tiled
+   photo of paper would show its repeat and cost a megabyte. */
+.grain{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:.42;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E")}
+/* A warm vignette so the flat ground gains some age at the edges. */
+.vignette{position:fixed;inset:0;z-index:39;pointer-events:none;
+  background:radial-gradient(ellipse 92% 80% at 50% 46%,transparent 55%,rgba(120,98,68,.13) 100%)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:76px;display:flex;align-items:center;
   justify-content:space-between;padding:0 5vw;z-index:60}
 .mark{font-size:.82rem;letter-spacing:.44em}
 .nav-r{display:flex;gap:30px}
 
-.rail{position:fixed;right:2.4vw;top:50%;transform:translateY(-50%);z-index:60;
+.rail{position:fixed;right:2.2vw;top:50%;transform:translateY(-50%);z-index:60;
   display:flex;flex-direction:column;gap:14px;align-items:center}
 .dot{width:6px;height:6px;border:1px solid var(--line);border-radius:50%;transition:.6s}
 .dot.on{background:var(--sage);border-color:var(--sage);transform:scale(1.35)}
@@ -44,36 +50,42 @@ a{color:inherit;text-decoration:none}
   display:flex;flex-direction:column;align-items:center;gap:9px;transition:opacity .8s}
 .hint .bar{width:1px;height:44px;background:linear-gradient(180deg,var(--line),transparent)}
 
-/* ---------- garments ---------- */
-.pieces{position:absolute;inset:0;perspective:1700px;pointer-events:none}
-/* margin:auto with all four offsets centres without a transform, leaving the
-   transform free for the scroll-driven drift and scale. */
-.piece{position:absolute;top:0;bottom:0;left:0;right:0;margin:auto;
-  width:min(86vh,54vw);height:min(86vh,54vw);opacity:0;will-change:opacity,transform}
-.piece.side-left{left:2vw;right:auto;width:min(74vh,42vw);height:min(74vh,42vw)}
-.piece.side-right{right:2vw;left:auto;width:min(74vh,42vw);height:min(74vh,42vw)}
+/* ---------- garments on paper sheets ---------- */
+.pieces{position:absolute;inset:0;perspective:1700px;pointer-events:none;z-index:2}
+.piece{position:absolute;top:0;bottom:0;margin:auto;
+  width:min(82vh,46vw);height:min(82vh,46vw);opacity:0;will-change:opacity,transform}
+.piece.at-right{right:5vw;left:auto}
+.piece.at-left{left:5vw;right:auto}
 .piece .card{width:100%;height:100%;position:relative;transform-style:preserve-3d;
-  transition:transform 1.1s cubic-bezier(.6,.02,.2,1);pointer-events:auto;cursor:pointer}
+  transition:transform 1.15s cubic-bezier(.6,.02,.2,1);pointer-events:auto;cursor:pointer}
 .piece .card.flipped{transform:rotateY(180deg)}
-.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  display:flex;align-items:center;justify-content:center}
-.frames{position:absolute;inset:0}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+
+/* The sheet. Multiplying the garment onto it turns the clip's studio white into
+   ink on paper — which is what stops the video reading as a pasted rectangle. */
+.sheet{position:absolute;inset:0;background:url('assets/paper.png') center/cover no-repeat;
+  box-shadow:0 20px 56px rgba(74,58,38,.17), 0 2px 8px rgba(74,58,38,.10);
+  transform:rotate(-.5deg)}
+.piece.at-left .sheet{transform:rotate(.6deg)}
+.frames{position:absolute;inset:4%}
 .frames img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
-  opacity:0;transition:opacity .5s ease}
+  opacity:0;transition:opacity .55s ease;mix-blend-mode:multiply}
 .frames img.on{opacity:1}
-/* Scroll-scrubbed clip: never played. Studio white is dropped into the paper
-   with multiply. Hidden until it can seek, so stills remain the fallback. */
 .frames video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
-  opacity:0;mix-blend-mode:multiply;transition:opacity .6s}
+  opacity:0;mix-blend-mode:multiply;transition:opacity .7s}
 .frames video.live{opacity:1}
 .frames.has-video img{opacity:0!important}
-.face.back{transform:rotateY(180deg);flex-direction:column;gap:24px;text-align:center;
-  background:rgba(246,242,235,.85);border:1px solid var(--line);padding:13%}
+
+.face.back{transform:rotateY(180deg);display:flex;flex-direction:column;gap:26px;
+  align-items:center;justify-content:center;text-align:center;
+  background:url('assets/paper.png') center/cover no-repeat;padding:14%;
+  box-shadow:0 20px 56px rgba(74,58,38,.17)}
 .face.back .k{font-size:.58rem;letter-spacing:.28em;text-transform:uppercase;color:var(--sage)}
-.face.back .v{font-family:var(--serif);font-size:1.15rem;color:var(--ink);margin-top:5px}
+.face.back .v{font-family:var(--serif);font-size:1.2rem;color:var(--ink);margin-top:5px}
 
 /* ---------- scenes ---------- */
-.scene{position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;opacity:0}
+.scene{position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;
+  opacity:0;z-index:3}
 .scene .inner{padding:0 5vw;width:100%;display:flex}
 .scene.centred{justify-content:center;text-align:center}
 .scene.copy-left  .inner{justify-content:flex-start}
@@ -85,35 +97,36 @@ a{color:inherit;text-decoration:none}
 .sub{font-family:var(--serif);font-size:clamp(1.1rem,2.3vw,1.8rem);color:var(--soft);
   margin-top:20px;font-style:italic}
 
-.copy{width:min(320px,26vw)}
+/* Copy sits in the half the sheet does not occupy. */
+.copy{width:min(400px,32vw)}
 .scene.copy-right .copy{text-align:right}
-.copy .num{font-family:var(--serif);font-size:2.4rem;color:var(--line);line-height:1}
-.copy h2{font-size:clamp(1.8rem,3vw,2.5rem);margin:12px 0 16px}
-.copy p{max-width:30ch}
+.copy .num{font-family:var(--serif);font-size:2.6rem;color:var(--line);line-height:1}
+.copy h2{font-size:clamp(2rem,3.4vw,2.9rem);margin:12px 0 18px}
+.copy p{max-width:32ch}
 .scene.copy-right .copy p{margin-left:auto}
-.tap{margin-top:26px;display:inline-flex;align-items:center;gap:9px;font-size:.62rem;
+.tap{margin-top:28px;display:inline-flex;align-items:center;gap:9px;font-size:.62rem;
   letter-spacing:.3em;text-transform:uppercase;color:var(--sage);
   border-bottom:1px solid var(--line);padding-bottom:6px}
 .tap i{width:5px;height:5px;background:var(--sage);border-radius:50%;
   animation:pulse 3.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 
-.closing{max-width:34ch;margin:0 auto}
-.closing h2{font-size:clamp(1.9rem,4vw,3.1rem);margin-bottom:20px}
-.btn{display:inline-block;margin-top:32px;font-size:.66rem;letter-spacing:.3em;
-  text-transform:uppercase;border:1px solid var(--line);padding:15px 38px;
+.closing{max-width:36ch;margin:0 auto}
+.closing h2{font-size:clamp(2rem,4.2vw,3.3rem);margin-bottom:22px}
+.btn{display:inline-block;margin-top:34px;font-size:.66rem;letter-spacing:.3em;
+  text-transform:uppercase;border:1px solid var(--line);padding:16px 40px;
   color:var(--ink);pointer-events:auto;transition:.5s}
 .btn:hover{background:var(--bark);color:var(--paper);border-color:var(--bark)}
 
 @media(max-width:900px){
   .nav-r{display:none}
   .rail{right:3vw}
-  .piece,.piece.side-left,.piece.side-right{
-    left:0;right:0;top:0;bottom:auto;margin:9vh auto 0;
-    width:min(56vh,88vw);height:min(56vh,88vw)}
+  .piece,.piece.at-left,.piece.at-right{
+    left:0;right:0;top:0;bottom:auto;margin:8vh auto 0;
+    width:min(54vh,86vw);height:min(54vh,86vw)}
   .copy{width:100%;max-width:none}
   .scene.copy-right .copy,.scene.copy-right .copy p{text-align:left;margin-left:0}
-  .scene:not(.centred){align-items:flex-end;padding-bottom:11vh}
+  .scene:not(.centred){align-items:flex-end;padding-bottom:9vh}
   .scene .inner{padding:0 7vw}
   .scene.copy-right .inner{justify-content:flex-start}
 }
@@ -127,23 +140,19 @@ a{color:inherit;text-decoration:none}
 <div class="velpi-page">
 <div id="viewport">
 
-  <nav class="nav">
-    <div class="mark">NONE</div>
-    <div class="nav-r"><span class="lbl">Pieces</span><span class="lbl">Story</span></div>
-  </nav>
-
-  <div class="rail" id="rail"></div>
-
   <div class="pieces" id="pieces">
 
-    <!-- 01 shirt — centre, the full rotation clip -->
-    <div class="piece" data-i="0"><div class="card">
-      <div class="face front"><div class="frames" data-video="assets/shirt-turn.mp4">
-        <img class="on" src="assets/shirt-cut.png"    alt="Oversized boxy cotton t-shirt in oat, front">
-        <img        src="assets/shirt-3q-cut.png"   alt="The same t-shirt at three-quarter angle">
-        <img        src="assets/shirt-side-cut.png" alt="The same t-shirt in side profile">
-        <img        src="assets/shirt-back-cut.png" alt="The same t-shirt from behind">
-      </div></div>
+    <!-- 01 shirt — sheet right, carries the rotation clip -->
+    <div class="piece at-right" data-i="0"><div class="card">
+      <div class="face front">
+        <div class="sheet"></div>
+        <div class="frames" data-video="assets/shirt-turn.mp4">
+          <img class="on" src="assets/shirt-cut.png"  alt="Oversized boxy cotton t-shirt in oat, front">
+          <img src="assets/shirt-3q-cut.png"   alt="The same t-shirt at three-quarter angle">
+          <img src="assets/shirt-side-cut.png" alt="The same t-shirt in side profile">
+          <img src="assets/shirt-back-cut.png" alt="The same t-shirt from behind">
+        </div>
+      </div>
       <div class="face back">
         <div><div class="k">Fabric</div><div class="v">14oz organic cotton</div></div>
         <div><div class="k">Fit</div><div class="v">Boxy, dropped shoulder</div></div>
@@ -151,14 +160,17 @@ a{color:inherit;text-decoration:none}
       </div>
     </div></div>
 
-    <!-- 02 pants — left -->
-    <div class="piece side-left" data-i="1"><div class="card">
-      <div class="face front"><div class="frames">
-        <img class="on" src="assets/pants-cut.png"     alt="Wide-leg cotton canvas trousers in clay, front">
-        <img        src="assets/pants-3q-cut.png"    alt="The same trousers at three-quarter angle">
-        <img        src="assets/pants-side-cut.png"  alt="The same trousers in side profile">
-        <img        src="assets/pants-back-cut.png"  alt="The same trousers from behind">
-      </div></div>
+    <!-- 02 pants — sheet left -->
+    <div class="piece at-left" data-i="1"><div class="card">
+      <div class="face front">
+        <div class="sheet"></div>
+        <div class="frames">
+          <img class="on" src="assets/pants-cut.png" alt="Wide-leg cotton canvas trousers in clay, front">
+          <img src="assets/pants-3q-cut.png"   alt="The same trousers at three-quarter angle">
+          <img src="assets/pants-side-cut.png" alt="The same trousers in side profile">
+          <img src="assets/pants-back-cut.png" alt="The same trousers from behind">
+        </div>
+      </div>
       <div class="face back">
         <div><div class="k">Fabric</div><div class="v">12oz cotton canvas</div></div>
         <div><div class="k">Fit</div><div class="v">Wide leg, elastic back</div></div>
@@ -166,14 +178,17 @@ a{color:inherit;text-decoration:none}
       </div>
     </div></div>
 
-    <!-- 03 cap — right -->
-    <div class="piece side-right" data-i="2"><div class="card">
-      <div class="face front"><div class="frames">
-        <img class="on" src="assets/cap-cut.png"      alt="Unstructured six-panel cap in sage twill">
-        <img        src="assets/cap-3q-cut.png"     alt="The same cap at three-quarter angle">
-        <img        src="assets/cap-back-cut.png"   alt="The same cap from behind">
-        <img        src="assets/cap-top-cut.png"    alt="The same cap from above">
-      </div></div>
+    <!-- 03 cap — sheet right -->
+    <div class="piece at-right" data-i="2"><div class="card">
+      <div class="face front">
+        <div class="sheet"></div>
+        <div class="frames">
+          <img class="on" src="assets/cap-cut.png"  alt="Unstructured six-panel cap in sage twill">
+          <img src="assets/cap-3q-cut.png"   alt="The same cap at three-quarter angle">
+          <img src="assets/cap-back-cut.png" alt="The same cap from behind">
+          <img src="assets/cap-top-cut.png"  alt="The same cap from above">
+        </div>
+      </div>
       <div class="face back">
         <div><div class="k">Fabric</div><div class="v">Washed cotton twill</div></div>
         <div><div class="k">Fit</div><div class="v">Unstructured, six-panel</div></div>
@@ -215,7 +230,14 @@ a{color:inherit;text-decoration:none}
     <a href="#" class="btn">Join the list</a>
   </div></div></section>
 
+  <nav class="nav">
+    <div class="mark">NONE</div>
+    <div class="nav-r"><span class="lbl">Pieces</span><span class="lbl">Story</span></div>
+  </nav>
+  <div class="rail" id="rail"></div>
   <div class="hint" id="hint"><span class="lbl">Scroll</span><span class="bar"></span></div>
+  <div class="vignette"></div>
+  <div class="grain"></div>
 
 </div>
 </div>
@@ -225,10 +247,12 @@ a{color:inherit;text-decoration:none}
   'use strict';
   var SCENES=5, LAST=SCENES-1;
 
-  // Deliberately unhurried. Halving the wheel gain and easing the follow makes
-  // a full turn take real scrolling, which is the point — the fabric is what
-  // is being sold and it needs time on screen.
   var WHEEL_GAIN=0.00075, TOUCH_GAIN=0.0030, KEY_STEP=0.34, FOLLOW=0.042;
+  // Falloff sharpness. At 1 a piece is only gone a full step away, which let the
+  // trousers arrive while the shirt's copy was still being read. At 2.05 each
+  // one is fully clear by roughly half a step, so only one thing is ever on
+  // screen and its text has the stage to itself.
+  var FALLOFF=2.05;
 
   var scenes=[].slice.call(document.querySelectorAll('.scene'));
   var pieces=[].slice.call(document.querySelectorAll('.piece'));
@@ -252,9 +276,8 @@ a{color:inherit;text-decoration:none}
   var dots=[].slice.call(rail.children);
 
   function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+  function ease(v){ return v*v*(3-2*v); }   // smoothstep, so handovers settle
 
-  // Coalesce seeks: a new currentTime issued while the previous seek is still
-  // resolving is what makes scrubbed video stutter. Hold the latest target.
   function seekTo(set,t){
     if(!set.ready||!set.vid) return;
     var time=clamp(t,0,1)*set.vid.duration;
@@ -278,7 +301,7 @@ a{color:inherit;text-decoration:none}
         set.ready=true; set.vid=v;
         v.classList.add('live'); host.classList.add('has-video');
       });
-      v.addEventListener('error',function(){   // never blank the piece
+      v.addEventListener('error',function(){
         set.ready=false; v.classList.remove('live'); host.classList.remove('has-video');
       });
       v.addEventListener('seeked',function(){
@@ -327,10 +350,10 @@ a{color:inherit;text-decoration:none}
     if(settled) cur=target;
 
     for(var s=0;s<SCENES;s++){
-      var v=clamp(1-Math.abs(cur-s),0,1);
+      var v=ease(clamp(1-Math.abs(cur-s)*FALLOFF,0,1));
       scenes[s].style.opacity=v;
       scenes[s].style.pointerEvents=v>.6?'auto':'none';
-      scenes[s].style.transform='translate3d(0,'+((cur-s)*-40)+'px,0)';
+      scenes[s].style.transform='translate3d(0,'+((cur-s)*-38)+'px,0)';
       dots[s].classList.toggle('on',Math.round(cur)===s);
     }
 
@@ -343,14 +366,15 @@ a{color:inherit;text-decoration:none}
 
     for(var p=0;p<pieces.length;p++){
       var local=cur-(p+1);
-      var pv=clamp(1-Math.abs(local),0,1);
+      var pv=ease(clamp(1-Math.abs(local)*FALLOFF,0,1));
       var pe=pieces[p];
       if(pv<=.004){ pe.style.opacity=0; pe.style.visibility='hidden'; continue; }
       pe.style.visibility='visible';
       pe.style.opacity=pv;
-      pe.style.transform='translate3d(0,'+(local*62)+'px,0) scale('+(.94+.06*pv)+')';
+      pe.style.transform='translate3d(0,'+(local*54)+'px,0) scale('+(.95+.05*pv)+')';
 
-      // One 0-1 value drives either the clip or the stills.
+      // The turn still reads across the piece's whole approach and exit, even
+      // though the piece is only fully opaque near its own stop.
       var set=frameSets[p];
       var t=clamp((local+.62)/1.24,0,1);
       if(set.ready){
