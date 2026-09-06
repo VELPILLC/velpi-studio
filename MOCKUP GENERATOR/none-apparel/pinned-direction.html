@@ -58,6 +58,14 @@ a{color:inherit;text-decoration:none}
 .frames{position:absolute;inset:0}
 .frames img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0}
 .frames img.on{opacity:1}
+/* A scroll-scrubbed clip: it never plays, its currentTime is driven by scroll.
+   The generated footage sits on studio white, so multiply drops that ground
+   into the paper. Hidden until it can actually seek, so the still frames
+   remain the fallback on a failed or slow load. */
+.frames video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  opacity:0;mix-blend-mode:multiply;transition:opacity .45s}
+.frames video.live{opacity:1}
+.frames.has-video img.on{opacity:0}
 .face.back{transform:rotateY(180deg);flex-direction:column;gap:24px;text-align:center;
   background:rgba(246,242,235,.82);border:1px solid var(--line);padding:14%}
 .face.back .k{font-size:.58rem;letter-spacing:.28em;text-transform:uppercase;color:var(--sage)}
@@ -121,7 +129,7 @@ a{color:inherit;text-decoration:none}
   <div class="pieces" id="pieces">
 
     <div class="piece" data-i="0"><div class="card">
-      <div class="face front"><div class="frames">
+      <div class="face front"><div class="frames" data-video="assets/shirt-turn.mp4">
         <img class="on" src="assets/shirt-cut.png"      alt="Oversized boxy cotton t-shirt in oat, front">
         <img          src="assets/shirt-3q-cut.png"   alt="The same t-shirt at three-quarter angle">
         <img          src="assets/shirt-side-cut.png" alt="The same t-shirt in side profile">
@@ -225,10 +233,47 @@ a{color:inherit;text-decoration:none}
   }
   var dots=[].slice.call(rail.children);
 
-  // Cache each piece's angle frames and its current frame index.
+  // Cache each piece's angle frames. Where a clip is declared, attach a video
+  // that is NEVER played — scroll drives its currentTime instead, which is what
+  // turns four discrete stills into continuous motion. The stills stay in place
+  // as the fallback until the clip can actually seek.
   var frameSets=pieces.map(function(p){
-    return { imgs:[].slice.call(p.querySelectorAll('.frames img')), idx:0 };
+    var host=p.querySelector('.frames');
+    var set={ imgs:[].slice.call(host.querySelectorAll('img')), idx:0,
+              host:host, vid:null, ready:false, seeking:false, want:-1 };
+    var src=host.getAttribute('data-video');
+    if(src && !reduced){
+      var v=document.createElement('video');
+      v.muted=true; v.playsInline=true; v.setAttribute('playsinline','');
+      v.preload='auto'; v.src=src;
+      v.addEventListener('loadedmetadata',function(){
+        if(!isFinite(v.duration)||v.duration<=0) return;
+        set.ready=true; set.vid=v;
+        v.classList.add('live'); host.classList.add('has-video');
+      });
+      // A clip that cannot load must not blank the piece — the stills carry on.
+      v.addEventListener('error',function(){
+        set.ready=false; v.classList.remove('live'); host.classList.remove('has-video');
+      });
+      v.addEventListener('seeked',function(){
+        set.seeking=false;
+        if(set.want>=0){ var w=set.want; set.want=-1; seekTo(set,w); }
+      });
+      host.appendChild(v);
+    }
+    return set;
   });
+
+  // Coalesce seeks: issuing a new currentTime while one is still resolving is
+  // what makes scrubbed video stutter. Hold the latest target instead.
+  function seekTo(set,t){
+    if(!set.ready||!set.vid) return;
+    var time=clamp(t,0,1)*set.vid.duration;
+    if(set.seeking){ set.want=t; return; }
+    if(Math.abs(set.vid.currentTime-time)<.012) return;
+    set.seeking=true;
+    try{ set.vid.currentTime=time; }catch(e){ set.seeking=false; }
+  }
 
   pieces.forEach(function(p){
     var card=p.querySelector('.card');
@@ -291,15 +336,20 @@ a{color:inherit;text-decoration:none}
       pe.style.opacity=pv;
       pe.style.transform='translate3d(0,'+(local*70)+'px,0) scale('+(.92+.08*pv)+')';
 
-      // Scrub the angle set across the piece's whole visible window, so the
-      // garment turns as it arrives and keeps turning as it leaves.
-      var set=frameSets[p], n=set.imgs.length;
+      // Scrub across the piece's whole visible window, so the garment turns as
+      // it arrives and keeps turning as it leaves.
+      var set=frameSets[p];
       var t=clamp((local+.62)/1.24,0,1);
-      var fi=Math.min(n-1,Math.floor(t*n));
-      if(fi!==set.idx){
-        set.imgs[set.idx].classList.remove('on');
-        set.imgs[fi].classList.add('on');
-        set.idx=fi;
+      if(set.ready){
+        seekTo(set,t);            // continuous: every frame of the clip
+      }else{
+        var n=set.imgs.length;    // fallback: the four generated angles
+        var fi=Math.min(n-1,Math.floor(t*n));
+        if(fi!==set.idx){
+          set.imgs[set.idx].classList.remove('on');
+          set.imgs[fi].classList.add('on');
+          set.idx=fi;
+        }
       }
     }
 
