@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<!-- STRUCTURE: nav=bare-mark | hero=type-first | gallery=sticky-garment-morph(shirt>cap>pants, tap-to-turn) | story=editorial-wide | index=quiet-list | footer=minimal -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NONE — Nothing you don't need</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Inter:wght@300;400;500&display=swap');
+
+:root{
+  --paper:#EDE7DC; --paper-2:#E3DBCC; --clay:#D6C9B6; --bark:#2E2823;
+  --ink:#3A332C; --soft:#7C7266; --sage:#7E8B70; --sky:#A9C2D4; --line:#CFC4B2;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --sans:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3{font-family:var(--serif);font-weight:300;letter-spacing:-.01em;margin:0;line-height:1.06}
+p{margin:0;line-height:1.8;color:var(--soft);font-size:.95rem}
+a{color:inherit;text-decoration:none}
+.wrap{width:min(1200px,88vw);margin:0 auto}
+.lbl{font-size:.66rem;letter-spacing:.34em;text-transform:uppercase;color:var(--soft);font-weight:400}
+
+/* nav */
+.nav{position:fixed;inset:0 0 auto 0;z-index:60;mix-blend-mode:multiply}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:74px}
+.mark{font-family:var(--sans);font-weight:400;font-size:.82rem;letter-spacing:.44em}
+.nav a.lbl:hover{color:var(--ink)}
+.nav-r{display:flex;gap:34px}
+
+/* hero */
+.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;position:relative;padding:120px 0 60px}
+.hero .giant{font-family:var(--sans);font-weight:300;font-size:clamp(4.5rem,19vw,17rem);
+  letter-spacing:.02em;line-height:.86;color:var(--bark)}
+.hero .sub{font-family:var(--serif);font-size:clamp(1.15rem,2.4vw,1.9rem);color:var(--soft);margin-top:22px;font-style:italic}
+.cue{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:10px}
+.cue .bar{width:1px;height:52px;background:linear-gradient(180deg,transparent,var(--line))}
+
+/* sticky garment gallery */
+.gallery{position:relative;background:var(--paper)}
+.g-canvas{position:sticky;top:0;height:100svh;width:100%;z-index:0;
+  background:radial-gradient(ellipse 58% 54% at 50% 42%,#F8F3EA 0%,#E2D7C4 44%,#C7B9A1 100%)}
+#scene{display:block;width:100%;height:100%}
+.g-content{position:relative;z-index:2;margin-top:-100svh;pointer-events:none}
+.g-stage{min-height:100svh;display:flex;align-items:center}
+.g-stage .side{width:min(360px,32vw);pointer-events:auto}
+.g-stage:nth-child(even) .side{margin-left:auto;text-align:right}
+.g-stage .num{font-family:var(--serif);font-size:2.5rem;color:var(--line);line-height:1}
+.g-stage h2{font-size:clamp(2rem,3.6vw,2.9rem);margin:14px 0 18px}
+.g-stage p{max-width:34ch}
+.g-stage:nth-child(even) p{margin-left:auto}
+.tap{margin-top:30px;display:inline-flex;align-items:center;gap:10px;font-size:.66rem;letter-spacing:.3em;
+  text-transform:uppercase;color:var(--sage);border-bottom:1px solid var(--line);padding-bottom:7px}
+.tap i{width:5px;height:5px;background:var(--sage);border-radius:50%;display:block;
+  animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* flip detail card */
+.detail{position:fixed;left:50%;bottom:5.5vh;transform:translateX(-50%) translateY(14px);
+  z-index:30;background:rgba(246,241,231,.93);border:1px solid var(--line);
+  padding:20px 26px;display:flex;gap:38px;opacity:0;pointer-events:none;
+  transition:opacity .5s ease,transform .5s ease;backdrop-filter:blur(6px);max-width:88vw}
+.detail.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.detail div{min-width:0}
+.detail .k{font-size:.6rem;letter-spacing:.26em;text-transform:uppercase;color:var(--sage)}
+.detail .v{font-family:var(--serif);font-size:1.02rem;color:var(--ink);margin-top:5px;white-space:nowrap}
+
+/* story */
+.story{padding:20vh 0;background:var(--paper-2);position:relative;z-index:3}
+.story-in{display:grid;grid-template-columns:1fr 1fr;gap:min(9vw,120px);align-items:start}
+.story h2{font-size:clamp(2.2rem,5vw,4.2rem)}
+.story .body{padding-top:10px;display:flex;flex-direction:column;gap:24px}
+.story .body p{font-size:1rem}
+.pull{font-family:var(--serif);font-size:clamp(1.5rem,3vw,2.3rem);color:var(--ink);line-height:1.35;
+  padding:8vh 0;text-align:center;max-width:22ch;margin:0 auto}
+
+/* index list */
+.index{padding:16vh 0;background:var(--paper);position:relative;z-index:3}
+.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:28px;align-items:baseline;
+  padding:30px 0;border-top:1px solid var(--line)}
+.row:last-child{border-bottom:1px solid var(--line)}
+.row .n{font-family:var(--serif);color:var(--line);font-size:1.1rem}
+.row .nm{font-family:var(--serif);font-size:clamp(1.3rem,2.6vw,1.9rem);color:var(--ink)}
+.row .sp{font-size:.8rem;color:var(--soft)}
+.row .pr{font-family:var(--serif);font-size:1.1rem;color:var(--ink)}
+
+/* closing */
+.close{padding:20vh 0;text-align:center;background:var(--bark);color:var(--paper);position:relative;z-index:3}
+.close h2{font-size:clamp(2rem,4.6vw,3.6rem);color:var(--paper);max-width:18ch;margin:0 auto 26px}
+.close p{color:rgba(237,231,220,.6);max-width:44ch;margin:0 auto 40px}
+.btn{display:inline-block;font-size:.68rem;letter-spacing:.3em;text-transform:uppercase;
+  border:1px solid rgba(237,231,220,.35);padding:16px 40px;color:var(--paper);transition:.4s}
+.btn:hover{background:var(--paper);color:var(--bark)}
+footer{padding:52px 0;background:var(--bark);color:rgba(237,231,220,.45);position:relative;z-index:3;
+  border-top:1px solid rgba(237,231,220,.12)}
+.f-in{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:.72rem;letter-spacing:.1em}
+
+@media(max-width:860px){
+  .nav-r{gap:20px}
+  .g-stage{align-items:flex-end;padding-bottom:8vh}
+  .g-stage .side,.g-stage:nth-child(even) .side{width:100%;text-align:left;margin:0}
+  .g-stage:nth-child(even) p{margin-left:0}
+  .story-in{grid-template-columns:1fr;gap:34px}
+  .detail{gap:22px;padding:16px 18px;flex-wrap:wrap;justify-content:center;text-align:center}
+  .detail .v{font-size:.9rem}
+  .row{grid-template-columns:auto 1fr;gap:12px}
+  .row .sp,.row .pr{grid-column:2}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .tap i{animation:none;opacity:.7}
+}
+</style>
+</head>
+<body>
+<div class="velpi-page">
+
+  <nav class="nav"><div class="wrap nav-in">
+    <div class="mark">NONE</div>
+    <div class="nav-r">
+      <a href="#gallery" class="lbl">Pieces</a>
+      <a href="#story" class="lbl">Story</a>
+      <a href="#index" class="lbl">Index</a>
+    </div>
+  </div></nav>
+
+  <header class="hero">
+    <div class="giant">NONE</div>
+    <div class="sub">Nothing you don't need.</div>
+    <div class="cue"><span class="lbl">Scroll</span><span class="bar"></span></div>
+  </header>
+
+  <section class="gallery" id="gallery">
+    <div class="g-canvas"><canvas id="scene"></canvas></div>
+    <div class="g-content">
+
+      <div class="g-stage"><div class="wrap"><div class="side">
+        <div class="num">01</div>
+        <h2>The Shirt</h2>
+        <p>Fourteen ounces of cotton, cut wide and left alone. Nothing printed on the chest, because a chest is not a billboard.</p>
+        <span class="tap"><i></i> Tap to turn</span>
+      </div></div></div>
+
+      <div class="g-stage"><div class="wrap"><div class="side">
+        <div class="num">02</div>
+        <h2>The Cap</h2>
+        <p>Unstructured, so it creases where you crease it. Six panels of washed twill and a brim that bends once and stays bent.</p>
+        <span class="tap"><i></i> Tap to turn</span>
+      </div></div></div>
+
+      <div class="g-stage"><div class="wrap"><div class="side">
+        <div class="num">03</div>
+        <h2>The Pants</h2>
+        <p>Room to sit down in. Room to walk in. The waistband does the work so the leg is free to do nothing at all.</p>
+        <span class="tap"><i></i> Tap to turn</span>
+      </div></div></div>
+
+    </div>
+  </section>
+
+  <div class="detail" id="detail">
+    <div><div class="k">Fabric</div><div class="v" id="d1">—</div></div>
+    <div><div class="k">Fit</div><div class="v" id="d2">—</div></div>
+    <div><div class="k">Made</div><div class="v" id="d3">—</div></div>
+  </div>
+
+  <section class="story" id="story"><div class="wrap">
+    <div class="story-in">
+      <div><span class="lbl">The idea</span><h2 style="margin-top:20px">We make<br>very little.</h2></div>
+      <div class="body">
+        <p>NONE started as a subtraction. We took a wardrobe apart and kept removing until only the things that got worn every week were left. Three of them. That is the whole collection, and it is meant to stay that way.</p>
+        <p>Everything is cut generously and finished plainly. No seasonal colour, no drop schedule, no logo doing the talking. When a piece wears out we will make it again the same way, in the same cotton, from the same mill outside Porto.</p>
+        <p>It is a quieter way to get dressed. You stop deciding, and the morning gets shorter.</p>
+      </div>
+    </div>
+    <div class="pull">Fewer things, kept longer, in colours borrowed from the ground and the sky.</div>
+  </section>
+
+  <section class="index" id="index"><div class="wrap">
+    <span class="lbl">The index</span>
+    <div style="margin-top:40px">
+      <div class="row"><span class="n">01</span><span class="nm">The Shirt</span><span class="sp">14oz organic cotton — bone</span><span class="pr">$95</span></div>
+      <div class="row"><span class="n">02</span><span class="nm">The Cap</span><span class="sp">Washed twill — sage</span><span class="pr">$55</span></div>
+      <div class="row"><span class="n">03</span><span class="nm">The Pants</span><span class="sp">12oz canvas — clay</span><span class="pr">$135</span></div>
+    </div>
+  </section>
+
+  <section class="close"><div class="wrap">
+    <span class="lbl" style="color:rgba(237,231,220,.5)">Made in small runs</span>
+    <h2 style="margin-top:22px">Three pieces. That is the collection.</h2>
+    <p>We restock when the cotton arrives and not before. Leave an address and we will tell you when it does.</p>
+    <a href="#" class="btn">Join the list</a>
+  </div></section>
+
+  <footer><div class="wrap f-in">
+    <span class="mark">NONE</span>
+    <span>Porto — since 2021</span>
+    <span>&copy; 2026</span>
+  </div></footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  var canvas=document.getElementById('scene');
+  var gallery=document.getElementById('gallery');
+  var detail=document.getElementById('detail');
+  if(!canvas||!gallery) return;
+
+  var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function isMobile(){ return window.innerWidth<768; }
+  function supportsWebGL(){
+    try{ var c=document.createElement('canvas');
+      return !!(window.WebGLRenderingContext&&(c.getContext('webgl')||c.getContext('experimental-webgl'))); }
+    catch(e){ return false; }
+  }
+
+  var scene,camera,renderer,clock,raf=null,visible=false,ready=false;
+  var garments=[],active=0,progress=0;
+  var pointer={x:0,y:0},smooth={x:0,y:0};
+  var ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+
+  var SPECS=[
+    ['14oz organic cotton','Boxy, dropped shoulder','Porto, Portugal'],
+    ['Washed cotton twill','Unstructured, 6-panel','Porto, Portugal'],
+    ['12oz cotton canvas','Wide leg, elastic back','Porto, Portugal']
+  ];
+
+  function fabric(hex){
+    return new THREE.MeshStandardMaterial({
+      color:hex, roughness:.96, metalness:0, side:THREE.DoubleSide,
+      transparent:true, opacity:1 });
+  }
+
+  // Cloth reads as plastic unless the surface actually moves. Base positions are
+  // kept so a travelling sine can be re-applied every frame from the original
+  // shape rather than compounding drift into it.
+  function clothify(geo,amp){
+    var p=geo.attributes.position;
+    geo.userData.base=new Float32Array(p.array);
+    geo.userData.amp=amp||.03;
+    return geo;
+  }
+  function waveGeo(geo,t){
+    var b=geo.userData.base; if(!b) return;
+    var p=geo.attributes.position, a=geo.userData.amp, n=p.count;
+    for(var i=0;i<n;i++){
+      var x=b[i*3],y=b[i*3+1],z=b[i*3+2];
+      p.array[i*3]   = x + Math.sin(y*2.3+t*1.25+x*1.1)*a;
+      p.array[i*3+1] = y + Math.sin(x*1.7+t*.9)*a*.35;
+      p.array[i*3+2] = z + Math.cos(y*2.0+t*1.05+z*.9)*a;
+    }
+    p.needsUpdate=true;
+    geo.computeVertexNormals();
+  }
+
+  // Squash a tube's cross-section so it reads as a flat-ish garment, and let the
+  // hem fall unevenly — a perfectly circular hem is the giveaway of a primitive.
+  function garmentShape(geo,squash,hemY,hemAmp){
+    var p=geo.attributes.position;
+    for(var i=0;i<p.count;i++){
+      var x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+      p.setZ(i,z*squash);
+      if(y<hemY){
+        var ang=Math.atan2(z,x);
+        p.setY(i,y+Math.sin(ang*3.0)*hemAmp+Math.sin(ang*5.0)*hemAmp*.4);
+      }
+    }
+    p.needsUpdate=true; geo.computeVertexNormals();
+  }
+
+  function makeShirt(){
+    var g=new THREE.Group();
+    var m=fabric(0xCDBC9E);
+    var body=new THREE.CylinderGeometry(1.0,1.16,1.8,40,24,true);
+    garmentShape(body,.62,-.6,.07); clothify(body,.032);
+    var bodyM=new THREE.Mesh(body,m); bodyM.position.y=.15; g.add(bodyM);
+
+    function sleeve(side){
+      var s=new THREE.CylinderGeometry(.36,.44,1.05,22,10,true);
+      garmentShape(s,.86,-.42,.05); clothify(s,.03);
+      var sm=new THREE.Mesh(s,m);
+      sm.position.set(side*.92,.62,0);
+      sm.rotation.z=side*1.16; sm.rotation.x=.1;
+      return sm;
+    }
+    g.add(sleeve(-1)); g.add(sleeve(1));
+
+    var col=new THREE.Mesh(new THREE.TorusGeometry(.4,.075,14,32),m);
+    col.rotation.x=Math.PI/2; col.scale.z=.64; col.position.y=1.06; g.add(col);
+
+    g.userData.geos=[body];
+    return g;
+  }
+
+  function makeCap(){
+    var g=new THREE.Group();
+    var m=fabric(0x7E8B70);
+    var crown=new THREE.SphereGeometry(.95,40,24,0,Math.PI*2,0,Math.PI*.54);
+    clothify(crown,.016);
+    var cm=new THREE.Mesh(crown,m); cm.scale.y=.78; cm.position.y=.1; g.add(cm);
+
+    // Brim: a wedge of a disc, curved down at its outer edge.
+    var brim=new THREE.CylinderGeometry(1.5,1.5,.06,40,4,false,-Math.PI*.44,Math.PI*.88);
+    var bp=brim.attributes.position;
+    for(var i=0;i<bp.count;i++){
+      var x=bp.getX(i),z=bp.getZ(i);
+      var d=Math.sqrt(x*x+z*z);
+      bp.setY(i,bp.getY(i)-Math.pow(d/1.5,2.2)*.42);
+      bp.setZ(i,z*.82);
+    }
+    bp.needsUpdate=true; brim.computeVertexNormals();
+    var bm=new THREE.Mesh(brim,m); bm.position.set(0,.06,.16); bm.rotation.y=Math.PI; g.add(bm);
+
+    var band=new THREE.Mesh(new THREE.TorusGeometry(.93,.055,12,36),m);
+    band.rotation.x=Math.PI/2; band.position.y=.1; g.add(band);
+    var btn=new THREE.Mesh(new THREE.SphereGeometry(.07,14,10),m);
+    btn.position.y=.86; g.add(btn);
+
+    g.userData.geos=[crown];
+    return g;
+  }
+
+  function makePants(){
+    var g=new THREE.Group();
+    var m=fabric(0x94795B);
+    var waist=new THREE.CylinderGeometry(.84,.9,.46,32,4,true);
+    garmentShape(waist,.66,-99,0); clothify(waist,.018);
+    var wm=new THREE.Mesh(waist,m); wm.position.y=.95; g.add(wm);
+
+    function leg(side){
+      var l=new THREE.CylinderGeometry(.52,.6,1.95,26,14,true);
+      garmentShape(l,.78,-.75,.06); clothify(l,.034);
+      var lm=new THREE.Mesh(l,m);
+      lm.position.set(side*.38,-.28,0);
+      lm.rotation.z=side*.035;
+      return lm;
+    }
+    var lL=leg(-1), lR=leg(1); g.add(lL); g.add(lR);
+
+    var seat=new THREE.Mesh(new THREE.SphereGeometry(.86,28,18),m);
+    seat.scale.set(1,.5,.66); seat.position.y=.66; g.add(seat);
+
+    g.userData.geos=[lL.geometry,lR.geometry];
+    return g;
+  }
+
+  function envMap(){
+    var c=document.createElement('canvas'); c.width=512; c.height=256;
+    var x=c.getContext('2d');
+    var g=x.createLinearGradient(0,0,0,256);
+    g.addColorStop(0,'#cfe0ec');           // sky
+    g.addColorStop(.48,'#f4ecdd');
+    g.addColorStop(.54,'#e6d9c2');
+    g.addColorStop(1,'#9d8a72');           // ground
+    x.fillStyle=g; x.fillRect(0,0,512,256);
+    x.fillStyle='rgba(255,250,240,.9)'; x.fillRect(120,30,180,34);
+    var t=new THREE.CanvasTexture(c);
+    t.mapping=THREE.EquirectangularReflectionMapping;
+    return t;
+  }
+
+  function init(){
+    if(ready||!supportsWebGL()) return;
+    var w=canvas.clientWidth,h=canvas.clientHeight;
+    if(!w||!h) return;
+
+    renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:!isMobile(),alpha:true,preserveDrawingBuffer:true});
+    renderer.setSize(w,h,false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,isMobile()?1.5:2));
+    renderer.outputEncoding=THREE.sRGBEncoding;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure=.9;
+
+    scene=new THREE.Scene();
+    camera=new THREE.PerspectiveCamera(34,w/h,.1,60);
+    camera.position.set(0,.15,7.2);
+    camera.lookAt(0,0,0);
+
+    try{
+      var pm=new THREE.PMREMGenerator(renderer);
+      pm.compileEquirectangularShader();
+      scene.environment=pm.fromEquirectangular(envMap()).texture;
+    }catch(e){}
+
+    // Ambient was drowning the form. Earth tones on an earth-toned ground only
+    // read if the light does the separating — a bone shirt lit flat against
+    // bone paper measured ~10/255 per channel apart, i.e. invisible.
+    // Total illumination has to land the fabric in the MIDS. Too much ambient
+    // and it flattens into the paper; too much key and it blows out to white
+    // and vanishes into the paper from the other side. Both were measured.
+    scene.add(new THREE.AmbientLight(0xFFF3E2,.28));
+    var key=new THREE.DirectionalLight(0xFFF1DC,1.35); key.position.set(3.5,5,4); scene.add(key);
+    var sky=new THREE.DirectionalLight(0xA9C2D4,.5); sky.position.set(-5,2.5,2); scene.add(sky);
+    var back=new THREE.DirectionalLight(0xC9AE86,.38); back.position.set(0,-2,-5); scene.add(back);
+
+    // Contact shadow — without it the garment floats in soup.
+    var sc=document.createElement('canvas'); sc.width=sc.height=128;
+    var sx=sc.getContext('2d');
+    var rg=sx.createRadialGradient(64,64,4,64,64,62);
+    rg.addColorStop(0,'rgba(90,74,56,.5)'); rg.addColorStop(.55,'rgba(90,74,56,.18)');
+    rg.addColorStop(1,'rgba(90,74,56,0)');
+    sx.fillStyle=rg; sx.fillRect(0,0,128,128);
+    var shadow=new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2,4.2),
+      new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc),transparent:true,depthWrite:false}));
+    shadow.rotation.x=-Math.PI/2; shadow.position.y=-2.05; shadow.scale.set(1,.62,1);
+    scene.add(shadow);
+
+    garments=[makeShirt(),makeCap(),makePants()];
+    for(var i=0;i<garments.length;i++){
+      garments[i].userData.flip=0;
+      garments[i].userData.flipT=0;
+      scene.add(garments[i]);
+    }
+    clock=new THREE.Clock();
+    ready=true;
+  }
+
+  function scrollProgress(){
+    var r=gallery.getBoundingClientRect();
+    var span=gallery.offsetHeight-window.innerHeight;
+    if(span<=0) return 0;
+    return Math.max(0,Math.min(1,-r.top/span));
+  }
+
+  function frame(){
+    raf=requestAnimationFrame(frame);
+    if(!ready) return;
+    var t=clock.getElapsedTime();
+
+    progress+=(scrollProgress()-progress)*.09;
+    var sf=progress*(garments.length-1);
+    var nearest=Math.round(sf);
+    if(nearest!==active){ active=nearest; syncDetail(); }
+
+    smooth.x+=(pointer.x-smooth.x)*.05;
+    smooth.y+=(pointer.y-smooth.y)*.05;
+
+    for(var i=0;i<garments.length;i++){
+      var g=garments[i];
+      // Held fully opaque across the core of each band and faded only through
+      // the overlap. A plain linear falloff left BOTH neighbours near 50%
+      // mid-transition, which read as two washed-out ghosts rather than one
+      // garment becoming another.
+      var d=Math.abs(sf-i);
+      var v = d<=.42 ? 1 : (d>=.94 ? 0 : 1-(d-.42)/.52);
+      var vis=v>.012;
+      g.visible=vis;
+      if(!vis) continue;
+
+      var mats=[];
+      g.traverse(function(o){ if(o.isMesh&&mats.indexOf(o.material)<0) mats.push(o.material); });
+      for(var k=0;k<mats.length;k++) mats[k].opacity=v;
+
+      var s=.78+.22*v;
+      g.scale.set(s,s,s);
+      g.position.y=Math.sin(t*.55+i)*.09+(1-v)*.5;
+
+      g.userData.flipT+=(g.userData.flip*Math.PI-g.userData.flipT)*.08;
+      g.rotation.y=g.userData.flipT+smooth.x*.5+Math.sin(t*.28+i)*.1;
+      g.rotation.z=Math.sin(t*.34+i*2)*.035;
+      g.rotation.x=-smooth.y*.16;
+
+      if(!reduced){
+        var geos=g.userData.geos||[];
+        for(var q=0;q<geos.length;q++) waveGeo(geos[q],t);
+      }
+    }
+    renderer.render(scene,camera);
+  }
+
+  function syncDetail(){
+    var g=garments[active];
+    if(g&&g.userData.flip){
+      var s=SPECS[active];
+      document.getElementById('d1').textContent=s[0];
+      document.getElementById('d2').textContent=s[1];
+      document.getElementById('d3').textContent=s[2];
+      detail.classList.add('on');
+    }else{
+      detail.classList.remove('on');
+    }
+  }
+
+  // init() bails when the canvas has no layout yet, which can happen if the
+  // observer fires mid-layout. start() is otherwise only called on an
+  // intersection CHANGE — so a single early bail left the canvas blank forever
+  // while it sat there visible. Retry while visible until it takes.
+  var tries=0;
+  function start(){
+    if(!ready) init();
+    if(!ready){
+      if(visible && tries++ < 40) setTimeout(start,120);
+      return;
+    }
+    if(reduced){ renderer.render(scene,camera); return; }
+    if(!raf) frame();
+  }
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
+
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ visible=e.isIntersecting; visible?start():stop(); });
+  },{threshold:.02});
+  io.observe(canvas);
+
+  // The observer decides PLAY/PAUSE only — it must never be the sole path to
+  // initialisation. IntersectionObserver callbacks are delivered during the
+  // browser's rendering steps, so a throttled or hidden tab (and, more to the
+  // point, an odd embed or a funnel iframe) can simply never deliver one. When
+  // that happened here the canvas sat at its default 300x150 with nothing drawn
+  // and no way to recover. Boot unconditionally and render one frame; the
+  // observer then only governs whether the loop runs.
+  function boot(){
+    if(ready) return;
+    init();
+    if(ready) renderer.render(scene,camera);
+  }
+  if(document.readyState==='complete') boot(); else window.addEventListener('load',boot);
+  setTimeout(boot,250); setTimeout(boot,1000);
+  window.addEventListener('scroll',function(){ boot(); if(visible&&!raf) start(); },{passive:true});
+
+  // A canvas sized in svh is 0x0 while its window has no size — which is the
+  // normal state for a hidden tab or an iframe that has not been shown yet.
+  // init() rightly refuses to build against 0x0, so without this the scene
+  // would never come up once the frame IS finally shown. Measured exactly that:
+  // clientWidth 0 with visibility:visible and WebGL available.
+  if(window.ResizeObserver){
+    var ro=new ResizeObserver(function(){
+      if(canvas.clientWidth&&canvas.clientHeight){
+        boot();
+        if(ready&&visible&&!raf) start();
+      }
+    });
+    ro.observe(canvas);
+  }
+
+  canvas.addEventListener('pointermove',function(e){
+    var r=canvas.getBoundingClientRect();
+    pointer.x=((e.clientX-r.left)/r.width)*2-1;
+    pointer.y=((e.clientY-r.top)/r.height)*2-1;
+    if(!ready) return;
+    ndc.x=pointer.x; ndc.y=-pointer.y;
+    ray.setFromCamera(ndc,camera);
+    var g=garments[active];
+    canvas.style.cursor=(g&&ray.intersectObject(g,true).length)?'pointer':'default';
+  },{passive:true});
+
+  canvas.addEventListener('click',function(e){
+    if(!ready) return;
+    var r=canvas.getBoundingClientRect();
+    ndc.x=((e.clientX-r.left)/r.width)*2-1;
+    ndc.y=-(((e.clientY-r.top)/r.height)*2-1);
+    ray.setFromCamera(ndc,camera);
+    var g=garments[active];
+    if(g&&ray.intersectObject(g,true).length){
+      g.userData.flip=g.userData.flip?0:1;
+      syncDetail();
+    }
+  });
+
+  var rt=null;
+  window.addEventListener('resize',function(){
+    clearTimeout(rt);
+    rt=setTimeout(function(){
+      if(!ready){ if(visible) start(); return; }
+      var w=canvas.clientWidth,h=canvas.clientHeight;
+      if(!w||!h) return;
+      camera.aspect=w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w,h,false);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio,isMobile()?1.5:2));
+    },160);
+  },{passive:true});
+
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden) stop(); else if(visible) start();
+  });
+})();
+</script>
+</body>
+</html>
