@@ -299,46 +299,73 @@ a{color:inherit;text-decoration:none}
   var frameSets=pieces.map(function(p){
     var host=p.querySelector('.frames');
     var set={ imgs:[].slice.call(host.querySelectorAll('img')), idx:0,
-              host:host, vid:null, ready:false, looping:false,
+              host:host, vid:null, ready:false, looping:false, probing:false,
               seeking:false, want:-1, guard:null };
     var src=host.getAttribute('data-video');
     if(src && !reduced){
       var v=document.createElement('video');
       v.muted=true; v.playsInline=true; v.setAttribute('playsinline','');
       v.preload='auto'; v.src=src;
-      // Three tiers, because a clip can be fully downloaded and still refuse to
-      // seek: served without HTTP range support the browser reports seekable as
-      // [0,0] and silently drops every currentTime assignment, freezing the
-      // garment on frame one. Duration is not proof it can be scrubbed.
-      //   1. seekable      -> scroll drives the turn (what we want)
-      //   2. plays but not -> loop it, so it still MOVES even if the motion is
-      //      seekable          no longer tied to the scroll position
-      //   3. neither       -> the four stills
-      function arm(){
+      // NOTHING here is allowed to hide the stills until the clip has PROVED it
+      // can move. Arming on duration alone was the regression: a clip that
+      // cannot seek still reports a duration, took over the frame, and then sat
+      // on frame one — replacing working (if steppy) still motion with none.
+      //
+      // So: actually seek, wait, and check where it landed.
+      //   lands correctly -> scroll drives the turn
+      //   does not land   -> loop the clip instead (still motion, just not
+      //                      scroll-linked); if that is refused too, the stills
+      //                      keep scrubbing and the video is never shown.
+      // Opacity is set inline as well as by class. A hidden or throttled
+      // document pauses CSS transitions, and if that fade never lands the
+      // stills are already hidden and nothing at all is visible. Inline styles
+      // do not depend on a transition completing.
+      function show(vid,hostEl){
+        hostEl.classList.add('has-video');
+        vid.classList.add('live');
+        vid.style.opacity='1';
+        for(var i=0;i<set.imgs.length;i++) set.imgs[i].style.opacity='0';
+      }
+
+      function loopFallback(){
         if(set.ready||set.looping) return;
-        if(!isFinite(v.duration)||v.duration<=0) return;
-        var canSeek=v.seekable.length && v.seekable.end(v.seekable.length-1)>0;
-        if(canSeek){
-          set.ready=true; set.vid=v;
-          v.classList.add('live'); host.classList.add('has-video');
-          return;
-        }
-        // Not seekable. Falling back to four stills would just be the slideshow
-        // again, so loop the clip instead — continuous motion either way.
-        if(v.readyState>=3){
-          set.looping=true; set.vid=v;
-          v.loop=true;
-          v.play().then(function(){
-            v.classList.add('live'); host.classList.add('has-video');
-          }).catch(function(){
-            set.looping=false;   // autoplay refused — stills carry on
-          });
+        if(v.readyState<3) return;
+        v.loop=true;
+        var p=v.play();
+        if(p&&p.then){
+          p.then(function(){ set.looping=true; set.vid=v; show(v,host); })
+           .catch(function(){ set.looping=false; set.vid=null; });
+        }else{
+          set.looping=true; set.vid=v; show(v,host);
         }
       }
-      v.addEventListener('loadedmetadata',arm);
-      v.addEventListener('canplay',arm);
-      v.addEventListener('canplaythrough',arm);
-      v.addEventListener('progress',arm);
+
+      function probe(){
+        if(set.ready||set.looping||set.probing) return;
+        if(!isFinite(v.duration)||v.duration<=0||v.readyState<2) return;
+        set.probing=true;
+        var mark=Math.min(0.6,v.duration*0.25), done=false;
+        function settle(ok){
+          if(done) return; done=true;
+          v.removeEventListener('seeked',onSeeked);
+          set.probing=false;
+          if(ok){
+            set.ready=true; set.vid=v;
+            show(v,host);
+            try{ v.currentTime=0; }catch(e){}
+          }else{
+            loopFallback();
+          }
+        }
+        function onSeeked(){ settle(Math.abs(v.currentTime-mark)<0.2); }
+        v.addEventListener('seeked',onSeeked);
+        try{ v.currentTime=mark; }catch(e){ settle(false); return; }
+        setTimeout(function(){ settle(Math.abs(v.currentTime-mark)<0.2); },1400);
+      }
+      v.addEventListener('loadedmetadata',probe);
+      v.addEventListener('canplay',probe);
+      v.addEventListener('canplaythrough',probe);
+      v.addEventListener('progress',probe);
       v.addEventListener('error',function(){
         set.ready=false; v.classList.remove('live'); host.classList.remove('has-video');
       });
