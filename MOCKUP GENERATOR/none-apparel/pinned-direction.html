@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<!-- STRUCTURE: pinned-viewport (no native scroll) | scroll delta drives scene progression 0>1
-     scenes: mark > shirt > cap > pants > close | headline letters scatter on transition -->
-<!-- Architecture per the reference: html/body overflow hidden, wheel/touch/key accumulate into a
-     progress value, every element is positioned from that value. Nothing scrolls; scroll animates. -->
+<!-- STRUCTURE: pinned-viewport (no native scroll) | scroll delta drives progress 0>4
+     scenes: mark > shirt > cap > pants > close | wordmark letters scatter on first handover
+     each garment scrubs through 4 generated angles as it enters and leaves, so it turns -->
+<!-- Photography generated with Higgsfield, backgrounds removed to real alpha (no blend-mode hack,
+     so the cutouts survive a dark ground too). Angle order: front > three-quarter > side > back. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -18,7 +19,7 @@
   --sans:'Inter',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
-/* The page itself never scrolls. */
+/* The page itself never scrolls — scroll drives the animation instead. */
 html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:300;
   -webkit-font-smoothing:antialiased;touch-action:none}
@@ -29,52 +30,54 @@ a{color:inherit;text-decoration:none}
 
 #viewport{position:fixed;inset:0;overflow:hidden}
 
-/* fixed chrome */
 .nav{position:fixed;top:0;left:0;right:0;height:74px;display:flex;align-items:center;
-  justify-content:space-between;padding:0 6vw;z-index:60}
+  justify-content:space-between;padding:0 5vw;z-index:60}
 .mark{font-size:.82rem;letter-spacing:.44em}
 .nav-r{display:flex;gap:30px}
 
-.rail{position:fixed;right:6vw;top:50%;transform:translateY(-50%);z-index:60;
+.rail{position:fixed;right:3.4vw;top:50%;transform:translateY(-50%);z-index:60;
   display:flex;flex-direction:column;gap:14px;align-items:center}
 .dot{width:6px;height:6px;border:1px solid var(--line);border-radius:50%;transition:.5s}
 .dot.on{background:var(--sage);border-color:var(--sage);transform:scale(1.35)}
 
-.hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:60;
+.hint{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:60;
   display:flex;flex-direction:column;align-items:center;gap:9px;transition:opacity .6s}
 .hint .bar{width:1px;height:44px;background:linear-gradient(180deg,var(--line),transparent)}
 
-/* garments — all pinned centre, opacity/scale driven by progress */
-.pieces{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  perspective:1500px;pointer-events:none}
-.piece{position:absolute;width:min(48vh,44vw);aspect-ratio:1/1;opacity:0;will-change:opacity,transform}
+/* ---------- garments ---------- */
+.pieces{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;
+  padding-right:4vw;perspective:1600px;pointer-events:none}
+/* Deliberately large — the fabric is the product, so it gets the room. */
+.piece{position:absolute;width:min(88vh,58vw);aspect-ratio:1/1;opacity:0;
+  will-change:opacity,transform}
 .piece .card{width:100%;height:100%;position:relative;transform-style:preserve-3d;
   transition:transform .95s cubic-bezier(.6,.02,.2,1);pointer-events:auto;cursor:pointer}
 .piece .card.flipped{transform:rotateY(180deg)}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
   display:flex;align-items:center;justify-content:center}
-.face img{width:100%;height:100%;object-fit:contain}
-.face.back{transform:rotateY(180deg);flex-direction:column;gap:22px;text-align:center;
-  background:rgba(246,242,235,.78);border:1px solid var(--line);padding:11%}
+.frames{position:absolute;inset:0}
+.frames img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0}
+.frames img.on{opacity:1}
+.face.back{transform:rotateY(180deg);flex-direction:column;gap:24px;text-align:center;
+  background:rgba(246,242,235,.82);border:1px solid var(--line);padding:14%}
 .face.back .k{font-size:.58rem;letter-spacing:.28em;text-transform:uppercase;color:var(--sage)}
-.face.back .v{font-family:var(--serif);font-size:1.1rem;color:var(--ink);margin-top:5px}
+.face.back .v{font-family:var(--serif);font-size:1.2rem;color:var(--ink);margin-top:5px}
 
-/* scenes */
+/* ---------- scenes ---------- */
 .scene{position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;opacity:0}
-.scene .inner{padding:0 6vw;width:100%}
+.scene .inner{padding:0 5vw;width:100%}
 .scene.centred{justify-content:center;text-align:center}
 
-/* the wordmark, split into letters that scatter */
 #wordmark{font-weight:300;font-size:clamp(4.5rem,19vw,17rem);letter-spacing:.02em;
   line-height:.86;color:var(--bark);display:flex;justify-content:center}
 #wordmark span{display:inline-block;will-change:transform,opacity}
 .sub{font-family:var(--serif);font-size:clamp(1.1rem,2.3vw,1.8rem);color:var(--soft);
   margin-top:20px;font-style:italic}
 
-.copy{width:min(360px,34vw)}
+.copy{width:min(330px,27vw)}
 .copy .num{font-family:var(--serif);font-size:2.4rem;color:var(--line);line-height:1}
-.copy h2{font-size:clamp(2rem,3.6vw,2.9rem);margin:12px 0 16px}
-.copy p{max-width:32ch}
+.copy h2{font-size:clamp(1.9rem,3.2vw,2.7rem);margin:12px 0 16px}
+.copy p{max-width:30ch}
 .tap{margin-top:26px;display:inline-flex;align-items:center;gap:9px;font-size:.62rem;
   letter-spacing:.3em;text-transform:uppercase;color:var(--sage);
   border-bottom:1px solid var(--line);padding-bottom:6px}
@@ -89,13 +92,14 @@ a{color:inherit;text-decoration:none}
   color:var(--ink);pointer-events:auto;transition:.4s}
 .btn:hover{background:var(--bark);color:var(--paper);border-color:var(--bark)}
 
-@media(max-width:860px){
+@media(max-width:900px){
   .nav-r{display:none}
-  .rail{right:4vw}
-  .piece{width:min(38vh,74vw)}
+  .rail{right:3vw}
+  .pieces{justify-content:center;padding-right:0;align-items:flex-start;padding-top:9vh}
+  .piece{width:min(62vh,92vw)}
   .copy{width:100%;max-width:none}
+  .scene:not(.centred){align-items:flex-end;padding-bottom:13vh}
   .scene .inner{padding:0 7vw}
-  .scene:not(.centred){align-items:flex-end;padding-bottom:16vh}
 }
 @media(prefers-reduced-motion:reduce){
   .piece .card{transition:none}
@@ -115,30 +119,49 @@ a{color:inherit;text-decoration:none}
   <div class="rail" id="rail"></div>
 
   <div class="pieces" id="pieces">
+
     <div class="piece" data-i="0"><div class="card">
-      <div class="face front"><img src="assets/shirt-cut.png" alt="Oversized boxy cotton t-shirt in oat"></div>
+      <div class="face front"><div class="frames">
+        <img class="on" src="assets/shirt-cut.png"      alt="Oversized boxy cotton t-shirt in oat, front">
+        <img          src="assets/shirt-3q-cut.png"   alt="The same t-shirt at three-quarter angle">
+        <img          src="assets/shirt-side-cut.png" alt="The same t-shirt in side profile">
+        <img          src="assets/shirt-back-cut.png" alt="The same t-shirt from behind">
+      </div></div>
       <div class="face back">
         <div><div class="k">Fabric</div><div class="v">14oz organic cotton</div></div>
         <div><div class="k">Fit</div><div class="v">Boxy, dropped shoulder</div></div>
         <div><div class="k">Made</div><div class="v">Porto, Portugal</div></div>
       </div>
     </div></div>
+
     <div class="piece" data-i="1"><div class="card">
-      <div class="face front"><img src="assets/cap-cut.png" alt="Unstructured six-panel cap in sage washed twill"></div>
+      <div class="face front"><div class="frames">
+        <img class="on" src="assets/cap-cut.png"      alt="Unstructured six-panel cap in sage twill">
+        <img          src="assets/cap-3q-cut.png"   alt="The same cap at three-quarter angle">
+        <img          src="assets/cap-back-cut.png" alt="The same cap from behind">
+        <img          src="assets/cap-top-cut.png"  alt="The same cap from above">
+      </div></div>
       <div class="face back">
         <div><div class="k">Fabric</div><div class="v">Washed cotton twill</div></div>
         <div><div class="k">Fit</div><div class="v">Unstructured, six-panel</div></div>
         <div><div class="k">Made</div><div class="v">Porto, Portugal</div></div>
       </div>
     </div></div>
+
     <div class="piece" data-i="2"><div class="card">
-      <div class="face front"><img src="assets/pants-cut.png" alt="Wide-leg cotton canvas trousers in clay"></div>
+      <div class="face front"><div class="frames">
+        <img class="on" src="assets/pants-cut.png"      alt="Wide-leg cotton canvas trousers in clay, front">
+        <img          src="assets/pants-3q-cut.png"   alt="The same trousers at three-quarter angle">
+        <img          src="assets/pants-side-cut.png" alt="The same trousers in side profile">
+        <img          src="assets/pants-back-cut.png" alt="The same trousers from behind">
+      </div></div>
       <div class="face back">
         <div><div class="k">Fabric</div><div class="v">12oz cotton canvas</div></div>
         <div><div class="k">Fit</div><div class="v">Wide leg, elastic back</div></div>
         <div><div class="k">Made</div><div class="v">Porto, Portugal</div></div>
       </div>
     </div></div>
+
   </div>
 
   <section class="scene centred" data-s="0"><div class="inner">
@@ -186,12 +209,12 @@ a{color:inherit;text-decoration:none}
   var rail=document.getElementById('rail');
   var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Split the wordmark so letters can scatter independently on the first handover.
+  // Wordmark split so the letters can scatter independently on the first handover.
   var wm=document.getElementById('wordmark');
   'NONE'.split('').forEach(function(ch,i){
     var s=document.createElement('span');
     s.textContent=ch;
-    s.dataset.dx=(i-1.5)*40+(i%2?18:-14);   // deterministic, not random: same every load
+    s.dataset.dx=(i-1.5)*44+(i%2?18:-14);   // deterministic, identical every load
     s.dataset.rot=(i%2?1:-1)*(14+i*5);
     wm.appendChild(s);
   });
@@ -202,6 +225,11 @@ a{color:inherit;text-decoration:none}
   }
   var dots=[].slice.call(rail.children);
 
+  // Cache each piece's angle frames and its current frame index.
+  var frameSets=pieces.map(function(p){
+    return { imgs:[].slice.call(p.querySelectorAll('.frames img')), idx:0 };
+  });
+
   pieces.forEach(function(p){
     var card=p.querySelector('.card');
     card.addEventListener('click',function(){ card.classList.toggle('flipped'); });
@@ -209,15 +237,13 @@ a{color:inherit;text-decoration:none}
 
   var target=0, cur=0, raf=null;
   function clamp(v,a,b){ return v<a?a:v>b?b:v; }
-
   function add(delta){
     target=clamp(target+delta,0,LAST);
     if(!raf) raf=requestAnimationFrame(tick);
   }
 
   window.addEventListener('wheel',function(e){
-    e.preventDefault();
-    add(e.deltaY*0.0016);
+    e.preventDefault(); add(e.deltaY*0.0016);
   },{passive:false});
 
   var touchY=null;
@@ -225,9 +251,7 @@ a{color:inherit;text-decoration:none}
   window.addEventListener('touchmove',function(e){
     if(touchY===null) return;
     var y=e.touches[0].clientY;
-    add((touchY-y)*0.006);
-    touchY=y;
-    e.preventDefault();
+    add((touchY-y)*0.006); touchY=y; e.preventDefault();
   },{passive:false});
   window.addEventListener('touchend',function(){ touchY=null; },{passive:true});
 
@@ -240,41 +264,47 @@ a{color:inherit;text-decoration:none}
 
   function tick(){
     cur += (target-cur)*(reduced?1:.075);
-    var done=Math.abs(target-cur)<.0006;
-    if(done) cur=target;
+    var settled=Math.abs(target-cur)<.0006;
+    if(settled) cur=target;
 
-    // scenes: each is fully present at its own integer stop
     for(var s=0;s<SCENES;s++){
       var v=clamp(1-Math.abs(cur-s),0,1);
-      var el=scenes[s];
-      el.style.opacity=v;
-      el.style.pointerEvents=v>.6?'auto':'none';
-      el.style.transform='translate3d(0,'+((cur-s)*-46)+'px,0)';
+      scenes[s].style.opacity=v;
+      scenes[s].style.pointerEvents=v>.6?'auto':'none';
+      scenes[s].style.transform='translate3d(0,'+((cur-s)*-46)+'px,0)';
       dots[s].classList.toggle('on',Math.round(cur)===s);
     }
 
-    // the wordmark scatters upward as scene 0 hands over to scene 1
     var esc=clamp(cur,0,1);
     for(var l=0;l<letters.length;l++){
       var L=letters[l];
-      L.style.transform='translate3d('+(L.dataset.dx*esc)+'px,'+(-esc*esc*260)+'px,0) rotate('+(L.dataset.rot*esc)+'deg)';
+      L.style.transform='translate3d('+(L.dataset.dx*esc)+'px,'+(-esc*esc*280)+'px,0) rotate('+(L.dataset.rot*esc)+'deg)';
       L.style.opacity=1-esc;
     }
 
-    // garments live on scenes 1..3
     for(var p=0;p<pieces.length;p++){
-      var pv=clamp(1-Math.abs(cur-(p+1)),0,1);
+      var local=cur-(p+1);
+      var pv=clamp(1-Math.abs(local),0,1);
       var pe=pieces[p];
       if(pv<=.004){ pe.style.opacity=0; pe.style.visibility='hidden'; continue; }
       pe.style.visibility='visible';
       pe.style.opacity=pv;
-      var off=(cur-(p+1))*70;
-      pe.style.transform='translate3d(0,'+off+'px,0) scale('+(.9+.1*pv)+')';
+      pe.style.transform='translate3d(0,'+(local*70)+'px,0) scale('+(.92+.08*pv)+')';
+
+      // Scrub the angle set across the piece's whole visible window, so the
+      // garment turns as it arrives and keeps turning as it leaves.
+      var set=frameSets[p], n=set.imgs.length;
+      var t=clamp((local+.62)/1.24,0,1);
+      var fi=Math.min(n-1,Math.floor(t*n));
+      if(fi!==set.idx){
+        set.imgs[set.idx].classList.remove('on');
+        set.imgs[fi].classList.add('on');
+        set.idx=fi;
+      }
     }
 
     hint.style.opacity=cur>.12?0:1;
-
-    if(!done) raf=requestAnimationFrame(tick); else raf=null;
+    if(!settled) raf=requestAnimationFrame(tick); else raf=null;
   }
   tick();
 })();
