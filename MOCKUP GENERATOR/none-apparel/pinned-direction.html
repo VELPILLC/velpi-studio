@@ -557,7 +557,11 @@ a{color:inherit;text-decoration:none}
           if(ok){
             set.ready=true; set.vid=v;
             show(v,host);
-            try{ v.currentTime=0; }catch(e){}
+            // Do NOT park at zero. The probe can finish while the page is
+            // already settled at a scene, and rAF has stopped — leaving the
+            // garment frozen at the wrong orientation until the next input.
+            // Wake the loop so it seeks to whatever the current position wants.
+            if(!raf) raf=requestAnimationFrame(tick);
           }else{
             loopFallback();
           }
@@ -571,8 +575,17 @@ a{color:inherit;text-decoration:none}
       v.addEventListener('canplay',probe);
       v.addEventListener('canplaythrough',probe);
       v.addEventListener('progress',probe);
+      // Removing the classes alone did not recover: show() writes INLINE
+      // opacity, which outlives any class change. A clip failing after arming
+      // stayed visible at inline opacity 1 while every still stayed at inline 0
+      // — a blank frame. The inline values have to be unwound too.
       v.addEventListener('error',function(){
-        set.ready=false; v.classList.remove('live'); host.classList.remove('has-video');
+        set.ready=false; set.looping=false; set.probing=false; set.vid=null;
+        v.classList.remove('live'); host.classList.remove('has-video');
+        v.style.opacity='0';
+        for(var i=0;i<set.imgs.length;i++) set.imgs[i].style.opacity='';
+        set.idx=-1;                       // force the still scrub to re-sync
+        if(!raf) raf=requestAnimationFrame(tick);
       });
       v.addEventListener('seeked',function(){
         clearTimeout(set.guard);
@@ -595,18 +608,48 @@ a{color:inherit;text-decoration:none}
     if(!raf) raf=requestAnimationFrame(tick);
   }
 
+  // deltaY is not always pixels. Firefox and some mice report lines, and page
+  // mode exists too — multiplying all three by one gain made the same gesture
+  // travel wildly different distances per device.
+  function wheelPx(e){
+    if(e.deltaMode===1) return e.deltaY*16;                  // lines
+    if(e.deltaMode===2) return e.deltaY*window.innerHeight;  // pages
+    return e.deltaY;                                         // pixels
+  }
   window.addEventListener('wheel',function(e){
-    e.preventDefault(); add(e.deltaY*WHEEL_GAIN);
+    if(e.ctrlKey) return;                 // pinch-zoom arrives as ctrl+wheel
+    if(Math.abs(e.deltaY)<Math.abs(e.deltaX)) return;  // horizontal gesture
+    e.preventDefault();
+    add(wheelPx(e)*WHEEL_GAIN);
   },{passive:false});
 
-  var touchY=null;
-  window.addEventListener('touchstart',function(e){ touchY=e.touches[0].clientY; },{passive:true});
+  // Track the identifier, not touches[0]: lifting a second finger used to end
+  // navigation for the finger still on the glass. touchcancel is its own event
+  // path and was leaking a stuck gesture.
+  var touchY=null, touchId=null;
+  function findTouch(list){
+    for(var i=0;i<list.length;i++) if(list[i].identifier===touchId) return list[i];
+    return null;
+  }
+  window.addEventListener('touchstart',function(e){
+    if(touchId!==null) return;
+    var t=e.changedTouches[0];
+    touchId=t.identifier; touchY=t.clientY;
+  },{passive:true});
   window.addEventListener('touchmove',function(e){
-    if(touchY===null) return;
-    var y=e.touches[0].clientY;
-    add((touchY-y)*TOUCH_GAIN); touchY=y; e.preventDefault();
+    if(touchId===null) return;
+    var t=findTouch(e.touches); if(!t) return;
+    var dy=touchY-t.clientY;
+    if(Math.abs(dy)<1.5) return;          // let a tap stay a tap
+    add(dy*TOUCH_GAIN); touchY=t.clientY; e.preventDefault();
   },{passive:false});
-  window.addEventListener('touchend',function(){ touchY=null; },{passive:true});
+  function endTouch(e){
+    if(touchId===null) return;
+    if(e && e.changedTouches && !findTouch(e.changedTouches)) return;
+    touchId=null; touchY=null;
+  }
+  window.addEventListener('touchend',endTouch,{passive:true});
+  window.addEventListener('touchcancel',endTouch,{passive:true});
 
   window.addEventListener('keydown',function(e){
     if(['ArrowDown','PageDown',' '].indexOf(e.key)>-1){ e.preventDefault(); add(KEY_STEP); }
@@ -615,15 +658,40 @@ a{color:inherit;text-decoration:none}
     if(e.key==='End'){ e.preventDefault(); target=LAST; if(!raf) raf=requestAnimationFrame(tick); }
   });
 
-  function tick(){
-    cur += (target-cur)*(reduced?1:FOLLOW);
+  var lastTs=0;
+  function tick(ts){
+    // Cleared at the START of the callback, not the end. Held until the end, an
+    // exception anywhere below left `raf` holding an id that had already fired,
+    // so every later `if(!raf)` refused to schedule and the loop was dead.
+    raf=null;
+
+    var dt=(ts&&lastTs)?Math.min(64,ts-lastTs):16.7;
+    lastTs=ts||0;
+    // Frame-rate independent damping. A fixed per-frame factor settled in about
+    // 2.9s at 60Hz but 1.4s at 120Hz — the same page moved at two speeds
+    // depending on the monitor.
+    var k=reduced?1:(1-Math.pow(1-FOLLOW,dt/16.7));
+    cur += (target-cur)*k;
+
     var settled=Math.abs(target-cur)<.0006;
-    if(settled) cur=target;
+    if(settled){
+      cur=target;
+      // FALLOFF leaves a band around each midpoint where NO scene is lit. Easing
+      // could come to rest inside it and simply stay there, on an empty screen.
+      // Settling snaps to the nearest scene so a resting page always shows one.
+      var snap=clamp(Math.round(target),0,LAST);
+      if(Math.abs(target-snap)>0.0006){ target=snap; settled=false; }
+    }
 
     for(var s=0;s<SCENES;s++){
       var v=ease(clamp(1-Math.abs(cur-s)*FALLOFF,0,1));
       scenes[s].style.opacity=v;
-      scenes[s].style.pointerEvents=v>.6?'auto':'none';
+      // The scene is a full-viewport layer at z-index 3, above the garments at
+      // 2. Making it pointer-interactive swallowed every click aimed at a
+      // garment, so tap-to-turn silently stopped working exactly when the scene
+      // was most visible. It stays transparent to the pointer; the few things
+      // inside it that need clicks opt in themselves via CSS.
+      scenes[s].style.pointerEvents='none';
       scenes[s].style.transform='translate3d(0,'+((cur-s)*-38)+'px,0)';
       dots[s].classList.toggle('on',Math.round(cur)===s);
     }
@@ -675,7 +743,8 @@ a{color:inherit;text-decoration:none}
     }
 
     hint.style.opacity=cur>.12?0:1;
-    if(!settled) raf=requestAnimationFrame(tick); else raf=null;
+    if(!settled) raf=requestAnimationFrame(tick);
+    else lastTs=0;                 // next start measures its own first frame
   }
   tick();
 })();
