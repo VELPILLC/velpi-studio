@@ -27,8 +27,13 @@ a{color:inherit;text-decoration:none}
 
 #viewport{position:fixed;inset:0;overflow:hidden}
 
-/* Procedural grain over the whole page. Seamless and weightless, where a tiled
-   photo of paper would show its repeat and cost a megabyte. */
+/* The sand. A WebGL height field, drawn behind every piece of content and never
+   over it. Static until the cursor disturbs it — there is no time uniform, so
+   an untouched screen is perfectly still rather than idly animating. */
+#sand{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;
+  pointer-events:none}
+/* Fallback grain, kept for when WebGL is unavailable. Turned down to a whisper
+   when the sand is live so the two never stack. */
 .grain{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:.42;
   mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E")}
@@ -101,12 +106,14 @@ a{color:inherit;text-decoration:none}
 
 /* Copy sits in the half the garment does not occupy, and is sized to actually
    fill it — at the old scale the column read as mostly empty space. */
-.copy{width:min(560px,40vw)}
+/* Wide enough to run almost to the sheet without touching it, and sized so the
+   column reads as a facing page rather than a caption stranded in space. */
+.copy{width:min(820px,43vw)}
 .scene.copy-right .copy{text-align:right}
-.copy .num{font-family:var(--serif);font-size:clamp(2.6rem,3.4vw,3.6rem);
+.copy .num{font-family:var(--serif);font-size:clamp(2.8rem,4vw,4.2rem);
   color:var(--line);line-height:1}
-.copy h2{font-size:clamp(2.8rem,5vw,4.5rem);margin:14px 0 24px}
-.copy p{font-size:clamp(1.05rem,1.5vw,1.4rem);line-height:1.75;max-width:26ch}
+.copy h2{font-size:clamp(3.4rem,6.4vw,6.2rem);margin:16px 0 28px}
+.copy p{font-size:clamp(1.25rem,1.85vw,1.75rem);line-height:1.7;max-width:26ch}
 .scene.copy-right .copy p{margin-left:auto}
 .tap{margin-top:34px;display:inline-flex;align-items:center;gap:10px;font-size:.72rem;
   letter-spacing:.3em;text-transform:uppercase;color:var(--sage);
@@ -115,9 +122,12 @@ a{color:inherit;text-decoration:none}
   animation:pulse 3.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 
-.closing{max-width:30ch;margin:0 auto}
-.closing h2{font-size:clamp(2.8rem,6vw,5rem);margin-bottom:26px}
-.closing p{font-size:clamp(1.05rem,1.5vw,1.35rem);line-height:1.8}
+/* The closing was running at 30ch down the middle of a wide screen, which read
+   as a thin ribbon. Given room it becomes a statement. */
+.closing{max-width:min(1100px,74vw);margin:0 auto}
+.closing h2{font-size:clamp(3.4rem,7.5vw,7rem);margin-bottom:30px}
+.closing p{font-size:clamp(1.25rem,1.9vw,1.7rem);line-height:1.75;
+  max-width:46ch;margin-left:auto;margin-right:auto}
 .btn{display:inline-block;margin-top:40px;font-size:.74rem;letter-spacing:.3em;
   text-transform:uppercase;border:1px solid var(--line);padding:18px 46px;
   color:var(--ink);pointer-events:auto;transition:.5s}
@@ -144,6 +154,8 @@ a{color:inherit;text-decoration:none}
 <body>
 <div class="velpi-page">
 <div id="viewport">
+
+  <canvas id="sand"></canvas>
 
   <div class="pieces" id="pieces">
 
@@ -246,6 +258,160 @@ a{color:inherit;text-decoration:none}
 
 </div>
 </div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   SAND
+   A WebGL height field. fBm noise gives the grain, normals come from the height
+   gradient, and a fixed directional light gives every grain relief so it reads
+   as a surface rather than a pattern. The cursor pushes grains radially away
+   and leaves a groove that settles behind it.
+
+   There is deliberately NO time uniform. An untouched screen does not move at
+   all, which is the difference between sand that is stamped into the page and
+   sand that looks animated. The loop also stops entirely once the groove has
+   settled, so an idle tab costs nothing.
+--------------------------------------------------------------------------- */
+(function(){
+  'use strict';
+  var canvas=document.getElementById('sand');
+  if(!canvas) return;
+  var gl=null;
+  try{ gl=canvas.getContext('webgl',{antialias:false,alpha:false,depth:false})
+         ||canvas.getContext('experimental-webgl',{antialias:false,alpha:false,depth:false}); }
+  catch(e){}
+  if(!gl) return;                       // CSS grain stays as the fallback
+
+  var TRAIL=10;
+  var VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+  var FS=[
+  'precision highp float;',
+  'uniform vec2 uRes;',
+  'uniform vec3 uTint;',
+  'uniform vec2 uTrail['+TRAIL+'];',
+  'uniform float uStr['+TRAIL+'];',
+  'float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}',
+  'float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);',
+  '  return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),u.x),',
+  '             mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),u.x),u.y);}',
+  'float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<5;i++){v+=a*vnoise(p);p*=2.03;a*=0.5;}return v;}',
+  // Grains are pushed outward from each trail point, strongest at the cursor.
+  'vec2 push(vec2 q){vec2 d=vec2(0.0);',
+  '  for(int i=0;i<'+TRAIL+';i++){',
+  '    float s=uStr[i]; if(s<=0.002) continue;',
+  '    vec2 v=q-uTrail[i]; float L=length(v)+1e-5;',
+  '    float f=exp(-(L*L)/0.0060);',
+  '    d+=(v/L)*f*s*0.030;',
+  '  } return d;}',
+  'float H(vec2 q){vec2 a=vec2(uRes.x/uRes.y,1.0);return fbm((q+push(q))*a*190.0);}',
+  'void main(){',
+  '  vec2 uv=gl_FragCoord.xy/uRes;',
+  '  float e=1.4/uRes.y;',
+  '  float h=H(uv), hx=H(uv+vec2(e,0.0)), hy=H(uv+vec2(0.0,e));',
+  '  vec3 n=normalize(vec3((h-hx)/e,(h-hy)/e,26.0));',
+  '  vec3 L=normalize(vec3(-0.42,0.66,0.62));',
+  '  float d=clamp(dot(n,L),0.0,1.0);',
+  '  float shade=mix(0.955,1.045,d);',
+  // A shallow bowl of shadow under the cursor so the groove reads as depth.
+  '  float bowl=0.0;',
+  '  for(int i=0;i<'+TRAIL+';i++){ float s=uStr[i]; if(s<=0.002) continue;',
+  '    vec2 v=uv-uTrail[i]; bowl+=exp(-dot(v,v)/0.0042)*s; }',
+  '  shade*=1.0-clamp(bowl,0.0,1.0)*0.055;',
+  '  gl_FragColor=vec4(uTint*shade,1.0);}'
+  ].join('\n');
+
+  function sh(type,src){
+    var s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) return null;
+    return s;
+  }
+  var vs=sh(gl.VERTEX_SHADER,VS), fs=sh(gl.FRAGMENT_SHADER,FS);
+  if(!vs||!fs) return;
+  var prog=gl.createProgram();
+  gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) return;
+  gl.useProgram(prog);
+
+  var buf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  var loc=gl.getAttribLocation(prog,'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+  var uRes=gl.getUniformLocation(prog,'uRes'),
+      uTint=gl.getUniformLocation(prog,'uTint'),
+      uTrail=gl.getUniformLocation(prog,'uTrail'),
+      uStr=gl.getUniformLocation(prog,'uStr');
+
+  // Light tints of the piece each scene presents.
+  var PAL=[[0.914,0.882,0.827],   // mark  — warm neutral
+           [0.929,0.898,0.843],   // shirt — oat
+           [0.918,0.863,0.796],   // pants — clay
+           [0.890,0.898,0.847],   // cap   — sage
+           [0.914,0.882,0.827]];  // close — warm neutral
+  var tint=PAL[0].slice(), want=PAL[0].slice();
+
+  var trail=new Float32Array(TRAIL*2), str=new Float32Array(TRAIL);
+  var raf=null, dpr=1;
+
+  function size(){
+    dpr=Math.min(window.devicePixelRatio||1,1.6);
+    var w=Math.round(canvas.clientWidth*dpr), h=Math.round(canvas.clientHeight*dpr);
+    if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; }
+    gl.viewport(0,0,canvas.width,canvas.height);
+  }
+
+  function draw(){
+    gl.uniform2f(uRes,canvas.width,canvas.height);
+    gl.uniform3f(uTint,tint[0],tint[1],tint[2]);
+    gl.uniform2fv(uTrail,trail);
+    gl.uniform1fv(uStr,str);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+
+  function busy(){
+    for(var i=0;i<TRAIL;i++) if(str[i]>0.003) return true;
+    return Math.abs(tint[0]-want[0])+Math.abs(tint[1]-want[1])+Math.abs(tint[2]-want[2])>0.0012;
+  }
+
+  function frame(){
+    for(var i=0;i<TRAIL;i++) str[i]*=0.938;          // the groove settles
+    for(var c=0;c<3;c++) tint[c]+=(want[c]-tint[c])*0.05;
+    draw();
+    raf=busy()?requestAnimationFrame(frame):null;    // idle costs nothing
+  }
+  function kick(){ if(!raf) raf=requestAnimationFrame(frame); }
+
+  window.addEventListener('pointermove',function(e){
+    for(var i=TRAIL-1;i>0;i--){
+      trail[i*2]=trail[(i-1)*2]; trail[i*2+1]=trail[(i-1)*2+1];
+      str[i]=str[i-1]*0.94;
+    }
+    trail[0]=e.clientX/window.innerWidth;
+    trail[1]=1.0-e.clientY/window.innerHeight;       // GL origin is bottom-left
+    str[0]=1.0;
+    kick();
+  },{passive:true});
+
+  var rt=null;
+  window.addEventListener('resize',function(){
+    clearTimeout(rt); rt=setTimeout(function(){ size(); draw(); },140);
+  },{passive:true});
+
+  // Scenes hand their index over; the ground takes the colour of the piece.
+  window.__sandScene=function(i){
+    var t=PAL[Math.max(0,Math.min(PAL.length-1,i))];
+    if(t[0]===want[0]&&t[1]===want[1]&&t[2]===want[2]) return;
+    want=t.slice();
+    document.body.style.background='rgb('+Math.round(t[0]*255)+','+Math.round(t[1]*255)+','+Math.round(t[2]*255)+')';
+    kick();
+  };
+
+  size(); draw();
+  document.querySelector('.grain').style.opacity='.16';  // sand carries the texture now
+})();
+</script>
 
 <script>
 (function(){
@@ -384,7 +550,7 @@ a{color:inherit;text-decoration:none}
     card.addEventListener('click',function(){ card.classList.toggle('flipped'); });
   });
 
-  var target=0, cur=0, raf=null;
+  var target=0, cur=0, raf=null, lastScene=-1;
   function add(delta){
     target=clamp(target+delta,0,LAST);
     if(!raf) raf=requestAnimationFrame(tick);
@@ -421,6 +587,13 @@ a{color:inherit;text-decoration:none}
       scenes[s].style.pointerEvents=v>.6?'auto':'none';
       scenes[s].style.transform='translate3d(0,'+((cur-s)*-38)+'px,0)';
       dots[s].classList.toggle('on',Math.round(cur)===s);
+    }
+
+    // The ground takes the colour of whatever piece is being presented.
+    var near=clamp(Math.round(cur),0,SCENES-1);
+    if(near!==lastScene){
+      lastScene=near;
+      if(window.__sandScene) window.__sandScene(near);
     }
 
     var esc=clamp(cur,0,1);
