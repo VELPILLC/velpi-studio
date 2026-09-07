@@ -299,6 +299,16 @@ a{color:inherit;text-decoration:none}
   '  return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),u.x),',
   '             mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),u.x),u.y);}',
   'float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<5;i++){v+=a*vnoise(p);p*=2.03;a*=0.5;}return v;}',
+  // Individual grains. fBm on its own is a continuous field and reads as haze;
+  // real sand is discrete specks, only some cells holding one, each catching
+  // the light on its own. Brightness varies per grain so they do not glitter
+  // uniformly.
+  'float specks(vec2 p){',
+  '  vec2 c=floor(p); float h=hash(c);',
+  '  float present=step(0.855,h);',
+  '  vec2 f=fract(p)-0.5;',
+  '  float d=length(f - (vec2(hash(c+7.3),hash(c+3.1))-0.5)*0.45);',
+  '  return present*smoothstep(0.30,0.02,d)*(0.45+0.55*fract(h*37.0));}',
   // Grains are pushed outward from each trail point. The gaussian is kept tight
   // and the displacement small: ten wide overlapping pushes was what smeared the
   // surface into blur rather than moving individual grains.
@@ -325,6 +335,15 @@ a{color:inherit;text-decoration:none}
   '  vec3 L=normalize(vec3(-0.42,0.66,0.62));',
   '  float d=clamp(dot(n,L),0.0,1.0);',
   '  float shade=mix(0.938,1.062,d);',
+  // Grain density is graded by a slow field, so the surface is coarser in some
+  // stretches and finer in others rather than evenly speckled everywhere. The
+  // specks ride the same displacement, so they move with the push.
+  '  vec2 ar=vec2(uRes.x/uRes.y,1.0);',
+  '  vec2 sp=(uv+push(uv))*ar;',
+  '  float density=0.35+0.65*fbm(sp*6.0);',
+  '  float grains=specks(sp*1100.0)*density;',
+  '  shade+=grains*0.055;',
+  '  shade-=specks(sp*1100.0+vec2(0.37,0.19))*density*0.028;',
   // A shallow bowl of shadow under the cursor so the groove reads as depth.
   // Tighter than before, so the edge stays soft without going muddy.
   '  float bowl=0.0;',
