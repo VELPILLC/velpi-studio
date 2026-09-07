@@ -11,8 +11,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Inter:wght@300;400;500&display=swap');
 
 :root{
-  --paper:#E9E1D3; --paper-warm:#E2D8C6; --bark:#2E2823; --ink:#3A332C;
-  --soft:#796F62; --sage:#7B8A6E; --line:#C9BCA6;
+  --paper:#D9CFBB; --paper-warm:#D2C6AE; --bark:#2E2823; --ink:#332D26;
+  /* Deepened along with the ground. Against the new sage tint the old --soft
+     measured about 2.8:1, under the 4.5:1 body copy needs; this lands near 5:1
+     on the darkest of the four sections. --line follows so the section
+     numerals do not disappear into a mid-tone background. */
+  --soft:#524A3F; --sage:#63734F; --line:#AFA286;
   --serif:'Cormorant Garamond',Georgia,serif;
   --sans:'Inter',system-ui,sans-serif;
 }
@@ -295,28 +299,38 @@ a{color:inherit;text-decoration:none}
   '  return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),u.x),',
   '             mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),u.x),u.y);}',
   'float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<5;i++){v+=a*vnoise(p);p*=2.03;a*=0.5;}return v;}',
-  // Grains are pushed outward from each trail point, strongest at the cursor.
+  // Grains are pushed outward from each trail point. The gaussian is kept tight
+  // and the displacement small: ten wide overlapping pushes was what smeared the
+  // surface into blur rather than moving individual grains.
   'vec2 push(vec2 q){vec2 d=vec2(0.0);',
   '  for(int i=0;i<'+TRAIL+';i++){',
-  '    float s=uStr[i]; if(s<=0.002) continue;',
+  '    float s=uStr[i]; if(s<=0.004) continue;',
   '    vec2 v=q-uTrail[i]; float L=length(v)+1e-5;',
-  '    float f=exp(-(L*L)/0.0060);',
-  '    d+=(v/L)*f*s*0.030;',
+  '    float f=exp(-(L*L)/0.0022);',
+  '    d+=(v/L)*f*s*0.016;',
   '  } return d;}',
-  'float H(vec2 q){vec2 a=vec2(uRes.x/uRes.y,1.0);return fbm((q+push(q))*a*190.0);}',
+  // Real sand is fine grain sitting on a broader drift. One frequency alone
+  // reads as television static; two, weighted apart, reads as a surface.
+  'float H(vec2 q){',
+  '  vec2 a=vec2(uRes.x/uRes.y,1.0);',
+  '  vec2 p=(q+push(q))*a;',
+  '  float grain=fbm(p*520.0);',
+  '  float drift=fbm(p*26.0);',
+  '  return grain*0.74+drift*0.26;}',
   'void main(){',
   '  vec2 uv=gl_FragCoord.xy/uRes;',
-  '  float e=1.4/uRes.y;',
+  '  float e=1.0/uRes.y;',
   '  float h=H(uv), hx=H(uv+vec2(e,0.0)), hy=H(uv+vec2(0.0,e));',
-  '  vec3 n=normalize(vec3((h-hx)/e,(h-hy)/e,26.0));',
+  '  vec3 n=normalize(vec3((h-hx)/e,(h-hy)/e,18.0));',
   '  vec3 L=normalize(vec3(-0.42,0.66,0.62));',
   '  float d=clamp(dot(n,L),0.0,1.0);',
-  '  float shade=mix(0.955,1.045,d);',
+  '  float shade=mix(0.938,1.062,d);',
   // A shallow bowl of shadow under the cursor so the groove reads as depth.
+  // Tighter than before, so the edge stays soft without going muddy.
   '  float bowl=0.0;',
-  '  for(int i=0;i<'+TRAIL+';i++){ float s=uStr[i]; if(s<=0.002) continue;',
-  '    vec2 v=uv-uTrail[i]; bowl+=exp(-dot(v,v)/0.0042)*s; }',
-  '  shade*=1.0-clamp(bowl,0.0,1.0)*0.055;',
+  '  for(int i=0;i<'+TRAIL+';i++){ float s=uStr[i]; if(s<=0.004) continue;',
+  '    vec2 v=uv-uTrail[i]; bowl+=exp(-dot(v,v)/0.0020)*s; }',
+  '  shade*=1.0-clamp(bowl,0.0,1.0)*0.045;',
   '  gl_FragColor=vec4(uTint*shade,1.0);}'
   ].join('\n');
 
@@ -344,12 +358,14 @@ a{color:inherit;text-decoration:none}
       uTrail=gl.getUniformLocation(prog,'uTrail'),
       uStr=gl.getUniformLocation(prog,'uStr');
 
-  // Light tints of the piece each scene presents.
-  var PAL=[[0.914,0.882,0.827],   // mark  — warm neutral
-           [0.929,0.898,0.843],   // shirt — oat
-           [0.918,0.863,0.796],   // pants — clay
-           [0.890,0.898,0.847],   // cap   — sage
-           [0.914,0.882,0.827]];  // close — warm neutral
+  // Tints of the piece each scene presents. Deliberately deeper than a wash —
+  // the first pass sat so close to white that the ground read as unlit paper
+  // rather than as the colour of the garment.
+  var PAL=[[0.851,0.812,0.733],   // mark  — warm neutral  #D9CFBB
+           [0.863,0.820,0.737],   // shirt — oat           #DCD1BC
+           [0.824,0.737,0.635],   // pants — clay          #D2BCA2
+           [0.749,0.776,0.675],   // cap   — sage          #BFC6AC
+           [0.851,0.812,0.733]];  // close — warm neutral  #D9CFBB
   var tint=PAL[0].slice(), want=PAL[0].slice();
 
   var trail=new Float32Array(TRAIL*2), str=new Float32Array(TRAIL);
@@ -418,7 +434,11 @@ a{color:inherit;text-decoration:none}
   'use strict';
   var SCENES=5, LAST=SCENES-1;
 
-  var WHEEL_GAIN=0.00075, TOUCH_GAIN=0.0030, KEY_STEP=0.34, FOLLOW=0.042;
+  var WHEEL_GAIN=0.00042, TOUCH_GAIN=0.0018, KEY_STEP=0.22, FOLLOW=0.042;
+  // How many full turns a garment makes across its own section. One pass was
+  // over before there was time to read the copy beside it; letting the turn
+  // cycle means you can keep scrolling and it keeps spinning.
+  var SPINS=2.5;
   // Falloff sharpness. At 1 a piece is only gone a full step away, which let the
   // trousers arrive while the shirt's copy was still being read. At 2.05 each
   // one is fully clear by roughly half a step, so only one thing is ever on
@@ -615,7 +635,11 @@ a{color:inherit;text-decoration:none}
       // The turn still reads across the piece's whole approach and exit, even
       // though the piece is only fully opaque near its own stop.
       var set=frameSets[p];
-      var t=clamp((local+.62)/1.24,0,1);
+      // Cycles instead of running once, so the piece keeps turning for as long
+      // as there is scroll left in its section. The clip is a full 360, so
+      // wrapping back to zero is seamless rather than a visible cut.
+      var span=clamp((local+.62)/1.24,0,1)*SPINS;
+      var t=span-Math.floor(span);
       if(set.ready){
         seekTo(set,t);
       }else if(set.looping){
