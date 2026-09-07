@@ -286,7 +286,9 @@ a{color:inherit;text-decoration:none}
   catch(e){}
   if(!gl) return;                       // CSS grain stays as the fallback
 
-  var TRAIL=10;
+  // A longer trail with a slower decay leaves an actual path behind the cursor
+  // rather than one sticky blob following it around.
+  var TRAIL=18;
   var VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
   var FS=[
   'precision highp float;',
@@ -298,72 +300,91 @@ a{color:inherit;text-decoration:none}
   'float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);',
   '  return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),u.x),',
   '             mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),u.x),u.y);}',
-  'float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<5;i++){v+=a*vnoise(p);p*=2.03;a*=0.5;}return v;}',
-  // Individual grains. fBm on its own is a continuous field and reads as haze;
-  // real sand is discrete specks, only some cells holding one, each catching
-  // the light on its own. Brightness varies per grain so they do not glitter
-  // uniformly.
-  'float specks(vec2 p){',
+  // Three octaves, not five. The 4th and 5th had cell widths of 0.17 and 0.08
+  // pixels at 720p — pure aliasing, invisible as detail, and paid for on every
+  // one of the three H() evaluations per fragment.
+  'float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<3;i++){v+=a*vnoise(p);p*=2.03;a*=0.5;}return v;}',
+  // Grains with real height, not painted flecks. Each is a dome with its own
+  // radius and elevation, jittered off the lattice. This feeds H(), so grains
+  // generate their own normals instead of borrowing lighting from an unrelated
+  // field — which is what made the surface read as embossed noise.
+  // `thresh` varies occupancy: lowering it puts MORE grains in play, where the
+  // old version multiplied brightness afterwards and left the count fixed.
+  'float grains(vec2 p,float thresh){',
   '  vec2 c=floor(p); float h=hash(c);',
-  '  float present=step(0.855,h);',
-  '  vec2 f=fract(p)-0.5;',
-  '  float d=length(f - (vec2(hash(c+7.3),hash(c+3.1))-0.5)*0.45);',
-  '  return present*smoothstep(0.30,0.02,d)*(0.45+0.55*fract(h*37.0));}',
+  '  if(h<thresh) return 0.0;',
+  '  vec2 jit=(vec2(hash(c+7.3),hash(c+3.1))-0.5)*0.5;',
+  '  float d=length(fract(p)-0.5-jit);',
+  '  float r=0.20+0.18*fract(h*37.0);',
+  '  float m=1.0-smoothstep(0.0,r,d);',   // ascending edges: reversed is undefined
+  '  return m*m*(0.55+0.45*fract(h*91.0));}',
   // Grains are pushed outward from each trail point. The gaussian is kept tight
   // and the displacement small: ten wide overlapping pushes was what smeared the
   // surface into blur rather than moving individual grains.
+  // v is left UN-normalised, so the push is zero exactly at the cursor and
+  // grows smoothly outward. Normalising gave a unit vector at the centre and a
+  // near-singular slope there, which is what read as a sticky glossy blob
+  // dragging around rather than grains being displaced.
   'vec2 push(vec2 q){vec2 d=vec2(0.0);',
   '  for(int i=0;i<'+TRAIL+';i++){',
-  '    float s=uStr[i]; if(s<=0.004) continue;',
-  '    vec2 v=q-uTrail[i]; float L=length(v)+1e-5;',
-  '    float f=exp(-(L*L)/0.0022);',
-  '    d+=(v/L)*f*s*0.016;',
+  '    float s=uStr[i]; if(s<=0.003) continue;',
+  '    vec2 v=q-uTrail[i];',
+  '    d+=v*exp(-dot(v,v)/0.0042)*s*0.85;',
   '  } return d;}',
-  // Real sand is fine grain sitting on a broader drift. One frequency alone
-  // reads as television static; two, weighted apart, reads as a surface.
+  // Grains are part of the HEIGHT now, not paint on top of it, so each one
+  // generates its own normal. Sampling is subtracted, not added: adding warps
+  // the material inward when the intent is to push it outward.
   'float H(vec2 q){',
   '  vec2 a=vec2(uRes.x/uRes.y,1.0);',
-  '  vec2 p=(q+push(q))*a;',
-  '  float grain=fbm(p*520.0);',
-  '  float drift=fbm(p*26.0);',
-  '  return grain*0.74+drift*0.26;}',
+  '  vec2 p=(q-push(q))*a;',
+  '  float drift=fbm(p*24.0);',
+  '  float fine=fbm(p*150.0);',
+  '  float thresh=0.62-0.14*drift;',      // occupancy varies, not brightness
+  '  float g=grains(p*260.0,thresh);',
+  '  return drift*0.26+fine*0.22+g*0.52;}',
   'void main(){',
   '  vec2 uv=gl_FragCoord.xy/uRes;',
   '  float e=1.0/uRes.y;',
   '  float h=H(uv), hx=H(uv+vec2(e,0.0)), hy=H(uv+vec2(0.0,e));',
-  '  vec3 n=normalize(vec3((h-hx)/e,(h-hy)/e,18.0));',
+  '  vec3 n=normalize(vec3((h-hx)/e,(h-hy)/e,14.0));',
   '  vec3 L=normalize(vec3(-0.42,0.66,0.62));',
   '  float d=clamp(dot(n,L),0.0,1.0);',
-  '  float shade=mix(0.938,1.062,d);',
-  // Grain density is graded by a slow field, so the surface is coarser in some
-  // stretches and finer in others rather than evenly speckled everywhere. The
-  // specks ride the same displacement, so they move with the push.
-  '  vec2 ar=vec2(uRes.x/uRes.y,1.0);',
-  '  vec2 sp=(uv+push(uv))*ar;',
-  '  float density=0.35+0.65*fbm(sp*6.0);',
-  '  float grains=specks(sp*1100.0)*density;',
-  '  shade+=grains*0.055;',
-  '  shade-=specks(sp*1100.0+vec2(0.37,0.19))*density*0.028;',
-  // A shallow bowl of shadow under the cursor so the groove reads as depth.
-  // Tighter than before, so the edge stays soft without going muddy.
-  '  float bowl=0.0;',
-  '  for(int i=0;i<'+TRAIL+';i++){ float s=uStr[i]; if(s<=0.004) continue;',
-  '    vec2 v=uv-uTrail[i]; bowl+=exp(-dot(v,v)/0.0020)*s; }',
-  '  shade*=1.0-clamp(bowl,0.0,1.0)*0.045;',
+  // Wider range than before: a 0.124 span could not let a cavity go dark, so
+  // nothing between grains ever read as shadow.
+  '  float shade=mix(0.855,1.105,d);',
+  // Contact darkening: low ground between grains sits in its own shade. This is
+  // the occlusion that was missing, and it does more for realism than the
+  // shifted dark speck it replaces.
+  '  shade*=mix(0.90,1.0,clamp(h*1.5,0.0,1.0));',
   '  gl_FragColor=vec4(uTint*shade,1.0);}'
   ].join('\n');
 
+  // A WebGL context is OPAQUE. Bailing out without hiding the canvas leaves a
+  // black rectangle sitting over the entire page — which is exactly what a
+  // broken shader did. Never return from here without taking the canvas away.
+  function fail(why,log){
+    canvas.style.display='none';
+    if(window.console&&console.warn) console.warn('sand: '+why,log||'');
+    return null;
+  }
   function sh(type,src){
     var s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
-    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) return null;
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+      return fail('shader compile failed',gl.getShaderInfoLog(s));
     return s;
   }
   var vs=sh(gl.VERTEX_SHADER,VS), fs=sh(gl.FRAGMENT_SHADER,FS);
-  if(!vs||!fs) return;
+  if(!vs||!fs){ fail('no shader'); return; }
   var prog=gl.createProgram();
   gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog);
-  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) return;
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){
+    fail('link failed',gl.getProgramInfoLog(prog)); return;
+  }
   gl.useProgram(prog);
+  // A lost context is the same black-rectangle problem by another route.
+  canvas.addEventListener('webglcontextlost',function(e){
+    e.preventDefault(); canvas.style.display='none';
+  });
 
   var buf=gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER,buf);
@@ -411,7 +432,7 @@ a{color:inherit;text-decoration:none}
   }
 
   function frame(){
-    for(var i=0;i<TRAIL;i++) str[i]*=0.938;          // the groove settles
+    for(var i=0;i<TRAIL;i++) str[i]*=0.972;          // the path settles slowly
     for(var c=0;c<3;c++) tint[c]+=(want[c]-tint[c])*0.05;
     draw();
     raf=busy()?requestAnimationFrame(frame):null;    // idle costs nothing
@@ -421,7 +442,7 @@ a{color:inherit;text-decoration:none}
   window.addEventListener('pointermove',function(e){
     for(var i=TRAIL-1;i>0;i--){
       trail[i*2]=trail[(i-1)*2]; trail[i*2+1]=trail[(i-1)*2+1];
-      str[i]=str[i-1]*0.94;
+      str[i]=str[i-1]*0.975;
     }
     trail[0]=e.clientX/window.innerWidth;
     trail[1]=1.0-e.clientY/window.innerHeight;       // GL origin is bottom-left
