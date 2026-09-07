@@ -340,7 +340,7 @@ a{color:inherit;text-decoration:none}
   '  float drift=fbm(p*24.0);',
   '  float fine=fbm(p*150.0);',
   '  float thresh=0.62-0.14*drift;',      // occupancy varies, not brightness
-  '  float g=grains(p*260.0,thresh);',
+  '  float g=grains(p*185.0,thresh);',
   '  return drift*0.26+fine*0.22+g*0.52;}',
   'void main(){',
   '  vec2 uv=gl_FragCoord.xy/uRes;',
